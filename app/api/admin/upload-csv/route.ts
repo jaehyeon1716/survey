@@ -1,9 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
-// 서버사이드에서 사용할 Supabase 클라이언트
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-
 // 토큰 생성 함수
 function generateToken(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
@@ -40,6 +37,15 @@ function parseCSV(csvText: string): Array<{ hospital_name: string; participant_n
 
 export async function POST(request: NextRequest) {
   try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (!supabaseUrl || !supabaseKey) {
+      return NextResponse.json({ error: "Supabase 환경 변수가 설정되지 않았습니다." }, { status: 500 })
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseKey)
+
     const formData = await request.formData()
     const file = formData.get("csvFile") as File
 
