@@ -4,20 +4,8 @@ import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { supabase, type SurveyData } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase/client"
 import { CheckCircle, Heart, AlertCircle, User, Building2 } from "lucide-react"
-
-const questions = [
-  "병원 직원들이 친절하게 대해주었습니까?",
-  "진료 대기시간이 적절했습니까?",
-  "의료진의 설명이 이해하기 쉬웠습니까?",
-  "병원 시설이 깨끗하고 쾌적했습니까?",
-  "진료 결과에 만족하십니까?",
-  "병원 접근성(교통, 주차 등)이 편리했습니까?",
-  "예약 및 접수 과정이 편리했습니까?",
-  "병원비가 적절하다고 생각하십니까?",
-  "이 병원을 다른 사람에게 추천하시겠습니까?",
-]
 
 const scaleLabels = [
   { value: 5, label: "매우 그렇다", color: "bg-green-500" },
@@ -29,11 +17,25 @@ const scaleLabels = [
 
 type Participant = {
   id: number
+  survey_id: number
   token: string
   hospital_name: string
   participant_name: string
   phone_number: string
-  survey_completed: boolean
+  is_completed: boolean
+}
+
+type Survey = {
+  id: number
+  title: string
+  description: string
+  is_active: boolean
+}
+
+type Question = {
+  id: number
+  question_number: number
+  question_text: string
 }
 
 export default function HospitalSurvey() {
@@ -41,7 +43,9 @@ export default function HospitalSurvey() {
   const token = params.token as string
 
   const [participant, setParticipant] = useState<Participant | null>(null)
-  const [answers, setAnswers] = useState<Partial<SurveyData>>({})
+  const [survey, setSurvey] = useState<Survey | null>(null)
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [answers, setAnswers] = useState<Record<number, number>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [currentQuestion, setCurrentQuestion] = useState(0)
@@ -49,7 +53,7 @@ export default function HospitalSurvey() {
   const [error, setError] = useState("")
 
   useEffect(() => {
-    const validateToken = async () => {
+    const validateTokenAndLoadSurvey = async () => {
       if (!token) {
         setError("유효하지 않은 접근입니다. 올바른 링크를 통해 접속해 주세요.")
         setLoading(false)
@@ -63,10 +67,17 @@ export default function HospitalSurvey() {
       }
 
       try {
-        // 토큰으로 참여자 정보 조회
         const { data: participantData, error: participantError } = await supabase
           .from("survey_participants")
-          .select("*")
+          .select(`
+            *,
+            surveys (
+              id,
+              title,
+              description,
+              is_active
+            )
+          `)
           .eq("token", token)
           .single()
 
@@ -76,14 +87,47 @@ export default function HospitalSurvey() {
           return
         }
 
-        // 이미 완료된 설문인지 확인
-        if (participantData.survey_completed) {
+        if (participantData.is_completed) {
           setError("이미 완료된 설문입니다. 감사합니다.")
           setLoading(false)
           return
         }
 
+        if (!participantData.surveys?.is_active) {
+          setError("현재 비활성화된 설문입니다. 관리자에게 문의해 주세요.")
+          setLoading(false)
+          return
+        }
+
         setParticipant(participantData)
+        setSurvey(participantData.surveys)
+
+        const { data: questionsData, error: questionsError } = await supabase
+          .from("survey_questions")
+          .select("*")
+          .eq("survey_id", participantData.survey_id)
+          .order("question_number", { ascending: true })
+
+        if (questionsError || !questionsData || questionsData.length === 0) {
+          setError("설문 문항을 불러올 수 없습니다. 관리자에게 문의해 주세요.")
+          setLoading(false)
+          return
+        }
+
+        setQuestions(questionsData)
+
+        const { data: existingResponses, error: responsesError } = await supabase
+          .from("survey_responses")
+          .select("question_id, response_value")
+          .eq("participant_token", token)
+
+        if (!responsesError && existingResponses) {
+          const existingAnswers: Record<number, number> = {}
+          existingResponses.forEach((response) => {
+            existingAnswers[response.question_id] = response.response_value
+          })
+          setAnswers(existingAnswers)
+        }
       } catch (err) {
         console.error("Token validation error:", err)
         setError("설문 정보를 불러오는 중 오류가 발생했습니다.")
@@ -92,7 +136,7 @@ export default function HospitalSurvey() {
       }
     }
 
-    validateToken()
+    validateTokenAndLoadSurvey()
   }, [token])
 
   if (!supabase) {
@@ -139,11 +183,10 @@ export default function HospitalSurvey() {
     )
   }
 
-  const handleAnswer = (questionIndex: number, value: number) => {
-    const questionKey = `question_${questionIndex + 1}` as keyof SurveyData
+  const handleAnswer = (questionId: number, value: number) => {
     setAnswers((prev) => ({
       ...prev,
-      [questionKey]: value,
+      [questionId]: value,
     }))
   }
 
@@ -160,11 +203,7 @@ export default function HospitalSurvey() {
   }
 
   const handleSubmit = async () => {
-    // 모든 문항이 답변되었는지 확인
-    const allAnswered = questions.every((_, index) => {
-      const questionKey = `question_${index + 1}` as keyof SurveyData
-      return answers[questionKey] !== undefined
-    })
+    const allAnswered = questions.every((question) => answers[question.id] !== undefined)
 
     if (!allAnswered) {
       alert("모든 문항에 답변해 주세요.")
@@ -178,15 +217,22 @@ export default function HospitalSurvey() {
         throw new Error("설문 제출에 필요한 정보가 없습니다.")
       }
 
-      const surveyResponse = {
-        token: participant.token,
-        ...(answers as SurveyData),
-      }
+      const responses = questions.map((question) => ({
+        participant_token: participant.token,
+        question_id: question.id,
+        response_value: answers[question.id],
+      }))
 
-      const { error } = await supabase.from("survey_responses").insert([surveyResponse])
+      await supabase.from("survey_responses").delete().eq("participant_token", participant.token)
 
-      if (error) {
-        console.error("Error submitting survey:", error)
+      const { error: insertError } = await supabase.from("survey_responses").insert(responses)
+
+      if (insertError) {
+        if (insertError.message.includes("이미 설문을 완료한 참여자입니다")) {
+          setError("이미 완료된 설문입니다. 중복 응답은 불가능합니다.")
+          return
+        }
+        console.error("Error submitting survey:", insertError)
         alert("설문 제출 중 오류가 발생했습니다. 다시 시도해 주세요.")
       } else {
         setIsSubmitted(true)
@@ -199,8 +245,23 @@ export default function HospitalSurvey() {
     }
   }
 
-  const currentQuestionKey = `question_${currentQuestion + 1}` as keyof SurveyData
-  const currentAnswer = answers[currentQuestionKey]
+  if (!questions.length) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-2xl">
+          <CardContent className="text-center py-16">
+            <AlertCircle className="w-24 h-24 text-yellow-500 mx-auto mb-8" />
+            <h1 className="text-4xl font-bold text-gray-800 mb-4">설문 문항 없음</h1>
+            <p className="text-2xl text-gray-600 mb-8">이 설문에는 아직 문항이 등록되지 않았습니다.</p>
+            <p className="text-xl text-gray-500">관리자에게 문의해 주세요.</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const currentQuestionData = questions[currentQuestion]
+  const currentAnswer = answers[currentQuestionData?.id]
   const progress = ((currentQuestion + 1) / questions.length) * 100
 
   if (isSubmitted) {
@@ -214,6 +275,7 @@ export default function HospitalSurvey() {
             <div className="bg-blue-50 p-6 rounded-lg mb-6">
               <p className="text-xl text-blue-800 font-medium">{participant?.participant_name}님</p>
               <p className="text-lg text-blue-600">{participant?.hospital_name}</p>
+              {survey && <p className="text-lg text-blue-600 mt-2">"{survey.title}" 설문 완료</p>}
             </div>
             <p className="text-xl text-gray-500">더 나은 의료 서비스를 위해 활용하겠습니다.</p>
           </CardContent>
@@ -228,8 +290,10 @@ export default function HospitalSurvey() {
         {/* 헤더 */}
         <div className="text-center mb-8">
           <Heart className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">병원 만족도 조사</h1>
-          <p className="text-xl text-gray-600 mb-6">더 나은 의료 서비스를 위한 여러분의 소중한 의견을 들려주세요</p>
+          <h1 className="text-4xl font-bold text-gray-800 mb-2">{survey?.title || "설문조사"}</h1>
+          <p className="text-xl text-gray-600 mb-6">
+            {survey?.description || "더 나은 서비스를 위한 여러분의 소중한 의견을 들려주세요"}
+          </p>
 
           {participant && (
             <div className="bg-white p-6 rounded-xl shadow-sm max-w-md mx-auto">
@@ -271,7 +335,7 @@ export default function HospitalSurvey() {
           </CardHeader>
           <CardContent>
             <h2 className="text-3xl font-medium text-center text-gray-800 mb-12 leading-relaxed">
-              {questions[currentQuestion]}
+              {currentQuestionData?.question_text}
             </h2>
 
             {/* 답변 선택지 */}
@@ -279,7 +343,7 @@ export default function HospitalSurvey() {
               {scaleLabels.map((scale) => (
                 <button
                   key={scale.value}
-                  onClick={() => handleAnswer(currentQuestion, scale.value)}
+                  onClick={() => handleAnswer(currentQuestionData.id, scale.value)}
                   className={`w-full p-6 rounded-xl border-2 transition-all duration-200 text-xl font-medium ${
                     currentAnswer === scale.value
                       ? `${scale.color} text-white border-gray-400 shadow-lg scale-105`
@@ -330,14 +394,13 @@ export default function HospitalSurvey() {
         <div className="mt-8 p-6 bg-white rounded-xl shadow-sm">
           <h3 className="text-xl font-medium text-gray-800 mb-4">답변 현황</h3>
           <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
-            {questions.map((_, index) => {
-              const questionKey = `question_${index + 1}` as keyof SurveyData
-              const isAnswered = answers[questionKey] !== undefined
+            {questions.map((question, index) => {
+              const isAnswered = answers[question.id] !== undefined
               const isCurrent = index === currentQuestion
 
               return (
                 <div
-                  key={index}
+                  key={question.id}
                   className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
                     isCurrent
                       ? "bg-blue-500 text-white ring-4 ring-blue-200"
