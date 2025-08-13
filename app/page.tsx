@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { supabase, type SurveyData } from "@/lib/supabase/client"
-import { CheckCircle, Heart } from "lucide-react"
+import { CheckCircle, Heart, AlertCircle, User, Building2 } from "lucide-react"
 
 const questions = [
   "병원 직원들이 친절하게 대해주었습니까?",
@@ -26,11 +27,117 @@ const scaleLabels = [
   { value: 1, label: "전혀 그렇지 않다", color: "bg-red-400" },
 ]
 
+type Participant = {
+  id: number
+  token: string
+  hospital_name: string
+  participant_name: string
+  phone_number: string
+  survey_completed: boolean
+}
+
 export default function HospitalSurvey() {
+  const searchParams = useSearchParams()
+  const token = searchParams.get("token")
+
+  const [participant, setParticipant] = useState<Participant | null>(null)
   const [answers, setAnswers] = useState<Partial<SurveyData>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [currentQuestion, setCurrentQuestion] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    const validateToken = async () => {
+      if (!token) {
+        setError("유효하지 않은 접근입니다. 올바른 링크를 통해 접속해 주세요.")
+        setLoading(false)
+        return
+      }
+
+      if (!supabase) {
+        setError("데이터베이스 연결 설정이 필요합니다.")
+        setLoading(false)
+        return
+      }
+
+      try {
+        // 토큰으로 참여자 정보 조회
+        const { data: participantData, error: participantError } = await supabase
+          .from("survey_participants")
+          .select("*")
+          .eq("token", token)
+          .single()
+
+        if (participantError || !participantData) {
+          setError("유효하지 않은 토큰입니다. 관리자에게 문의해 주세요.")
+          setLoading(false)
+          return
+        }
+
+        // 이미 완료된 설문인지 확인
+        if (participantData.survey_completed) {
+          setError("이미 완료된 설문입니다. 감사합니다.")
+          setLoading(false)
+          return
+        }
+
+        setParticipant(participantData)
+      } catch (err) {
+        console.error("Token validation error:", err)
+        setError("설문 정보를 불러오는 중 오류가 발생했습니다.")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    validateToken()
+  }, [token])
+
+  if (!supabase) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-2xl">
+          <CardContent className="text-center py-16">
+            <AlertCircle className="w-24 h-24 text-red-500 mx-auto mb-8" />
+            <h1 className="text-4xl font-bold text-gray-800 mb-4">설정 오류</h1>
+            <p className="text-2xl text-gray-600 mb-8">데이터베이스 연결 설정이 필요합니다.</p>
+            <p className="text-xl text-gray-500">관리자에게 문의해 주세요.</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-2xl">
+          <CardContent className="text-center py-16">
+            <div className="animate-spin rounded-full h-24 w-24 border-b-2 border-blue-500 mx-auto mb-8"></div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-4">설문 정보 확인 중...</h1>
+            <p className="text-xl text-gray-600">잠시만 기다려 주세요.</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-2xl">
+          <CardContent className="text-center py-16">
+            <AlertCircle className="w-24 h-24 text-red-500 mx-auto mb-8" />
+            <h1 className="text-4xl font-bold text-gray-800 mb-4">접근 오류</h1>
+            <p className="text-2xl text-gray-600 mb-8">{error}</p>
+            <p className="text-xl text-gray-500">문의사항이 있으시면 관리자에게 연락해 주세요.</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   const handleAnswer = (questionIndex: number, value: number) => {
     const questionKey = `question_${questionIndex + 1}` as keyof SurveyData
@@ -67,7 +174,16 @@ export default function HospitalSurvey() {
     setIsSubmitting(true)
 
     try {
-      const { error } = await supabase.from("hospital_surveys").insert([answers as SurveyData])
+      if (!supabase || !participant) {
+        throw new Error("설문 제출에 필요한 정보가 없습니다.")
+      }
+
+      const surveyResponse = {
+        token: participant.token,
+        ...(answers as SurveyData),
+      }
+
+      const { error } = await supabase.from("survey_responses").insert([surveyResponse])
 
       if (error) {
         console.error("Error submitting survey:", error)
@@ -94,7 +210,11 @@ export default function HospitalSurvey() {
           <CardContent className="text-center py-16">
             <CheckCircle className="w-24 h-24 text-green-500 mx-auto mb-8" />
             <h1 className="text-4xl font-bold text-gray-800 mb-4">설문 완료</h1>
-            <p className="text-2xl text-gray-600 mb-8">소중한 의견을 주셔서 감사합니다.</p>
+            <p className="text-2xl text-gray-600 mb-4">소중한 의견을 주셔서 감사합니다.</p>
+            <div className="bg-blue-50 p-6 rounded-lg mb-6">
+              <p className="text-xl text-blue-800 font-medium">{participant?.participant_name}님</p>
+              <p className="text-lg text-blue-600">{participant?.hospital_name}</p>
+            </div>
             <p className="text-xl text-gray-500">더 나은 의료 서비스를 위해 활용하겠습니다.</p>
           </CardContent>
         </Card>
@@ -109,7 +229,23 @@ export default function HospitalSurvey() {
         <div className="text-center mb-8">
           <Heart className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-4xl font-bold text-gray-800 mb-2">병원 만족도 조사</h1>
-          <p className="text-xl text-gray-600">더 나은 의료 서비스를 위한 여러분의 소중한 의견을 들려주세요</p>
+          <p className="text-xl text-gray-600 mb-6">더 나은 의료 서비스를 위한 여러분의 소중한 의견을 들려주세요</p>
+
+          {participant && (
+            <div className="bg-white p-6 rounded-xl shadow-sm max-w-md mx-auto">
+              <div className="flex items-center justify-center space-x-4 text-lg">
+                <div className="flex items-center space-x-2">
+                  <Building2 className="w-6 h-6 text-blue-500" />
+                  <span className="font-medium text-gray-800">{participant.hospital_name}</span>
+                </div>
+                <div className="w-px h-6 bg-gray-300"></div>
+                <div className="flex items-center space-x-2">
+                  <User className="w-6 h-6 text-green-500" />
+                  <span className="font-medium text-gray-800">{participant.participant_name}님</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 진행률 표시 */}
