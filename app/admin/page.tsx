@@ -132,9 +132,8 @@ export default function AdminPage() {
     }
   }
 
-  // 설문 링크 복사 기능 추가
   const copyToClipboard = async (token: string) => {
-    const surveyUrl = `${window.location.origin}?token=${token}`
+    const surveyUrl = `${window.location.origin}/${token}`
     try {
       await navigator.clipboard.writeText(surveyUrl)
       alert("설문 링크가 클립보드에 복사되었습니다!")
@@ -286,7 +285,7 @@ export default function AdminPage() {
               <CardHeader>
                 <CardTitle className="text-2xl">참여자 CSV 업로드</CardTitle>
                 <CardDescription className="text-lg">
-                  병원명, 대상자이름, 휴대폰번호 형식의 CSV 파일을 업로드하세요
+                  병원명|대상자이름|휴대폰번호 형식의 CSV 파일을 업로드하세요
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -331,21 +330,21 @@ export default function AdminPage() {
                   <h3 className="text-xl font-semibold mb-4">CSV 파일 형식 안내</h3>
                   <div className="space-y-3">
                     <p className="text-lg">
-                      <strong>형식:</strong> 병원명, 대상자이름, 휴대폰번호
+                      <strong>형식:</strong> 병원명|대상자이름|휴대폰번호
                     </p>
                     <p className="text-lg">
                       <strong>예시:</strong>
                     </p>
                     <div className="bg-white p-4 rounded border font-mono text-sm">
-                      서울대학교병원, 김철수, 010-1234-5678
+                      서울대학교병원|김철수|010-1234-5678
                       <br />
-                      연세대학교병원, 이영희, 010-9876-5432
+                      연세대학교병원|이영희|010-9876-5432
                       <br />
-                      고려대학교병원, 박민수, 010-5555-1234
+                      고려대학교병원|박민수|010-5555-1234
                     </div>
                     <p className="text-sm text-gray-600">
                       * 첫 번째 줄부터 데이터를 입력하세요 (헤더 없음)
-                      <br />* 각 항목은 쉼표(,)로 구분합니다
+                      <br />* 각 항목은 파이프(|)로 구분합니다
                       <br />* 특수문자가 포함된 경우 따옴표로 감싸주세요
                     </p>
                   </div>
@@ -415,7 +414,7 @@ export default function AdminPage() {
                                 </Button>
                                 <Button
                                   onClick={() =>
-                                    window.open(`${window.location.origin}?token=${participant.token}`, "_blank")
+                                    window.open(`${window.location.origin}/${participant.token}`, "_blank")
                                   }
                                   size="sm"
                                   variant="outline"

@@ -20,8 +20,8 @@ function parseCSV(csvText: string): Array<{ hospital_name: string; participant_n
     const line = lines[i].trim()
     if (!line) continue
 
-    // CSV 파싱 (쉼표로 구분, 따옴표 처리)
-    const values = line.split(",").map((val) => val.trim().replace(/^["']|["']$/g, ""))
+    // CSV 파싱 (파이프(|)로 구분, 따옴표 처리)
+    const values = line.split("|").map((val) => val.trim().replace(/^["']|["']$/g, ""))
 
     if (values.length >= 3) {
       participants.push({
