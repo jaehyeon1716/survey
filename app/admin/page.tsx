@@ -28,7 +28,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { supabase } from "@/lib/supabase/client"
-import { Copy, Download, ExternalLink, Eye, Plus, Trash2, Edit } from "lucide-react"
+import { Copy, Download, ExternalLink, Eye, Plus, Trash2, Edit, FileText } from "lucide-react"
 
 const ADMIN_PASSWORD = "hospital2024"
 
@@ -127,8 +127,6 @@ export default function AdminPage() {
       휴대폰번호: participant.phone_number,
       토큰: participant.token,
       설문링크: `${window.location.origin}/${participant.token}`,
-      완료상태: participant.is_completed ? "완료" : "미완료",
-      등록일: new Date(participant.created_at).toLocaleDateString("ko-KR"),
     }))
 
     const headers = Object.keys(excelData[0])
@@ -153,6 +151,73 @@ export default function AdminPage() {
     const url = URL.createObjectURL(blob)
     link.setAttribute("href", url)
     link.setAttribute("download", `${selectedSurvey.title}_참여자연락처_${new Date().toISOString().split("T")[0]}.csv`)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const downloadGuide = () => {
+    const guideContent = `
+관리자 페이지 사용 가이드
+
+1. 설문지 생성
+   - "설문지 생성" 탭에서 새로운 설문지를 만들 수 있습니다.
+   - 설문지 제목, 설명을 입력하고 문항들을 추가합니다.
+   - 각 문항은 5점 척도(매우 그렇다 ~ 전혀 그렇지 않다)로 평가됩니다.
+
+2. 설문지 관리
+   - "설문지 목록" 탭에서 생성된 설문지를 확인할 수 있습니다.
+   - 수정 버튼으로 설문지 내용을 변경할 수 있습니다.
+   - 삭제 시에는 관리자 비밀번호(hospital2024) 재입력이 필요합니다.
+
+3. 참여자 등록
+   - 특정 설문지를 선택한 후 CSV 파일로 참여자를 등록합니다.
+   - CSV 형식: 병원명|참여자명|휴대폰번호 (파이프 구분자 사용)
+   - 기존 참여자는 새로운 CSV 업로드 시 초기화됩니다.
+   - 중복 참여자(병원명, 참여자명, 휴대폰번호 모두 동일)는 자동 제거됩니다.
+
+4. 참여자 관리
+   - "참여자 목록" 탭에서 등록된 참여자를 확인할 수 있습니다.
+   - 병원명으로 검색하거나 완료/미완료 상태로 필터링 가능합니다.
+   - "연락처 다운로드" 버튼으로 문자 발송용 CSV 파일을 다운로드할 수 있습니다.
+   - 각 참여자의 설문 링크를 복사하여 개별 발송도 가능합니다.
+
+5. 설문 결과 조회
+   - "설문 결과" 탭에서 완료된 설문 응답을 확인할 수 있습니다.
+   - 참여자별 상세 응답과 총점을 볼 수 있습니다.
+   - CSV 다운로드로 결과 데이터를 추출할 수 있습니다.
+
+6. 통계 분석
+   - "통계" 탭에서 설문 결과를 분석할 수 있습니다.
+   - 전체 평균점수, 참여율, 병원별 통계를 확인할 수 있습니다.
+   - 병원명을 입력하여 특정 병원의 문항별 평균점수를 조회할 수 있습니다.
+   - "통계 다운로드" 버튼으로 상세한 통계 보고서를 엑셀로 다운로드할 수 있습니다.
+
+7. 설문 링크 형식
+   - 각 참여자에게는 고유한 토큰이 부여됩니다.
+   - 설문 링크: https://사이트주소/토큰
+   - 중복 응답은 자동으로 방지됩니다.
+
+8. 보안 기능
+   - 관리자 페이지 접속 시 비밀번호 인증 필요
+   - 설문지 삭제 시 추가 비밀번호 확인
+   - 참여자별 고유 토큰으로 보안 강화
+
+9. 문자 발송 가이드
+   - "참여자 목록"에서 "연락처 다운로드"로 CSV 파일 생성
+   - 외부 문자 발송 플랫폼에 CSV 파일 업로드
+   - 각 참여자에게 개별 설문 링크가 포함된 문자 발송
+
+관리자 비밀번호: hospital2024
+문의사항이 있으시면 시스템 관리자에게 연락하시기 바랍니다.
+    `
+
+    const blob = new Blob([guideContent], { type: "text/plain;charset=utf-8" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `관리자페이지_사용가이드_${new Date().toISOString().split("T")[0]}.txt`)
     link.style.visibility = "hidden"
     document.body.appendChild(link)
     link.click()
@@ -821,10 +886,18 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold text-gray-900">병원 만족도 조사 관리 시스템</h1>
           <Button onClick={() => setIsAuthenticated(false)} variant="outline" className="text-lg px-6 py-2">
             로그아웃
+          </Button>
+        </div>
+
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">병원 만족도 조사 관리자</h1>
+          <Button onClick={downloadGuide} variant="outline" className="flex items-center space-x-2 bg-transparent">
+            <FileText className="w-4 h-4" />
+            <span>사용 가이드 다운로드</span>
           </Button>
         </div>
 
