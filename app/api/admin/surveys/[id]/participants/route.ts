@@ -28,13 +28,30 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "CSV 파일이 비어있습니다." }, { status: 400 })
     }
 
+    await supabase
+      .from("survey_responses")
+      .delete()
+      .eq(
+        "participant_token",
+        supabase.from("survey_participants").select("token").eq("survey_id", Number.parseInt(surveyId)),
+      )
+    await supabase.from("survey_participants").delete().eq("survey_id", Number.parseInt(surveyId))
+
     const participants = []
+    const uniqueParticipants = new Set() // 중복 방지를 위한 Set
+
     for (const line of lines) {
       const [hospitalName, participantName, phoneNumber] = line.split("|").map((item) => item.trim())
 
       if (!hospitalName || !participantName || !phoneNumber) {
         continue
       }
+
+      const participantKey = `${hospitalName}|${participantName}|${phoneNumber}`
+      if (uniqueParticipants.has(participantKey)) {
+        continue
+      }
+      uniqueParticipants.add(participantKey)
 
       const token = randomBytes(16).toString("hex")
       participants.push({
