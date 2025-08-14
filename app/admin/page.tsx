@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,7 +30,7 @@ import {
 import { supabase } from "@/lib/supabase/client"
 import { Copy, Download, ExternalLink, Eye, Plus, Trash2, Edit } from "lucide-react"
 
-const ADMIN_PASSWORD = "hospital2024" // 실제 운영시에는 환경변수로 관리
+const ADMIN_PASSWORD = "hospital2024"
 
 interface Survey {
   id: number
@@ -39,6 +38,11 @@ interface Survey {
   description: string
   is_active: boolean
   created_at: string
+  survey_questions?: Array<{
+    id: number
+    question_text: string
+    question_number: number
+  }>
 }
 
 interface Participant {
@@ -58,6 +62,13 @@ interface SurveyResponse {
   question_id: number
   response_value: number
   created_at: string
+  survey_participants?: {
+    hospital_name: string
+    participant_name: string
+    phone_number: string
+  }
+  total_score: number
+  max_possible_score: number
 }
 
 interface QuestionStat {
@@ -75,12 +86,12 @@ export default function AdminPage() {
   const [surveys, setSurveys] = useState<Survey[]>([])
   const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null)
   const [participants, setParticipants] = useState<Participant[]>([])
-  const [responses, setResponses] = useState<any[]>([])
+  const [responses, setResponses] = useState<SurveyResponse[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [uploadSuccess, setUploadSuccess] = useState("")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [selectedResponse, setSelectedResponse] = useState<any>(null)
+  const [selectedResponse, setSelectedResponse] = useState<SurveyResponse | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
 
   const [newSurveyTitle, setNewSurveyTitle] = useState("")
@@ -103,6 +114,50 @@ export default function AdminPage() {
   const [surveyToDelete, setSurveyToDelete] = useState<Survey | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deletePassword, setDeletePassword] = useState("")
+
+  const downloadParticipantsExcel = () => {
+    if (!selectedSurvey || filteredParticipants.length === 0) {
+      alert("다운로드할 참여자 데이터가 없습니다.")
+      return
+    }
+
+    const excelData = filteredParticipants.map((participant) => ({
+      병원명: participant.hospital_name,
+      참여자명: participant.participant_name,
+      휴대폰번호: participant.phone_number,
+      토큰: participant.token,
+      설문링크: `${window.location.origin}/${participant.token}`,
+      완료상태: participant.is_completed ? "완료" : "미완료",
+      등록일: new Date(participant.created_at).toLocaleDateString("ko-KR"),
+    }))
+
+    const headers = Object.keys(excelData[0])
+    const csvContent = [
+      headers.join(","),
+      ...excelData.map((row) =>
+        headers
+          .map((header) => {
+            const value = row[header as keyof typeof row]
+            return typeof value === "string" && (value.includes(",") || value.includes('"'))
+              ? `"${value.replace(/"/g, '""')}"`
+              : value
+          })
+          .join(","),
+      ),
+    ].join("\n")
+
+    const BOM = "\uFEFF"
+    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" })
+
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `${selectedSurvey.title}_참여자연락처_${new Date().toISOString().split("T")[0]}.csv`)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
@@ -230,10 +285,10 @@ export default function AdminPage() {
       if (responsesError || !responsesData) return
 
       const questionStatsMap = questionsData.map((question) => {
-        const questionResponses = responsesData.filter((r) => r.question_id === question.id)
+        const questionResponses = responsesData.filter((r: any) => r.question_id === question.id)
         const totalResponses = questionResponses.length
         const averageScore =
-          totalResponses > 0 ? questionResponses.reduce((sum, r) => sum + r.response_value, 0) / totalResponses : 0
+          totalResponses > 0 ? questionResponses.reduce((sum, r: any) => sum + r.response_value, 0) / totalResponses : 0
 
         return {
           id: question.id,
@@ -384,7 +439,7 @@ export default function AdminPage() {
 
     const headers = ["병원명", "참여자명", "휴대폰번호", "총점", "최대점수", "완료일시"]
 
-    const csvData = responses.map((response: any) => [
+    const csvData = responses.map((response) => [
       response.survey_participants?.hospital_name || "",
       response.survey_participants?.participant_name || "",
       response.survey_participants?.phone_number || "",
@@ -406,16 +461,16 @@ export default function AdminPage() {
     document.body.removeChild(link)
   }
 
-  const openDetailModal = (response: any) => {
+  const openDetailModal = (response: SurveyResponse) => {
     setSelectedResponse(response)
     setShowDetailModal(true)
   }
 
-  const handleEditSurvey = (survey: any) => {
+  const handleEditSurvey = (survey: Survey) => {
     setEditingSurvey(survey)
     setEditTitle(survey.title)
     setEditDescription(survey.description || "")
-    setEditQuestions(survey.survey_questions?.map((q: any) => q.question_text) || [""])
+    setEditQuestions(survey.survey_questions?.map((q) => q.question_text) || [""])
     setShowEditModal(true)
   }
 
@@ -467,7 +522,7 @@ export default function AdminPage() {
     }
   }
 
-  const handleDeleteConfirm = (survey: any) => {
+  const handleDeleteConfirm = (survey: Survey) => {
     setSurveyToDelete(survey)
     setShowDeleteConfirm(true)
   }
@@ -528,12 +583,10 @@ export default function AdminPage() {
   const filterParticipants = useCallback(() => {
     let filtered = participants
 
-    // 병원명 필터
     if (hospitalFilter.trim()) {
       filtered = filtered.filter((p) => p.hospital_name.toLowerCase().includes(hospitalFilter.toLowerCase()))
     }
 
-    // 상태 필터
     if (statusFilter !== "all") {
       const isCompleted = statusFilter === "completed"
       filtered = filtered.filter((p) => p.is_completed === isCompleted)
@@ -542,40 +595,16 @@ export default function AdminPage() {
     setFilteredParticipants(filtered)
   }, [participants, hospitalFilter, statusFilter])
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchSurveys()
-    }
-  }, [isAuthenticated])
-
-  useEffect(() => {
-    if (selectedSurvey) {
-      fetchParticipants(selectedSurvey.id)
-      fetchResponses(selectedSurvey.id)
-    }
-  }, [selectedSurvey])
-
-  useEffect(() => {
-    if (selectedSurvey) {
-      fetchQuestionStats(selectedSurvey.id, hospitalFilter)
-    }
-  }, [selectedSurvey, hospitalFilter])
-
-  useEffect(() => {
-    filterParticipants()
-  }, [filterParticipants])
-
   const downloadStatsExcel = async () => {
     if (!selectedSurvey || responses.length === 0) {
       alert("다운로드할 통계 데이터가 없습니다.")
       return
     }
 
-    const hospitalQuestionStats: any = {}
+    const hospitalQuestionStats: Record<string, Record<number, any>> = {}
 
     try {
       if (supabase) {
-        // 병원별 문항별 응답 데이터 조회
         const { data: detailedResponses, error } = await supabase
           .from("survey_responses")
           .select(`
@@ -595,7 +624,6 @@ export default function AdminPage() {
           )
 
         if (!error && detailedResponses) {
-          // 병원별 문항별 통계 계산
           detailedResponses.forEach((response: any) => {
             const hospital = response.survey_participants?.hospital_name || "알 수 없음"
             const questionId = response.question_id
@@ -635,14 +663,8 @@ export default function AdminPage() {
       [
         "전체 평균 점수",
         responses.length > 0
-          ? `${(responses.reduce((sum: number, r: any) => sum + (r.total_score || 0), 0) / responses.length).toFixed(1)}/${responses.length > 0 ? responses[0].max_possible_score : 0}`
+          ? `${(responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length).toFixed(1)}/${responses.length > 0 ? responses[0].max_possible_score : 0}`
           : "0",
-      ],
-      [
-        "만족도 비율",
-        responses.length > 0 && responses[0].max_possible_score > 0
-          ? `${((responses.reduce((sum: number, r: any) => sum + (r.total_score || 0), 0) / responses.length / responses[0].max_possible_score) * 100).toFixed(1)}%`
-          : "0%",
       ],
       [""],
     ]
@@ -659,7 +681,7 @@ export default function AdminPage() {
       [""],
     ]
 
-    const hospitalStats = responses.reduce((acc: any, response: any) => {
+    const hospitalStats = responses.reduce((acc: Record<string, any>, response) => {
       const hospital = response.survey_participants?.hospital_name || "알 수 없음"
       if (!acc[hospital]) {
         acc[hospital] = { count: 0, totalScore: 0, maxScore: response.max_possible_score }
@@ -685,13 +707,11 @@ export default function AdminPage() {
       ["병원명", "문항 번호", "문항 내용", "응답 수", "평균 점수"],
     ]
 
-    // 병원별로 정렬하여 데이터 추가
     Object.keys(hospitalQuestionStats)
       .sort()
       .forEach((hospital) => {
         const hospitalData = hospitalQuestionStats[hospital]
 
-        // 문항 번호순으로 정렬
         const sortedQuestions = Object.values(hospitalData).sort(
           (a: any, b: any) => a.questionNumber - b.questionNumber,
         )
@@ -707,7 +727,6 @@ export default function AdminPage() {
           ])
         })
 
-        // 병원별 전체 평균 추가
         const hospitalTotalStats = hospitalStats[hospital]
         if (hospitalTotalStats) {
           hospitalQuestionStatsData.push([
@@ -719,7 +738,6 @@ export default function AdminPage() {
           ])
         }
 
-        // 병원 구분을 위한 빈 줄
         hospitalQuestionStatsData.push(["", "", "", "", ""])
       })
 
@@ -737,6 +755,29 @@ export default function AdminPage() {
     link.click()
     document.body.removeChild(link)
   }
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchSurveys()
+    }
+  }, [isAuthenticated])
+
+  useEffect(() => {
+    if (selectedSurvey) {
+      fetchParticipants(selectedSurvey.id)
+      fetchResponses(selectedSurvey.id)
+    }
+  }, [selectedSurvey])
+
+  useEffect(() => {
+    if (selectedSurvey) {
+      fetchQuestionStats(selectedSurvey.id, hospitalFilter)
+    }
+  }, [selectedSurvey, hospitalFilter])
+
+  useEffect(() => {
+    filterParticipants()
+  }, [filterParticipants])
 
   if (!isAuthenticated) {
     return (
@@ -910,7 +951,7 @@ export default function AdminPage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {surveys.map((survey: any) => (
+                      {surveys.map((survey) => (
                         <div
                           key={survey.id}
                           className={`p-4 border rounded-lg transition-colors ${
@@ -1105,7 +1146,15 @@ export default function AdminPage() {
                           <option value="incomplete">미완료</option>
                         </select>
                       </div>
-                      <div className="flex items-end">
+                      <div className="flex items-end gap-2">
+                        <Button
+                          onClick={downloadParticipantsExcel}
+                          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white"
+                          disabled={filteredParticipants.length === 0}
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          연락처 다운로드
+                        </Button>
                         <Button
                           onClick={() => {
                             setHospitalFilter("")
@@ -1241,7 +1290,7 @@ export default function AdminPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {responses.map((response: any) => (
+                        {responses.map((response) => (
                           <tr key={response.id} className="hover:bg-gray-50">
                             <td className="border border-gray-300 px-4 py-3 text-lg">
                               {response.survey_participants?.hospital_name || ""}
@@ -1307,7 +1356,6 @@ export default function AdminPage() {
                     </div>
                   ) : (
                     <div className="space-y-8">
-                      {/* 기본 통계 */}
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                         <div className="bg-blue-50 p-6 rounded-lg">
                           <h3 className="text-lg font-semibold text-blue-800">총 참여자</h3>
@@ -1328,8 +1376,7 @@ export default function AdminPage() {
                           <p className="text-3xl font-bold text-purple-600">
                             {responses.length > 0
                               ? (
-                                  responses.reduce((sum: number, r: any) => sum + (r.total_score || 0), 0) /
-                                  responses.length
+                                  responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length
                                 ).toFixed(1)
                               : "0"}
                             /{responses.length > 0 ? responses[0].max_possible_score : 0}
@@ -1337,7 +1384,6 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* 문항별 평균점수 (병원별 필터링) */}
                       <div>
                         <div className="flex justify-between items-center mb-4">
                           <h3 className="text-xl font-semibold">문항별 평균점수</h3>
@@ -1390,7 +1436,6 @@ export default function AdminPage() {
                         )}
                       </div>
 
-                      {/* 병원별 통계 */}
                       <div>
                         <h3 className="text-xl font-semibold mb-4">병원별 통계</h3>
                         <div className="overflow-x-auto">
@@ -1404,7 +1449,7 @@ export default function AdminPage() {
                             </thead>
                             <tbody>
                               {Object.entries(
-                                responses.reduce((acc: any, response: any) => {
+                                responses.reduce((acc: Record<string, any>, response) => {
                                   const hospital = response.survey_participants?.hospital_name || "알 수 없음"
                                   if (!acc[hospital]) {
                                     acc[hospital] = { count: 0, totalScore: 0, maxScore: response.max_possible_score }
@@ -1434,7 +1479,6 @@ export default function AdminPage() {
           </TabsContent>
         </Tabs>
 
-        {/* 수정 모달 */}
         <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
@@ -1499,7 +1543,6 @@ export default function AdminPage() {
           </DialogContent>
         </Dialog>
 
-        {/* 삭제 확인 다이얼로그 */}
         <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -1539,7 +1582,6 @@ export default function AdminPage() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* 상세보기 모달 */}
         <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
