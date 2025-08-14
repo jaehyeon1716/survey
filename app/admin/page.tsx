@@ -158,7 +158,108 @@ export default function AdminPage() {
   }
 
   const downloadGuide = () => {
-    const guideContent = `
+    import("jspdf")
+      .then(({ jsPDF }) => {
+        const doc = new jsPDF()
+
+        // 한글 폰트 설정을 위한 기본 설정
+        doc.setFont("helvetica")
+        doc.setFontSize(16)
+
+        const guideContent = [
+          "관리자 페이지 사용 가이드",
+          "",
+          "1. 설문지 생성",
+          "   - '설문지 생성' 탭에서 새로운 설문지를 만들 수 있습니다.",
+          "   - 설문지 제목, 설명을 입력하고 문항들을 추가합니다.",
+          "   - 각 문항은 5점 척도(매우 그렇다 ~ 전혀 그렇지 않다)로 평가됩니다.",
+          "",
+          "2. 설문지 관리",
+          "   - '설문지 목록' 탭에서 생성된 설문지를 확인할 수 있습니다.",
+          "   - 수정 버튼으로 설문지 내용을 변경할 수 있습니다.",
+          "   - 삭제 시에는 관리자 비밀번호(hospital2024) 재입력이 필요합니다.",
+          "",
+          "3. 참여자 등록",
+          "   - 특정 설문지를 선택한 후 CSV 파일로 참여자를 등록합니다.",
+          "   - CSV 형식: 병원명|참여자명|휴대폰번호 (파이프 구분자 사용)",
+          "   - 기존 참여자는 새로운 CSV 업로드 시 초기화됩니다.",
+          "   - 중복 참여자(병원명, 참여자명, 휴대폰번호 모두 동일)는 자동 제거됩니다.",
+          "",
+          "4. 참여자 관리",
+          "   - '참여자 목록' 탭에서 등록된 참여자를 확인할 수 있습니다.",
+          "   - 병원명으로 검색하거나 완료/미완료 상태로 필터링 가능합니다.",
+          "   - '연락처 다운로드' 버튼으로 문자 발송용 CSV 파일을 다운로드할 수 있습니다.",
+          "   - 각 참여자의 설문 링크를 복사하여 개별 발송도 가능합니다.",
+          "",
+          "5. 설문 결과 조회",
+          "   - '설문 결과' 탭에서 완료된 설문 응답을 확인할 수 있습니다.",
+          "   - 참여자별 상세 응답과 총점을 볼 수 있습니다.",
+          "   - CSV 다운로드로 결과 데이터를 추출할 수 있습니다.",
+          "",
+          "6. 통계 분석",
+          "   - '통계' 탭에서 설문 결과를 분석할 수 있습니다.",
+          "   - 전체 평균점수, 참여율, 병원별 통계를 확인할 수 있습니다.",
+          "   - 병원명을 입력하여 특정 병원의 문항별 평균점수를 조회할 수 있습니다.",
+          "   - '통계 다운로드' 버튼으로 상세한 통계 보고서를 엑셀로 다운로드할 수 있습니다.",
+          "",
+          "7. 설문 링크 형식",
+          "   - 각 참여자에게는 고유한 토큰이 부여됩니다.",
+          "   - 설문 링크: https://사이트주소/토큰",
+          "   - 중복 응답은 자동으로 방지됩니다.",
+          "",
+          "8. 보안 기능",
+          "   - 관리자 페이지 접속 시 비밀번호 인증 필요",
+          "   - 설문지 삭제 시 추가 비밀번호 확인",
+          "   - 참여자별 고유 토큰으로 보안 강화",
+          "",
+          "9. 문자 발송 가이드",
+          "   - '참여자 목록'에서 '연락처 다운로드'로 CSV 파일 생성",
+          "   - 외부 문자 발송 플랫폼에 CSV 파일 업로드",
+          "   - 각 참여자에게 개별 설문 링크가 포함된 문자 발송",
+          "",
+          "관리자 비밀번호: hospital2024",
+          "문의사항이 있으시면 시스템 관리자에게 연락하시기 바랍니다.",
+        ]
+
+        // PDF에 텍스트 추가
+        let yPosition = 20
+        doc.setFontSize(18)
+        doc.text("관리자 페이지 사용 가이드", 20, yPosition)
+        yPosition += 15
+
+        doc.setFontSize(12)
+        guideContent.forEach((line, index) => {
+          if (index === 0) return // 제목은 이미 추가했으므로 스킵
+
+          if (yPosition > 270) {
+            // 페이지 끝에 도달하면 새 페이지 추가
+            doc.addPage()
+            yPosition = 20
+          }
+
+          if (line.startsWith("관리자 비밀번호:")) {
+            doc.setFontSize(14)
+            doc.setFont("helvetica", "bold")
+          } else if (line.match(/^\d+\./)) {
+            doc.setFontSize(14)
+            doc.setFont("helvetica", "bold")
+          } else {
+            doc.setFontSize(12)
+            doc.setFont("helvetica", "normal")
+          }
+
+          doc.text(line, 20, yPosition)
+          yPosition += 7
+        })
+
+        // PDF 다운로드
+        const fileName = `관리자페이지_사용가이드_${new Date().toISOString().split("T")[0]}.pdf`
+        doc.save(fileName)
+      })
+      .catch((error) => {
+        console.error("PDF 생성 중 오류 발생:", error)
+        // PDF 생성 실패 시 텍스트 파일로 대체
+        const guideContent = `
 관리자 페이지 사용 가이드
 
 1. 설문지 생성
@@ -180,7 +281,7 @@ export default function AdminPage() {
 4. 참여자 관리
    - "참여자 목록" 탭에서 등록된 참여자를 확인할 수 있습니다.
    - 병원명으로 검색하거나 완료/미완료 상태로 필터링 가능합니다.
-   - "연락처 다운로드" 버튼으로 문자 발송용 CSV 파일을 다운로드할 수 있습니다.
+   - "연락처 다운로드" 버튼으로 문자 발송용 CSV 파일을 다운로드할 수 있습니다.",
    - 각 참여자의 설문 링크를 복사하여 개별 발송도 가능합니다.
 
 5. 설문 결과 조회
@@ -211,17 +312,18 @@ export default function AdminPage() {
 
 관리자 비밀번호: hospital2024
 문의사항이 있으시면 시스템 관리자에게 연락하시기 바랍니다.
-    `
+      `
 
-    const blob = new Blob([guideContent], { type: "text/plain;charset=utf-8" })
-    const link = document.createElement("a")
-    const url = URL.createObjectURL(blob)
-    link.setAttribute("href", url)
-    link.setAttribute("download", `관리자페이지_사용가이드_${new Date().toISOString().split("T")[0]}.txt`)
-    link.style.visibility = "hidden"
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+        const blob = new Blob([guideContent], { type: "text/plain;charset=utf-8" })
+        const link = document.createElement("a")
+        const url = URL.createObjectURL(blob)
+        link.setAttribute("href", url)
+        link.setAttribute("download", `관리자페이지_사용가이드_${new Date().toISOString().split("T")[0]}.txt`)
+        link.style.visibility = "hidden"
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      })
   }
 
   const handleLogin = (e: React.FormEvent) => {
