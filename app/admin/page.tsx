@@ -10,24 +10,76 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { supabase } from "@/lib/supabase/client"
 import { Copy, Download, ExternalLink, Eye, Plus, Trash2, Edit } from "lucide-react"
 
 const ADMIN_PASSWORD = "hospital2024" // 실제 운영시에는 환경변수로 관리
 
+interface Survey {
+  id: number
+  title: string
+  description: string
+  is_active: boolean
+  created_at: string
+}
+
+interface Participant {
+  id: number
+  survey_id: number
+  token: string
+  hospital_name: string
+  participant_name: string
+  phone_number: string
+  is_completed: boolean
+  created_at: string
+}
+
+interface SurveyResponse {
+  id: number
+  participant_token: string
+  question_id: number
+  response_value: number
+  created_at: string
+}
+
+interface QuestionStat {
+  id: number
+  questionNumber: number
+  questionText: string
+  totalResponses: number
+  averageScore: string
+  maxScore: number
+}
+
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState("")
-  const [surveys, setSurveys] = useState<any[]>([])
-  const [selectedSurvey, setSelectedSurvey] = useState<any>(null)
-  const [participants, setParticipants] = useState<any[]>([])
+  const [surveys, setSurveys] = useState<Survey[]>([])
+  const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null)
+  const [participants, setParticipants] = useState<Participant[]>([])
   const [responses, setResponses] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [uploadSuccess, setUploadSuccess] = useState("")
-  const [activeTab, setActiveTab] = useState("surveys")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  // 상세 보기 상태 추가
   const [selectedResponse, setSelectedResponse] = useState<any>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
 
@@ -36,17 +88,17 @@ export default function AdminPage() {
   const [newSurveyQuestions, setNewSurveyQuestions] = useState([""])
   const [createLoading, setCreateLoading] = useState(false)
 
-  const [questionStats, setQuestionStats] = useState<any[]>([])
+  const [questionStats, setQuestionStats] = useState<QuestionStat[]>([])
   const [hospitalFilter, setHospitalFilter] = useState("")
 
   const [showEditModal, setShowEditModal] = useState(false)
-  const [editingSurvey, setEditingSurvey] = useState<any>(null)
+  const [editingSurvey, setEditingSurvey] = useState<Survey | null>(null)
   const [editTitle, setEditTitle] = useState("")
   const [editDescription, setEditDescription] = useState("")
   const [editQuestions, setEditQuestions] = useState<string[]>([])
   const [editLoading, setEditLoading] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [surveyToDelete, setSurveyToDelete] = useState<any>(null)
+  const [surveyToDelete, setSurveyToDelete] = useState<Survey | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deletePassword, setDeletePassword] = useState("")
 
@@ -148,7 +200,6 @@ export default function AdminPage() {
 
       if (questionsError || !questionsData) return
 
-      // 병원별 필터링을 위해 참여자 정보와 함께 응답 데이터 조회
       let responsesQuery = supabase
         .from("survey_responses")
         .select(`
@@ -168,7 +219,6 @@ export default function AdminPage() {
           questionsData.map((q) => q.id),
         )
 
-      // 병원명 필터링 적용
       if (hospitalName && hospitalName.trim() !== "") {
         responsesQuery = responsesQuery.ilike("survey_participants.hospital_name", `%${hospitalName.trim()}%`)
       }
@@ -324,7 +374,6 @@ export default function AdminPage() {
     }
   }
 
-  // CSV 다운로드 기능 추가
   const downloadCSV = () => {
     if (responses.length === 0) {
       alert("다운로드할 데이터가 없습니다.")
@@ -355,7 +404,6 @@ export default function AdminPage() {
     document.body.removeChild(link)
   }
 
-  // 상세 보기 모달 열기
   const openDetailModal = (response: any) => {
     setSelectedResponse(response)
     setShowDetailModal(true)
@@ -381,11 +429,11 @@ export default function AdminPage() {
       return
     }
 
-    setLoading(true)
+    setEditLoading(true)
     setError("")
 
     try {
-      const response = await fetch(`/api/admin/surveys/${editingSurvey.id}`, {
+      const response = await fetch(`/api/admin/surveys/${editingSurvey?.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -404,8 +452,7 @@ export default function AdminPage() {
         setShowEditModal(false)
         setEditingSurvey(null)
         fetchSurveys()
-        // 현재 선택된 설문지가 수정된 경우 업데이트
-        if (selectedSurvey?.id === editingSurvey.id) {
+        if (selectedSurvey?.id === editingSurvey?.id) {
           setSelectedSurvey(null)
         }
       } else {
@@ -414,7 +461,7 @@ export default function AdminPage() {
     } catch (err) {
       setError("설문지 수정 중 오류가 발생했습니다.")
     } finally {
-      setLoading(false)
+      setEditLoading(false)
     }
   }
 
@@ -447,7 +494,6 @@ export default function AdminPage() {
         setSurveyToDelete(null)
         setDeletePassword("")
         fetchSurveys()
-        // 현재 선택된 설문지가 삭제된 경우 선택 해제
         if (selectedSurvey?.id === surveyToDelete.id) {
           setSelectedSurvey(null)
         }
@@ -502,7 +548,6 @@ export default function AdminPage() {
       return
     }
 
-    // 기본 통계 데이터
     const basicStats = [
       ["통계 항목", "값"],
       ["설문지 제목", selectedSurvey.title],
@@ -521,10 +566,9 @@ export default function AdminPage() {
           ? `${((responses.reduce((sum: number, r: any) => sum + (r.total_score || 0), 0) / responses.length / responses[0].max_possible_score) * 100).toFixed(1)}%`
           : "0%",
       ],
-      [""], // 빈 줄
+      [""],
     ]
 
-    // 문항별 통계 데이터
     const questionStatsData = [
       ["문항별 통계"],
       ["문항 번호", "문항 내용", "응답 수", "평균 점수"],
@@ -534,10 +578,9 @@ export default function AdminPage() {
         stat.totalResponses.toString(),
         `${stat.averageScore}/${stat.maxScore}`,
       ]),
-      [""], // 빈 줄
+      [""],
     ]
 
-    // 병원별 통계 데이터
     const hospitalStats = responses.reduce((acc: any, response: any) => {
       const hospital = response.survey_participants?.hospital_name || "알 수 없음"
       if (!acc[hospital]) {
@@ -558,7 +601,6 @@ export default function AdminPage() {
       ]),
     ]
 
-    // 모든 데이터 합치기
     const allData = [...basicStats, ...questionStatsData, ...hospitalStatsData]
 
     const csvContent = allData.map((row) => row.map((field) => `"${field}"`).join(",")).join("\n")
@@ -656,7 +698,6 @@ export default function AdminPage() {
 
           <TabsContent value="surveys">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* 설문지 생성 */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-2xl">새 설문지 생성</CardTitle>
@@ -731,7 +772,6 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
 
-              {/* 설문지 목록 */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-2xl">설문지 목록</CardTitle>
@@ -818,7 +858,6 @@ export default function AdminPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* 설문지 선택 */}
                 <div>
                   <Label className="text-lg font-medium">설문지 선택 *</Label>
                   <div className="mt-2 p-4 border rounded-lg">
@@ -885,12 +924,10 @@ export default function AdminPage() {
                           <br />
                           연세대학교병원|이영희|010-9876-5432
                           <br />
-                          고려대학교병원|박민수|010-5555-1234
+                          고려대학교병원|박민수|010-5555-6666
                         </div>
-                        <p className="text-sm text-gray-600">
-                          * 첫 번째 줄부터 데이터를 입력하세요 (헤더 없음)
-                          <br />* 각 항목은 파이프(|)로 구분합니다
-                          <br />* 특수문자가 포함된 경우 따옴표로 감싸주세요
+                        <p className="text-lg text-red-600">
+                          <strong>주의:</strong> 기존 참여자는 초기화되고 새로운 참여자로 교체됩니다.
                         </p>
                       </div>
                     </div>
@@ -905,15 +942,13 @@ export default function AdminPage() {
               <CardHeader>
                 <CardTitle className="text-2xl">참여자 목록</CardTitle>
                 <CardDescription className="text-lg">
-                  {selectedSurvey
-                    ? `"${selectedSurvey.title}" 설문지의 참여자 목록`
-                    : "설문지를 선택하면 해당 참여자 목록을 확인할 수 있습니다"}
+                  등록된 참여자들의 정보와 설문 진행 상황을 확인하세요
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {!selectedSurvey ? (
                   <div className="text-center py-8">
-                    <p className="text-xl text-gray-500">설문지 관리 탭에서 설문지를 선택해주세요</p>
+                    <p className="text-xl text-gray-500">설문지를 선택해주세요</p>
                   </div>
                 ) : loading ? (
                   <div className="text-center py-8">
@@ -933,17 +968,20 @@ export default function AdminPage() {
                           <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
                             휴대폰번호
                           </th>
-                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">완료여부</th>
-                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">액션</th>
+                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">상태</th>
+                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">등록일</th>
+                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
+                            설문 링크
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
-                        {participants.map((participant: any) => (
+                        {participants.map((participant) => (
                           <tr key={participant.id} className="hover:bg-gray-50">
                             <td className="border border-gray-300 px-4 py-3 text-lg">{participant.hospital_name}</td>
                             <td className="border border-gray-300 px-4 py-3 text-lg">{participant.participant_name}</td>
                             <td className="border border-gray-300 px-4 py-3 text-lg">{participant.phone_number}</td>
-                            <td className="border border-gray-300 px-4 py-3 text-lg">
+                            <td className="border border-gray-300 px-4 py-3">
                               <span
                                 className={`px-3 py-1 rounded-full text-sm font-semibold ${
                                   participant.is_completed
@@ -953,6 +991,9 @@ export default function AdminPage() {
                               >
                                 {participant.is_completed ? "완료" : "미완료"}
                               </span>
+                            </td>
+                            <td className="border border-gray-300 px-4 py-3 text-lg">
+                              {new Date(participant.created_at).toLocaleDateString("ko-KR")}
                             </td>
                             <td className="border border-gray-300 px-4 py-3">
                               <div className="flex space-x-2">
@@ -966,9 +1007,7 @@ export default function AdminPage() {
                                   링크 복사
                                 </Button>
                                 <Button
-                                  onClick={() =>
-                                    window.open(`${window.location.origin}/${participant.token}`, "_blank")
-                                  }
+                                  onClick={() => window.open(`/${participant.token}`, "_blank")}
                                   size="sm"
                                   variant="outline"
                                   className="text-sm"
@@ -993,12 +1032,8 @@ export default function AdminPage() {
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <div>
-                    <CardTitle className="text-2xl">설문 응답 결과</CardTitle>
-                    <CardDescription className="text-lg">
-                      {selectedSurvey
-                        ? `"${selectedSurvey.title}" 설문지의 응답 결과`
-                        : "설문지를 선택하면 해당 응답 결과를 확인할 수 있습니다"}
-                    </CardDescription>
+                    <CardTitle className="text-2xl">설문 결과</CardTitle>
+                    <CardDescription className="text-lg">완료된 설문 응답을 확인하고 다운로드하세요</CardDescription>
                   </div>
                   {responses.length > 0 && (
                     <Button onClick={downloadCSV} className="bg-green-600 hover:bg-green-700">
@@ -1011,7 +1046,7 @@ export default function AdminPage() {
               <CardContent>
                 {!selectedSurvey ? (
                   <div className="text-center py-8">
-                    <p className="text-xl text-gray-500">설문지 관리 탭에서 설문지를 선택해주세요</p>
+                    <p className="text-xl text-gray-500">설문지를 선택해주세요</p>
                   </div>
                 ) : loading ? (
                   <div className="text-center py-8">
@@ -1028,6 +1063,9 @@ export default function AdminPage() {
                         <tr className="bg-gray-100">
                           <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">병원명</th>
                           <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">참여자명</th>
+                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
+                            휴대폰번호
+                          </th>
                           <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">총점</th>
                           <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">완료일시</th>
                           <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">상세보기</th>
@@ -1037,13 +1075,16 @@ export default function AdminPage() {
                         {responses.map((response: any) => (
                           <tr key={response.id} className="hover:bg-gray-50">
                             <td className="border border-gray-300 px-4 py-3 text-lg">
-                              {response.survey_participants?.hospital_name}
+                              {response.survey_participants?.hospital_name || ""}
                             </td>
                             <td className="border border-gray-300 px-4 py-3 text-lg">
-                              {response.survey_participants?.participant_name}
+                              {response.survey_participants?.participant_name || ""}
                             </td>
-                            <td className="border border-gray-300 px-4 py-3 text-lg font-semibold">
-                              {response.total_score}/{response.max_possible_score}
+                            <td className="border border-gray-300 px-4 py-3 text-lg">
+                              {response.survey_participants?.phone_number || ""}
+                            </td>
+                            <td className="border border-gray-300 px-4 py-3 text-lg">
+                              {response.total_score || 0} / {response.max_possible_score || 0}
                             </td>
                             <td className="border border-gray-300 px-4 py-3 text-lg">
                               {new Date(response.created_at).toLocaleString("ko-KR")}
@@ -1070,416 +1111,304 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="stats">
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle className="text-2xl">통계 정보</CardTitle>
-                    <CardDescription className="text-lg">
-                      {selectedSurvey
-                        ? `"${selectedSurvey.title}" 설문지의 통계`
-                        : "설문지를 선택하면 해당 통계를 확인할 수 있습니다"}
-                    </CardDescription>
-                  </div>
-                  {selectedSurvey && responses.length > 0 && (
-                    <Button onClick={downloadStatsExcel} className="bg-purple-600 hover:bg-purple-700">
-                      <Download className="w-4 h-4 mr-2" />
-                      통계 엑셀 다운로드
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {!selectedSurvey ? (
-                  <div className="text-center py-8">
-                    <p className="text-xl text-gray-500">설문지 관리 탭에서 설문지를 선택해주세요</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-                      <Label htmlFor="hospitalFilter" className="text-lg font-medium text-blue-800 mb-2 block">
-                        병원별 통계 필터링
-                      </Label>
-                      <div className="flex items-center space-x-4">
-                        <Input
-                          id="hospitalFilter"
-                          value={hospitalFilter}
-                          onChange={(e) => setHospitalFilter(e.target.value)}
-                          placeholder="병원명을 입력하세요 (예: 서울대학교병원)"
-                          className="flex-1 h-10 text-lg"
-                        />
-                        <Button onClick={() => setHospitalFilter("")} variant="outline" className="h-10 px-4">
-                          전체 보기
-                        </Button>
-                      </div>
-                      <p className="text-sm text-blue-600 mt-2">
-                        * 병원명을 입력하면 해당 병원의 문항별 평균점수만 표시됩니다. 부분 검색도 가능합니다.
-                      </p>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle className="text-2xl">통계</CardTitle>
+                      <CardDescription className="text-lg">설문 결과에 대한 상세 통계를 확인하세요</CardDescription>
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                      <div className="bg-blue-50 p-6 rounded-lg text-center">
-                        <h3 className="text-2xl font-bold text-blue-600 mb-2">{participants.length}</h3>
-                        <p className="text-lg text-blue-800">총 참여자 수</p>
-                      </div>
-                      <div className="bg-green-50 p-6 rounded-lg text-center">
-                        <h3 className="text-2xl font-bold text-green-600 mb-2">{responses.length}</h3>
-                        <p className="text-lg text-green-800">완료된 설문 수</p>
-                      </div>
-                      <div className="bg-orange-50 p-6 rounded-lg text-center">
-                        <h3 className="text-2xl font-bold text-orange-600 mb-2">
-                          {participants.length > 0 ? Math.round((responses.length / participants.length) * 100) : 0}%
-                        </h3>
-                        <p className="text-lg text-orange-800">완료율</p>
-                      </div>
+                    {selectedSurvey && responses.length > 0 && (
+                      <Button onClick={downloadStatsExcel} className="bg-green-600 hover:bg-green-700">
+                        <Download className="w-4 h-4 mr-2" />
+                        통계 엑셀 다운로드
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {!selectedSurvey ? (
+                    <div className="text-center py-8">
+                      <p className="text-xl text-gray-500">설문지를 선택해주세요</p>
                     </div>
+                  ) : responses.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-xl text-gray-500">통계를 표시할 데이터가 없습니다</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-8">
+                      {/* 기본 통계 */}
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div className="bg-blue-50 p-6 rounded-lg">
+                          <h3 className="text-lg font-semibold text-blue-800">총 참여자</h3>
+                          <p className="text-3xl font-bold text-blue-600">{participants.length}명</p>
+                        </div>
+                        <div className="bg-green-50 p-6 rounded-lg">
+                          <h3 className="text-lg font-semibold text-green-800">완료된 설문</h3>
+                          <p className="text-3xl font-bold text-green-600">{responses.length}명</p>
+                        </div>
+                        <div className="bg-yellow-50 p-6 rounded-lg">
+                          <h3 className="text-lg font-semibold text-yellow-800">완료율</h3>
+                          <p className="text-3xl font-bold text-yellow-600">
+                            {participants.length > 0 ? Math.round((responses.length / participants.length) * 100) : 0}%
+                          </p>
+                        </div>
+                        <div className="bg-purple-50 p-6 rounded-lg">
+                          <h3 className="text-lg font-semibold text-purple-800">평균 점수</h3>
+                          <p className="text-3xl font-bold text-purple-600">
+                            {responses.length > 0
+                              ? (
+                                  responses.reduce((sum: number, r: any) => sum + (r.total_score || 0), 0) /
+                                  responses.length
+                                ).toFixed(1)
+                              : "0"}
+                            /{responses.length > 0 ? responses[0].max_possible_score : 0}
+                          </p>
+                        </div>
+                      </div>
 
-                    {responses.length > 0 && (
-                      <div className="space-y-6">
-                        <div className="bg-white p-6 rounded-lg border">
-                          <h3 className="text-xl font-semibold mb-4">평균 점수 분석</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="bg-purple-50 p-4 rounded-lg">
-                              <h4 className="text-lg font-medium text-purple-800 mb-2">전체 평균 점수</h4>
-                              <p className="text-2xl font-bold text-purple-600">
-                                {responses.length > 0
-                                  ? (
-                                      responses.reduce((sum: number, r: any) => sum + (r.total_score || 0), 0) /
-                                      responses.length
-                                    ).toFixed(1)
-                                  : 0}
-                                /{responses.length > 0 ? responses[0].max_possible_score : 0}
-                              </p>
-                            </div>
-                            <div className="bg-indigo-50 p-4 rounded-lg">
-                              <h4 className="text-lg font-medium text-indigo-800 mb-2">만족도 비율</h4>
-                              <p className="text-2xl font-bold text-indigo-600">
-                                {responses.length > 0 && responses[0].max_possible_score > 0
-                                  ? (
-                                      (responses.reduce((sum: number, r: any) => sum + (r.total_score || 0), 0) /
-                                        responses.length /
-                                        responses[0].max_possible_score) *
-                                      100
-                                    ).toFixed(1)
-                                  : 0}
-                                %
-                              </p>
-                            </div>
+                      {/* 문항별 평균점수 (병원별 필터링) */}
+                      <div>
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="text-xl font-semibold">문항별 평균점수</h3>
+                          <div className="flex items-center space-x-2">
+                            <Label htmlFor="hospitalFilter" className="text-sm">
+                              병원 필터:
+                            </Label>
+                            <Input
+                              id="hospitalFilter"
+                              value={hospitalFilter}
+                              onChange={(e) => setHospitalFilter(e.target.value)}
+                              placeholder="병원명 입력"
+                              className="w-48"
+                            />
                           </div>
                         </div>
-
-                        {questionStats.length > 0 && (
-                          <div className="bg-white p-6 rounded-lg border">
-                            <h3 className="text-xl font-semibold mb-4">
-                              문항별 평균 점수
-                              {hospitalFilter && (
-                                <span className="text-lg text-blue-600 font-normal ml-2">
-                                  (병원: "{hospitalFilter}")
-                                </span>
-                              )}
-                            </h3>
-                            <div className="overflow-x-auto">
-                              <table className="w-full border-collapse border border-gray-300">
-                                <thead>
-                                  <tr className="bg-gray-100">
-                                    <th className="border border-gray-300 px-4 py-2 text-left">문항</th>
-                                    <th className="border border-gray-300 px-4 py-2 text-left">문항 내용</th>
-                                    <th className="border border-gray-300 px-4 py-2 text-left">응답 수</th>
-                                    <th className="border border-gray-300 px-4 py-2 text-left">평균 점수</th>
-                                    <th className="border border-gray-300 px-4 py-2 text-left">만족도</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {questionStats.map((stat) => (
-                                    <tr key={stat.id} className="hover:bg-gray-50">
-                                      <td className="border border-gray-300 px-4 py-2 font-semibold">
-                                        문항 {stat.questionNumber}
-                                      </td>
-                                      <td className="border border-gray-300 px-4 py-2 max-w-xs">
-                                        <div className="truncate" title={stat.questionText}>
-                                          {stat.questionText}
-                                        </div>
-                                      </td>
-                                      <td className="border border-gray-300 px-4 py-2">{stat.totalResponses}</td>
-                                      <td className="border border-gray-300 px-4 py-2 font-semibold">
-                                        {stat.averageScore}/{stat.maxScore}
-                                      </td>
-                                      <td className="border border-gray-300 px-4 py-2">
-                                        <div className="flex items-center space-x-2">
-                                          <div className="flex-1 bg-gray-200 rounded-full h-2">
-                                            <div
-                                              className="bg-blue-500 h-2 rounded-full"
-                                              style={{
-                                                width: `${(Number.parseFloat(stat.averageScore) / stat.maxScore) * 100}%`,
-                                              }}
-                                            />
-                                          </div>
-                                          <span className="text-sm font-medium">
-                                            {((Number.parseFloat(stat.averageScore) / stat.maxScore) * 100).toFixed(1)}%
-                                          </span>
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="bg-white p-6 rounded-lg border">
-                          <h3 className="text-xl font-semibold mb-4">병원별 통계</h3>
+                        {questionStats.length > 0 ? (
                           <div className="overflow-x-auto">
                             <table className="w-full border-collapse border border-gray-300">
                               <thead>
                                 <tr className="bg-gray-100">
-                                  <th className="border border-gray-300 px-4 py-2 text-left">병원명</th>
-                                  <th className="border border-gray-300 px-4 py-2 text-left">응답 수</th>
-                                  <th className="border border-gray-300 px-4 py-2 text-left">평균 점수</th>
+                                  <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                                    문항 번호
+                                  </th>
+                                  <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                                    문항 내용
+                                  </th>
+                                  <th className="border border-gray-300 px-4 py-3 text-left font-semibold">응답 수</th>
+                                  <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                                    평균 점수
+                                  </th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {Object.entries(responses.reduce((acc: any, response: any) => {
-                                  const hospital = response.survey_participants?.hospital_name || "알 수 없음"
-                                  if (!acc[hospital]) {
-                                    acc[hospital] = { count: 0, totalScore: 0, maxScore: response.max_possible_score }
-                                  }
-                                  acc[hospital].count += 1
-                                  acc[hospital].totalScore += response.total_score || 0
-                                  return acc
-                                }, {})).map(([hospital, stats]: [string, any]) => (
-                                  <tr key={hospital}>
-                                    <td className="border border-gray-300 px-4 py-2">{hospital}</td>
-                                    <td className="border border-gray-300 px-4 py-2">{stats.count}</td>
-                                    <td className="border border-gray-300 px-4 py-2">
-                                      {(stats.totalScore / stats.count).toFixed(1)}/{stats.maxScore}
-                                    </td>
-                                  </tr>
-                                ))}
-                                {responses.reduce((acc: any, response: any) => {
-                                  const hospital = response.survey_participants?.hospital_name || "알 수 없음"
-                                  if (!acc[hospital]) {
-                                    acc[hospital] = { count: 0, totalScore: 0, maxScore: response.max_possible_score }
-                                  }
-                                  acc[hospital].count += 1
-                                  acc[hospital].totalScore += response.total_score || 0
-                                  return acc
-                                }, {}).length === 0 && (
-                                  <tr>
-                                    <td colSpan={3} className="border border-gray-300 px-4 py-2 text-center text-gray-500">
-                                      통계 데이터가 없습니다.
+                                {questionStats.map((stat) => (
+                                  <tr key={stat.id} className="hover:bg-gray-50">
+                                    <td className="border border-gray-300 px-4 py-3">{stat.questionNumber}</td>
+                                    <td className="border border-gray-300 px-4 py-3">{stat.questionText}</td>
+                                    <td className="border border-gray-300 px-4 py-3">{stat.totalResponses}</td>
+                                    <td className="border border-gray-300 px-4 py-3">
+                                      {stat.averageScore}/{stat.maxScore}
                                     </td>
                                   </tr>
                                 ))}
                               </tbody>
                             </table>
                           </div>
+                        ) : (
+                          <p className="text-gray-500">문항별 통계 데이터가 없습니다.</p>
+                        )}
+                      </div>
+
+                      {/* 병원별 통계 */}
+                      <div>
+                        <h3 className="text-xl font-semibold mb-4">병원별 통계</h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse border border-gray-300">
+                            <thead>
+                              <tr className="bg-gray-100">
+                                <th className="border border-gray-300 px-4 py-3 text-left font-semibold">병원명</th>
+                                <th className="border border-gray-300 px-4 py-3 text-left font-semibold">응답 수</th>
+                                <th className="border border-gray-300 px-4 py-3 text-left font-semibold">평균 점수</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {Object.entries(
+                                responses.reduce((acc: any, response: any) => {
+                                  const hospital = response.survey_participants?.hospital_name || "알 수 없음"
+                                  if (!acc[hospital]) {
+                                    acc[hospital] = { count: 0, totalScore: 0, maxScore: response.max_possible_score }
+                                  }
+                                  acc[hospital].count += 1
+                                  acc[hospital].totalScore += response.total_score || 0
+                                  return acc
+                                }, {}),
+                              ).map(([hospital, stats]: [string, any]) => (
+                                <tr key={hospital} className="hover:bg-gray-50">
+                                  <td className="border border-gray-300 px-4 py-3">{hospital}</td>
+                                  <td className="border border-gray-300 px-4 py-3">{stats.count}</td>
+                                  <td className="border border-gray-300 px-4 py-3">
+                                    {(stats.totalScore / stats.count).toFixed(1)}/{stats.maxScore}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
 
-        {showEditModal && editingSurvey && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <h2 className="text-2xl font-bold mb-4">설문지 수정</h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="editTitle" className="text-lg font-medium">
-                    설문지 제목 *
-                  </Label>
-                  <Input
-                    id="editTitle"
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    className="mt-2 h-12 text-lg"
-                    placeholder="설문지 제목을 입력하세요"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="editDescription" className="text-lg font-medium">
-                    설문지 설명
-                  </Label>
-                  <Textarea
-                    id="editDescription"
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
-                    className="mt-2 text-lg"
-                    placeholder="설문지에 대한 간단한 설명을 입력하세요"
-                    rows={3}
-                  />
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-4">
-                    <Label className="text-lg font-medium">설문 문항 *</Label>
-                    <Button onClick={addEditQuestion} size="sm" variant="outline">
-                      <Plus className="w-4 h-4 mr-1" />
-                      문항 추가
-                    </Button>
-                  </div>
-                  <div className="space-y-3">
-                    {editQuestions.map((question, index) => (
-                      <div key={index} className="flex gap-2">
-                        <div className="flex-1">
-                          <Input
-                            value={question}
-                            onChange={(e) => updateEditQuestion(index, e.target.value)}
-                            placeholder={`문항 ${index + 1}을 입력하세요`}
-                            className="h-12 text-lg"
-                          />
-                        </div>
-                        {editQuestions.length > 1 && (
-                          <Button onClick={() => removeEditQuestion(index)} size="sm" variant="outline">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}\
-                  </div>
-                </div>
-
-                {error && (
-                  <Alert className="border-red-200 bg-red-50">
-                    <AlertDescription className="text-red-700">{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="flex justify-end space-x-4 pt-4">
-                  <Button
-                    onClick={() => {
-                      setShowEditModal(false)
-                      setEditingSurvey(null)
-                      setError("")
-                    }}
-                    variant="outline"
-                    className="px-6"
-                  >
-                    취소
+        {/* 수정 모달 */}
+        <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>설문지 수정</DialogTitle>
+              <DialogDescription>설문지 정보를 수정하세요</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="editTitle">설문지 제목 *</Label>
+                <Input
+                  id="editTitle"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="mt-2"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editDescription">설문지 설명</Label>
+                <Textarea
+                  id="editDescription"
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  className="mt-2"
+                  rows={3}
+                />
+              </div>
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <Label>설문 문항 *</Label>
+                  <Button onClick={addEditQuestion} size="sm" variant="outline">
+                    <Plus className="w-4 h-4 mr-1" />
+                    문항 추가
                   </Button>
-                  <Button
-                    onClick={handleSaveEdit}
-                    disabled={editLoading}
-                    className="px-6 bg-blue-600 hover:bg-blue-700"
-                  >
-                    {editLoading ? "저장 중..." : "저장"}
-                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {editQuestions.map((question, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        value={question}
+                        onChange={(e) => updateEditQuestion(index, e.target.value)}
+                        placeholder={`문항 ${index + 1}`}
+                        className="flex-1"
+                      />
+                      {editQuestions.length > 1 && (
+                        <Button onClick={() => removeEditQuestion(index)} size="sm" variant="outline">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
-          </div>
-        )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowEditModal(false)}>
+                취소
+              </Button>
+              <Button onClick={handleSaveEdit} disabled={editLoading}>
+                {editLoading ? "저장 중..." : "저장"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-        {showDeleteConfirm && surveyToDelete && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <h2 className="text-xl font-bold mb-4 text-red-600">설문지 삭제 확인</h2>
-              
-              <div className="space-y-4">
-                <p className="text-lg">
-                  <strong>"{surveyToDelete.title}"</strong> 설문지를 삭제하시겠습니까?
-                </p>
-                <p className="text-sm text-gray-600">
-                  이 작업은 되돌릴 수 없으며, 관련된 모든 참여자 데이터와 응답 결과도 함께 삭제됩니다.
-                </p>
-                
-                <div>
-                  <Label htmlFor="deletePassword" className="text-lg font-medium text-red-700">
-                    관리자 비밀번호 입력 *
-                  </Label>
-                  <Input
-                    id="deletePassword"
-                    type="password"
-                    value={deletePassword}
-                    onChange={(e) => setDeletePassword(e.target.value)}
-                    className="mt-2 h-12 text-lg"
-                    placeholder="관리자 비밀번호를 입력하세요"
-                  />
-                </div>
-
-                {error && (
-                  <Alert className="border-red-200 bg-red-50">
-                    <AlertDescription className="text-red-700">{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="flex justify-end space-x-4 pt-4">
-                  <Button
-                    onClick={() => {
-                      setShowDeleteConfirm(false)
-                      setSurveyToDelete(null)
-                      setDeletePassword("")
-                      setError("")
-                    }}
-                    variant="outline"
-                    className="px-6"
-                  >
-                    취소
-                  </Button>
-                  <Button
-                    onClick={handleDeleteSurvey}
-                    disabled={deleteLoading}
-                    className="px-6 bg-red-600 hover:bg-red-700"
-                  >
-                    {deleteLoading ? "삭제 중..." : "삭제"}
-                  </Button>
-                </div>
-              </div>
+        {/* 삭제 확인 다이얼로그 */}
+        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>설문지 삭제</AlertDialogTitle>
+              <AlertDialogDescription>
+                정말로 이 설문지를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                <br />
+                <br />
+                삭제하려면 관리자 비밀번호를 입력하세요:
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="my-4">
+              <Input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="관리자 비밀번호"
+              />
             </div>
-          </div>
-        )}
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  setDeletePassword("")
+                }}
+              >
+                취소
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteSurvey}
+                disabled={deleteLoading}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {deleteLoading ? "삭제 중..." : "삭제"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-        {showDetailModal && selectedResponse && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <h2 className="text-2xl font-bold mb-4">설문 응답 상세보기</h2>
-              
+        {/* 상세보기 모달 */}
+        <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>설문 응답 상세</DialogTitle>
+            </DialogHeader>
+            {selectedResponse && (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-lg font-medium">병원명</Label>
-                    <p className="text-lg mt-1">{selectedResponse.survey_participants?.hospital_name}</p>
+                    <Label>병원명</Label>
+                    <p className="text-lg">{selectedResponse.survey_participants?.hospital_name || ""}</p>
                   </div>
                   <div>
-                    <Label className="text-lg font-medium">참여자명</Label>
-                    <p className="text-lg mt-1">{selectedResponse.survey_participants?.participant_name}</p>
+                    <Label>참여자명</Label>
+                    <p className="text-lg">{selectedResponse.survey_participants?.participant_name || ""}</p>
                   </div>
                   <div>
-                    <Label className="text-lg font-medium">총점</Label>
-                    <p className="text-lg mt-1 font-semibold">
-                      {selectedResponse.total_score}/{selectedResponse.max_possible_score}
-                    </p>
+                    <Label>휴대폰번호</Label>
+                    <p className="text-lg">{selectedResponse.survey_participants?.phone_number || ""}</p>
                   </div>
                   <div>
-                    <Label className="text-lg font-medium">완료일시</Label>
-                    <p className="text-lg mt-1">
-                      {new Date(selectedResponse.created_at).toLocaleString("ko-KR")}
-                    </p>
+                    <Label>완료일시</Label>
+                    <p className="text-lg">{new Date(selectedResponse.created_at).toLocaleString("ko-KR")}</p>
                   </div>
                 </div>
-
-                <div className="flex justify-end pt-4">
-                  <Button
-                    onClick={() => {
-                      setShowDetailModal(false)
-                      setSelectedResponse(null)
-                    }}
-                    className="px-6"
-                  >
-                    닫기
-                  </Button>
+                <div>
+                  <Label>총점</Label>
+                  <p className="text-2xl font-bold">
+                    {selectedResponse.total_score || 0} / {selectedResponse.max_possible_score || 0}
+                  </p>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
+            <DialogFooter>
+              <Button onClick={() => setShowDetailModal(false)}>닫기</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

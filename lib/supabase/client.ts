@@ -1,10 +1,14 @@
 import { createClient } from "@supabase/supabase-js"
 
-// 환경 변수 검증 및 안전한 fallback 처리
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+// 빌드 시점에서도 안전하게 처리
 export const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null
+
+export const isSupabaseConfigured = () => {
+  return !!(supabaseUrl && supabaseAnonKey)
+}
 
 export type SurveyData = {
   question_1: number
