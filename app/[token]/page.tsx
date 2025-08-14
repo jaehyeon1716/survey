@@ -334,9 +334,39 @@ export default function HospitalSurvey() {
             <CardTitle className="text-2xl text-center text-gray-800">문항 {currentQuestion + 1}</CardTitle>
           </CardHeader>
           <CardContent>
-            <h2 className="text-3xl font-medium text-center text-gray-800 mb-12 leading-relaxed">
+            <h2 className="text-3xl font-medium text-center text-gray-800 mb-8 leading-relaxed">
               {currentQuestionData?.question_text}
             </h2>
+
+            {/* 네비게이션 버튼 */}
+            <div className="flex justify-between items-center mb-8">
+              <Button
+                onClick={handlePrevious}
+                disabled={currentQuestion === 0}
+                variant="outline"
+                size="lg"
+                className="text-xl px-8 py-4 h-auto bg-transparent"
+              >
+                이전
+              </Button>
+
+              <div className="flex space-x-4">
+                {currentQuestion === questions.length - 1 ? (
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={!currentAnswer || isSubmitting}
+                    size="lg"
+                    className="text-xl px-12 py-4 h-auto bg-green-600 hover:bg-green-700"
+                  >
+                    {isSubmitting ? "제출 중..." : "설문 완료"}
+                  </Button>
+                ) : (
+                  <Button onClick={handleNext} disabled={!currentAnswer} size="lg" className="text-xl px-8 py-4 h-auto">
+                    다음
+                  </Button>
+                )}
+              </div>
+            </div>
 
             {/* 답변 선택지 */}
             <div className="space-y-4">
@@ -359,36 +389,6 @@ export default function HospitalSurvey() {
             </div>
           </CardContent>
         </Card>
-
-        {/* 네비게이션 버튼 */}
-        <div className="flex justify-between items-center">
-          <Button
-            onClick={handlePrevious}
-            disabled={currentQuestion === 0}
-            variant="outline"
-            size="lg"
-            className="text-xl px-8 py-4 h-auto bg-transparent"
-          >
-            이전
-          </Button>
-
-          <div className="flex space-x-4">
-            {currentQuestion === questions.length - 1 ? (
-              <Button
-                onClick={handleSubmit}
-                disabled={!currentAnswer || isSubmitting}
-                size="lg"
-                className="text-xl px-12 py-4 h-auto bg-green-600 hover:bg-green-700"
-              >
-                {isSubmitting ? "제출 중..." : "설문 완료"}
-              </Button>
-            ) : (
-              <Button onClick={handleNext} disabled={!currentAnswer} size="lg" className="text-xl px-8 py-4 h-auto">
-                다음
-              </Button>
-            )}
-          </div>
-        </div>
 
         {/* 답변 현황 표시 */}
         <div className="mt-8 p-6 bg-white rounded-xl shadow-sm">

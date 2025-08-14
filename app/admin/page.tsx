@@ -18,14 +18,14 @@ const ADMIN_PASSWORD = "hospital2024" // 실제 운영시에는 환경변수로 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState("")
-  const [surveys, setSurveys] = useState([])
+  const [surveys, setSurveys] = useState<any[]>([])
   const [selectedSurvey, setSelectedSurvey] = useState<any>(null)
-  const [participants, setParticipants] = useState([])
-  const [responses, setResponses] = useState([])
+  const [participants, setParticipants] = useState<any[]>([])
+  const [responses, setResponses] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [uploadLoading, setUploadLoading] = useState(false)
   const [uploadSuccess, setUploadSuccess] = useState("")
+  const [activeTab, setActiveTab] = useState("surveys")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   // 상세 보기 상태 추가
   const [selectedResponse, setSelectedResponse] = useState<any>(null)
@@ -37,16 +37,18 @@ export default function AdminPage() {
   const [createLoading, setCreateLoading] = useState(false)
 
   const [questionStats, setQuestionStats] = useState<any[]>([])
+  const [hospitalFilter, setHospitalFilter] = useState("")
 
-  const [editingSurvey, setEditingSurvey] = useState<any>(null)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [editingSurvey, setEditingSurvey] = useState<any>(null)
   const [editTitle, setEditTitle] = useState("")
   const [editDescription, setEditDescription] = useState("")
   const [editQuestions, setEditQuestions] = useState<string[]>([])
   const [editLoading, setEditLoading] = useState(false)
-  const [deleteLoading, setDeleteLoading] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [surveyToDelete, setSurveyToDelete] = useState<any>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deletePassword, setDeletePassword] = useState("")
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
@@ -134,7 +136,7 @@ export default function AdminPage() {
     }
   }
 
-  const fetchQuestionStats = async (surveyId: number) => {
+  const fetchQuestionStats = async (surveyId: number, hospitalName?: string) => {
     if (!supabase) return
 
     try {
@@ -146,20 +148,32 @@ export default function AdminPage() {
 
       if (questionsError || !questionsData) return
 
-      const { data: responsesData, error: responsesError } = await supabase
+      // 병원별 필터링을 위해 참여자 정보와 함께 응답 데이터 조회
+      let responsesQuery = supabase
         .from("survey_responses")
         .select(`
           question_id,
           response_value,
+          participant_token,
           survey_questions (
             question_text,
             question_number
+          ),
+          survey_participants!inner (
+            hospital_name
           )
         `)
         .in(
           "question_id",
           questionsData.map((q) => q.id),
         )
+
+      // 병원명 필터링 적용
+      if (hospitalName && hospitalName.trim() !== "") {
+        responsesQuery = responsesQuery.ilike("survey_participants.hospital_name", `%${hospitalName.trim()}%`)
+      }
+
+      const { data: responsesData, error: responsesError } = await responsesQuery
 
       if (responsesError || !responsesData) return
 
@@ -269,7 +283,7 @@ export default function AdminPage() {
       return
     }
 
-    setUploadLoading(true)
+    setLoading(true)
     setError("")
     setUploadSuccess("")
 
@@ -296,7 +310,7 @@ export default function AdminPage() {
     } catch (err) {
       setError("업로드 중 오류가 발생했습니다.")
     } finally {
-      setUploadLoading(false)
+      setLoading(false)
     }
   }
 
@@ -367,7 +381,7 @@ export default function AdminPage() {
       return
     }
 
-    setEditLoading(true)
+    setLoading(true)
     setError("")
 
     try {
@@ -400,7 +414,7 @@ export default function AdminPage() {
     } catch (err) {
       setError("설문지 수정 중 오류가 발생했습니다.")
     } finally {
-      setEditLoading(false)
+      setLoading(false)
     }
   }
 
@@ -411,6 +425,11 @@ export default function AdminPage() {
 
   const handleDeleteSurvey = async () => {
     if (!surveyToDelete) return
+
+    if (deletePassword !== ADMIN_PASSWORD) {
+      setError("비밀번호가 올바르지 않습니다.")
+      return
+    }
 
     setDeleteLoading(true)
     setError("")
@@ -426,6 +445,7 @@ export default function AdminPage() {
         setUploadSuccess("설문지가 성공적으로 삭제되었습니다.")
         setShowDeleteConfirm(false)
         setSurveyToDelete(null)
+        setDeletePassword("")
         fetchSurveys()
         // 현재 선택된 설문지가 삭제된 경우 선택 해제
         if (selectedSurvey?.id === surveyToDelete.id) {
@@ -469,6 +489,12 @@ export default function AdminPage() {
       fetchResponses(selectedSurvey.id)
     }
   }, [selectedSurvey])
+
+  useEffect(() => {
+    if (selectedSurvey) {
+      fetchQuestionStats(selectedSurvey.id, hospitalFilter)
+    }
+  }, [selectedSurvey, hospitalFilter])
 
   const downloadStatsExcel = () => {
     if (!selectedSurvey || responses.length === 0) {
@@ -840,10 +866,10 @@ export default function AdminPage() {
 
                       <Button
                         onClick={handleUpload}
-                        disabled={!selectedFile || uploadLoading}
+                        disabled={!selectedFile || loading}
                         className="w-full h-12 text-lg font-semibold bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
                       >
-                        {uploadLoading ? "업로드 중..." : "CSV 파일 업로드"}
+                        {loading ? "업로드 중..." : "CSV 파일 업로드"}
                       </Button>
                     </div>
 
@@ -1072,6 +1098,27 @@ export default function AdminPage() {
                   </div>
                 ) : (
                   <>
+                    <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                      <Label htmlFor="hospitalFilter" className="text-lg font-medium text-blue-800 mb-2 block">
+                        병원별 통계 필터링
+                      </Label>
+                      <div className="flex items-center space-x-4">
+                        <Input
+                          id="hospitalFilter"
+                          value={hospitalFilter}
+                          onChange={(e) => setHospitalFilter(e.target.value)}
+                          placeholder="병원명을 입력하세요 (예: 서울대학교병원)"
+                          className="flex-1 h-10 text-lg"
+                        />
+                        <Button onClick={() => setHospitalFilter("")} variant="outline" className="h-10 px-4">
+                          전체 보기
+                        </Button>
+                      </div>
+                      <p className="text-sm text-blue-600 mt-2">
+                        * 병원명을 입력하면 해당 병원의 문항별 평균점수만 표시됩니다. 부분 검색도 가능합니다.
+                      </p>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                       <div className="bg-blue-50 p-6 rounded-lg text-center">
                         <h3 className="text-2xl font-bold text-blue-600 mb-2">{participants.length}</h3>
@@ -1125,7 +1172,14 @@ export default function AdminPage() {
 
                         {questionStats.length > 0 && (
                           <div className="bg-white p-6 rounded-lg border">
-                            <h3 className="text-xl font-semibold mb-4">문항별 평균 점수</h3>
+                            <h3 className="text-xl font-semibold mb-4">
+                              문항별 평균 점수
+                              {hospitalFilter && (
+                                <span className="text-lg text-blue-600 font-normal ml-2">
+                                  (병원: "{hospitalFilter}")
+                                </span>
+                              )}
+                            </h3>
                             <div className="overflow-x-auto">
                               <table className="w-full border-collapse border border-gray-300">
                                 <thead>
@@ -1186,27 +1240,7 @@ export default function AdminPage() {
                                   <th className="border border-gray-300 px-4 py-2 text-left">평균 점수</th>
                                 </tr>
                               </thead>
-                              <tbody>
-                                {Object.entries(
-                                  responses.reduce((acc: any, response: any) => {
-                                    const hospital = response.survey_participants?.hospital_name || "알 수 없음"
-                                    if (!acc[hospital]) {
-                                      acc[hospital] = { count: 0, totalScore: 0, maxScore: response.max_possible_score }
-                                    }
-                                    acc[hospital].count += 1
-                                    acc[hospital].totalScore += response.total_score || 0
-                                    return acc
-                                  }, {}),
-                                ).map(([hospital, stats]: [string, any]) => (
-                                  <tr key={hospital} className="hover:bg-gray-50">
-                                    <td className="border border-gray-300 px-4 py-2">{hospital}</td>
-                                    <td className="border border-gray-300 px-4 py-2">{stats.count}</td>
-                                    <td className="border border-gray-300 px-4 py-2 font-semibold">
-                                      {(stats.totalScore / stats.count).toFixed(1)}/{stats.maxScore}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
+                              <tbody>{/* 병원별 통계 데이터를 여기에 추가 */}</tbody>
                             </table>
                           </div>
                         </div>
@@ -1218,166 +1252,6 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
         </Tabs>
-
-        {/* 상세보기 모달 추가 */}
-        {showDetailModal && selectedResponse && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold">설문 응답 상세</h2>
-                  <Button onClick={() => setShowDetailModal(false)} variant="outline" size="sm">
-                    닫기
-                  </Button>
-                </div>
-
-                <div className="space-y-6">
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <h3 className="text-lg font-semibold mb-2">참여자 정보</h3>
-                    <p>
-                      <strong>병원명:</strong> {selectedResponse.survey_participants?.hospital_name}
-                    </p>
-                    <p>
-                      <strong>참여자명:</strong> {selectedResponse.survey_participants?.participant_name}
-                    </p>
-                    <p>
-                      <strong>완료일시:</strong> {new Date(selectedResponse.created_at).toLocaleString("ko-KR")}
-                    </p>
-                  </div>
-
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="text-lg font-semibold mb-4">응답 요약</h3>
-                    <div className="text-center p-4 bg-green-100 rounded">
-                      <span className="text-2xl font-bold text-green-800">
-                        총점: {selectedResponse.total_score}/{selectedResponse.max_possible_score}점
-                      </span>
-                      <p className="text-green-600 mt-2">
-                        만족도:{" "}
-                        {((selectedResponse.total_score / selectedResponse.max_possible_score) * 100).toFixed(1)}%
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showEditModal && editingSurvey && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold">설문지 수정</h2>
-                  <Button onClick={() => setShowEditModal(false)} variant="outline" size="sm">
-                    닫기
-                  </Button>
-                </div>
-
-                <div className="space-y-6">
-                  <div>
-                    <Label htmlFor="editTitle" className="text-lg font-medium">
-                      설문지 제목 *
-                    </Label>
-                    <Input
-                      id="editTitle"
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      className="mt-2 h-12 text-lg"
-                      placeholder="설문지 제목을 입력하세요"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="editDescription" className="text-lg font-medium">
-                      설문지 설명
-                    </Label>
-                    <Textarea
-                      id="editDescription"
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      className="mt-2 text-lg"
-                      placeholder="설문지에 대한 간단한 설명을 입력하세요"
-                      rows={3}
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-4">
-                      <Label className="text-lg font-medium">설문 문항 *</Label>
-                      <Button onClick={addEditQuestion} size="sm" variant="outline">
-                        <Plus className="w-4 h-4 mr-1" />
-                        문항 추가
-                      </Button>
-                    </div>
-                    <div className="space-y-3">
-                      {editQuestions.map((question, index) => (
-                        <div key={index} className="flex gap-2">
-                          <div className="flex-1">
-                            <Input
-                              value={question}
-                              onChange={(e) => updateEditQuestion(index, e.target.value)}
-                              placeholder={`문항 ${index + 1}을 입력하세요`}
-                              className="h-12 text-lg"
-                            />
-                          </div>
-                          {editQuestions.length > 1 && (
-                            <Button onClick={() => removeEditQuestion(index)} size="sm" variant="outline">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex space-x-4">
-                    <Button
-                      onClick={handleSaveEdit}
-                      disabled={editLoading}
-                      className="flex-1 h-12 text-lg font-semibold bg-blue-600 hover:bg-blue-700"
-                    >
-                      {editLoading ? "수정 중..." : "수정 완료"}
-                    </Button>
-                    <Button onClick={() => setShowEditModal(false)} variant="outline" className="flex-1 h-12 text-lg">
-                      취소
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showDeleteConfirm && surveyToDelete && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-md w-full">
-              <div className="p-6">
-                <h2 className="text-xl font-bold mb-4 text-red-600">설문지 삭제 확인</h2>
-                <p className="text-lg mb-2">다음 설문지를 삭제하시겠습니까?</p>
-                <p className="font-semibold text-lg mb-4">"{surveyToDelete.title}"</p>
-                <div className="bg-red-50 p-4 rounded-lg mb-6">
-                  <p className="text-red-700 text-sm">
-                    ⚠️ 주의: 설문지를 삭제하면 관련된 모든 참여자 정보와 응답 데이터가 함께 삭제됩니다. 이 작업은 되돌릴
-                    수 없습니다.
-                  </p>
-                </div>
-                <div className="flex space-x-4">
-                  <Button
-                    onClick={handleDeleteSurvey}
-                    disabled={deleteLoading}
-                    className="flex-1 h-12 text-lg font-semibold bg-red-600 hover:bg-red-700"
-                  >
-                    {deleteLoading ? "삭제 중..." : "삭제"}
-                  </Button>
-                  <Button onClick={() => setShowDeleteConfirm(false)} variant="outline" className="flex-1 h-12 text-lg">
-                    취소
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
