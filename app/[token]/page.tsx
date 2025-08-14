@@ -5,7 +5,7 @@ import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { supabase } from "@/lib/supabase/client"
-import { CheckCircle, Heart, AlertCircle, User, Building2 } from "lucide-react"
+import { CheckCircle, Heart, AlertCircle } from "lucide-react"
 
 const scaleLabels = [
   { value: 5, label: "매우 그렇다", color: "bg-green-500" },
@@ -297,16 +297,9 @@ export default function HospitalSurvey() {
 
           {participant && (
             <div className="bg-white p-6 rounded-xl shadow-sm max-w-md mx-auto">
-              <div className="flex items-center justify-center space-x-4 text-lg">
-                <div className="flex items-center space-x-2">
-                  <Building2 className="w-6 h-6 text-blue-500" />
-                  <span className="font-medium text-gray-800">{participant.hospital_name}</span>
-                </div>
-                <div className="w-px h-6 bg-gray-300"></div>
-                <div className="flex items-center space-x-2">
-                  <User className="w-6 h-6 text-green-500" />
-                  <span className="font-medium text-gray-800">{participant.participant_name}님</span>
-                </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-gray-800 mb-2">{participant.participant_name}님 안녕하세요</p>
+                <p className="text-xl text-blue-600 font-medium">{participant.hospital_name} 만족도조사입니다</p>
               </div>
             </div>
           )}

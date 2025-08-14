@@ -538,22 +538,20 @@ export default function AdminPage() {
     ]
 
     // 병원별 통계 데이터
-    const hospitalStats = Object.entries(
-      responses.reduce((acc: any, response: any) => {
-        const hospital = response.survey_participants?.hospital_name || "알 수 없음"
-        if (!acc[hospital]) {
-          acc[hospital] = { count: 0, totalScore: 0, maxScore: response.max_possible_score }
-        }
-        acc[hospital].count += 1
-        acc[hospital].totalScore += response.total_score || 0
-        return acc
-      }, {}),
-    )
+    const hospitalStats = responses.reduce((acc: any, response: any) => {
+      const hospital = response.survey_participants?.hospital_name || "알 수 없음"
+      if (!acc[hospital]) {
+        acc[hospital] = { count: 0, totalScore: 0, maxScore: response.max_possible_score }
+      }
+      acc[hospital].count += 1
+      acc[hospital].totalScore += response.total_score || 0
+      return acc
+    }, {})
 
     const hospitalStatsData = [
       ["병원별 통계"],
       ["병원명", "응답 수", "평균 점수"],
-      ...hospitalStats.map(([hospital, stats]: [string, any]) => [
+      ...Object.entries(hospitalStats).map(([hospital, stats]: [string, any]) => [
         hospital,
         stats.count.toString(),
         `${(stats.totalScore / stats.count).toFixed(1)}/${stats.maxScore}`,
@@ -1240,7 +1238,40 @@ export default function AdminPage() {
                                   <th className="border border-gray-300 px-4 py-2 text-left">평균 점수</th>
                                 </tr>
                               </thead>
-                              <tbody>{/* 병원별 통계 데이터를 여기에 추가 */}</tbody>
+                              <tbody>
+                                {Object.entries(responses.reduce((acc: any, response: any) => {
+                                  const hospital = response.survey_participants?.hospital_name || "알 수 없음"
+                                  if (!acc[hospital]) {
+                                    acc[hospital] = { count: 0, totalScore: 0, maxScore: response.max_possible_score }
+                                  }
+                                  acc[hospital].count += 1
+                                  acc[hospital].totalScore += response.total_score || 0
+                                  return acc
+                                }, {})).map(([hospital, stats]: [string, any]) => (
+                                  <tr key={hospital}>
+                                    <td className="border border-gray-300 px-4 py-2">{hospital}</td>
+                                    <td className="border border-gray-300 px-4 py-2">{stats.count}</td>
+                                    <td className="border border-gray-300 px-4 py-2">
+                                      {(stats.totalScore / stats.count).toFixed(1)}/{stats.maxScore}
+                                    </td>
+                                  </tr>
+                                ))}
+                                {responses.reduce((acc: any, response: any) => {
+                                  const hospital = response.survey_participants?.hospital_name || "알 수 없음"
+                                  if (!acc[hospital]) {
+                                    acc[hospital] = { count: 0, totalScore: 0, maxScore: response.max_possible_score }
+                                  }
+                                  acc[hospital].count += 1
+                                  acc[hospital].totalScore += response.total_score || 0
+                                  return acc
+                                }, {}).length === 0 && (
+                                  <tr>
+                                    <td colSpan={3} className="border border-gray-300 px-4 py-2 text-center text-gray-500">
+                                      통계 데이터가 없습니다.
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
                             </table>
                           </div>
                         </div>
@@ -1252,6 +1283,203 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {showEditModal && editingSurvey && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <h2 className="text-2xl font-bold mb-4">설문지 수정</h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="editTitle" className="text-lg font-medium">
+                    설문지 제목 *
+                  </Label>
+                  <Input
+                    id="editTitle"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="mt-2 h-12 text-lg"
+                    placeholder="설문지 제목을 입력하세요"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="editDescription" className="text-lg font-medium">
+                    설문지 설명
+                  </Label>
+                  <Textarea
+                    id="editDescription"
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    className="mt-2 text-lg"
+                    placeholder="설문지에 대한 간단한 설명을 입력하세요"
+                    rows={3}
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <Label className="text-lg font-medium">설문 문항 *</Label>
+                    <Button onClick={addEditQuestion} size="sm" variant="outline">
+                      <Plus className="w-4 h-4 mr-1" />
+                      문항 추가
+                    </Button>
+                  </div>
+                  <div className="space-y-3">
+                    {editQuestions.map((question, index) => (
+                      <div key={index} className="flex gap-2">
+                        <div className="flex-1">
+                          <Input
+                            value={question}
+                            onChange={(e) => updateEditQuestion(index, e.target.value)}
+                            placeholder={`문항 ${index + 1}을 입력하세요`}
+                            className="h-12 text-lg"
+                          />
+                        </div>
+                        {editQuestions.length > 1 && (
+                          <Button onClick={() => removeEditQuestion(index)} size="sm" variant="outline">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}\
+                  </div>
+                </div>
+
+                {error && (
+                  <Alert className="border-red-200 bg-red-50">
+                    <AlertDescription className="text-red-700">{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="flex justify-end space-x-4 pt-4">
+                  <Button
+                    onClick={() => {
+                      setShowEditModal(false)
+                      setEditingSurvey(null)
+                      setError("")
+                    }}
+                    variant="outline"
+                    className="px-6"
+                  >
+                    취소
+                  </Button>
+                  <Button
+                    onClick={handleSaveEdit}
+                    disabled={editLoading}
+                    className="px-6 bg-blue-600 hover:bg-blue-700"
+                  >
+                    {editLoading ? "저장 중..." : "저장"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showDeleteConfirm && surveyToDelete && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h2 className="text-xl font-bold mb-4 text-red-600">설문지 삭제 확인</h2>
+              
+              <div className="space-y-4">
+                <p className="text-lg">
+                  <strong>"{surveyToDelete.title}"</strong> 설문지를 삭제하시겠습니까?
+                </p>
+                <p className="text-sm text-gray-600">
+                  이 작업은 되돌릴 수 없으며, 관련된 모든 참여자 데이터와 응답 결과도 함께 삭제됩니다.
+                </p>
+                
+                <div>
+                  <Label htmlFor="deletePassword" className="text-lg font-medium text-red-700">
+                    관리자 비밀번호 입력 *
+                  </Label>
+                  <Input
+                    id="deletePassword"
+                    type="password"
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    className="mt-2 h-12 text-lg"
+                    placeholder="관리자 비밀번호를 입력하세요"
+                  />
+                </div>
+
+                {error && (
+                  <Alert className="border-red-200 bg-red-50">
+                    <AlertDescription className="text-red-700">{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="flex justify-end space-x-4 pt-4">
+                  <Button
+                    onClick={() => {
+                      setShowDeleteConfirm(false)
+                      setSurveyToDelete(null)
+                      setDeletePassword("")
+                      setError("")
+                    }}
+                    variant="outline"
+                    className="px-6"
+                  >
+                    취소
+                  </Button>
+                  <Button
+                    onClick={handleDeleteSurvey}
+                    disabled={deleteLoading}
+                    className="px-6 bg-red-600 hover:bg-red-700"
+                  >
+                    {deleteLoading ? "삭제 중..." : "삭제"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showDetailModal && selectedResponse && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <h2 className="text-2xl font-bold mb-4">설문 응답 상세보기</h2>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-lg font-medium">병원명</Label>
+                    <p className="text-lg mt-1">{selectedResponse.survey_participants?.hospital_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-lg font-medium">참여자명</Label>
+                    <p className="text-lg mt-1">{selectedResponse.survey_participants?.participant_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-lg font-medium">총점</Label>
+                    <p className="text-lg mt-1 font-semibold">
+                      {selectedResponse.total_score}/{selectedResponse.max_possible_score}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-lg font-medium">완료일시</Label>
+                    <p className="text-lg mt-1">
+                      {new Date(selectedResponse.created_at).toLocaleString("ko-KR")}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-4">
+                  <Button
+                    onClick={() => {
+                      setShowDetailModal(false)
+                      setSelectedResponse(null)
+                    }}
+                    className="px-6"
+                  >
+                    닫기
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
