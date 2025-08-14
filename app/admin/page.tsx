@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -89,7 +89,9 @@ export default function AdminPage() {
   const [createLoading, setCreateLoading] = useState(false)
 
   const [questionStats, setQuestionStats] = useState<QuestionStat[]>([])
-  const [hospitalFilter, setHospitalFilter] = useState("")
+  const [hospitalFilter, setHospitalFilter] = useState<string>("")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [filteredParticipants, setFilteredParticipants] = useState<Participant[]>([])
 
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingSurvey, setEditingSurvey] = useState<Survey | null>(null)
@@ -523,6 +525,23 @@ export default function AdminPage() {
     setEditQuestions(updated)
   }
 
+  const filterParticipants = useCallback(() => {
+    let filtered = participants
+
+    // 병원명 필터
+    if (hospitalFilter.trim()) {
+      filtered = filtered.filter((p) => p.hospital_name.toLowerCase().includes(hospitalFilter.toLowerCase()))
+    }
+
+    // 상태 필터
+    if (statusFilter !== "all") {
+      const isCompleted = statusFilter === "completed"
+      filtered = filtered.filter((p) => p.is_completed === isCompleted)
+    }
+
+    setFilteredParticipants(filtered)
+  }, [participants, hospitalFilter, statusFilter])
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchSurveys()
@@ -542,10 +561,69 @@ export default function AdminPage() {
     }
   }, [selectedSurvey, hospitalFilter])
 
-  const downloadStatsExcel = () => {
+  useEffect(() => {
+    filterParticipants()
+  }, [filterParticipants])
+
+  const downloadStatsExcel = async () => {
     if (!selectedSurvey || responses.length === 0) {
       alert("다운로드할 통계 데이터가 없습니다.")
       return
+    }
+
+    const hospitalQuestionStats: any = {}
+
+    try {
+      if (supabase) {
+        // 병원별 문항별 응답 데이터 조회
+        const { data: detailedResponses, error } = await supabase
+          .from("survey_responses")
+          .select(`
+            question_id,
+            response_value,
+            survey_questions (
+              question_text,
+              question_number
+            ),
+            survey_participants!inner (
+              hospital_name
+            )
+          `)
+          .in(
+            "question_id",
+            questionStats.map((q) => q.id),
+          )
+
+        if (!error && detailedResponses) {
+          // 병원별 문항별 통계 계산
+          detailedResponses.forEach((response: any) => {
+            const hospital = response.survey_participants?.hospital_name || "알 수 없음"
+            const questionId = response.question_id
+            const questionNumber = response.survey_questions?.question_number || 0
+            const questionText = response.survey_questions?.question_text || ""
+
+            if (!hospitalQuestionStats[hospital]) {
+              hospitalQuestionStats[hospital] = {}
+            }
+
+            if (!hospitalQuestionStats[hospital][questionId]) {
+              hospitalQuestionStats[hospital][questionId] = {
+                questionNumber,
+                questionText,
+                responses: [],
+                total: 0,
+                count: 0,
+              }
+            }
+
+            hospitalQuestionStats[hospital][questionId].responses.push(response.response_value)
+            hospitalQuestionStats[hospital][questionId].total += response.response_value
+            hospitalQuestionStats[hospital][questionId].count += 1
+          })
+        }
+      }
+    } catch (err) {
+      console.error("병원별 문항별 통계 조회 오류:", err)
     }
 
     const basicStats = [
@@ -599,9 +677,53 @@ export default function AdminPage() {
         stats.count.toString(),
         `${(stats.totalScore / stats.count).toFixed(1)}/${stats.maxScore}`,
       ]),
+      [""],
     ]
 
-    const allData = [...basicStats, ...questionStatsData, ...hospitalStatsData]
+    const hospitalQuestionStatsData = [
+      ["병원별 문항별 상세 통계"],
+      ["병원명", "문항 번호", "문항 내용", "응답 수", "평균 점수"],
+    ]
+
+    // 병원별로 정렬하여 데이터 추가
+    Object.keys(hospitalQuestionStats)
+      .sort()
+      .forEach((hospital) => {
+        const hospitalData = hospitalQuestionStats[hospital]
+
+        // 문항 번호순으로 정렬
+        const sortedQuestions = Object.values(hospitalData).sort(
+          (a: any, b: any) => a.questionNumber - b.questionNumber,
+        )
+
+        sortedQuestions.forEach((questionData: any) => {
+          const average = questionData.count > 0 ? (questionData.total / questionData.count).toFixed(1) : "0"
+          hospitalQuestionStatsData.push([
+            hospital,
+            questionData.questionNumber.toString(),
+            questionData.questionText,
+            questionData.count.toString(),
+            `${average}/5`,
+          ])
+        })
+
+        // 병원별 전체 평균 추가
+        const hospitalTotalStats = hospitalStats[hospital]
+        if (hospitalTotalStats) {
+          hospitalQuestionStatsData.push([
+            hospital,
+            "전체",
+            "모든 문항 평균",
+            hospitalTotalStats.count.toString(),
+            `${(hospitalTotalStats.totalScore / hospitalTotalStats.count).toFixed(1)}/${hospitalTotalStats.maxScore}`,
+          ])
+        }
+
+        // 병원 구분을 위한 빈 줄
+        hospitalQuestionStatsData.push(["", "", "", "", ""])
+      })
+
+    const allData = [...basicStats, ...questionStatsData, ...hospitalStatsData, ...hospitalQuestionStatsData]
 
     const csvContent = allData.map((row) => row.map((field) => `"${field}"`).join(",")).join("\n")
 
@@ -959,68 +1081,115 @@ export default function AdminPage() {
                     <p className="text-xl text-gray-500">등록된 참여자가 없습니다</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse border border-gray-300">
-                      <thead>
-                        <tr className="bg-gray-100">
-                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">병원명</th>
-                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">참여자명</th>
-                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
-                            휴대폰번호
-                          </th>
-                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">상태</th>
-                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">등록일</th>
-                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
-                            설문 링크
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {participants.map((participant) => (
-                          <tr key={participant.id} className="hover:bg-gray-50">
-                            <td className="border border-gray-300 px-4 py-3 text-lg">{participant.hospital_name}</td>
-                            <td className="border border-gray-300 px-4 py-3 text-lg">{participant.participant_name}</td>
-                            <td className="border border-gray-300 px-4 py-3 text-lg">{participant.phone_number}</td>
-                            <td className="border border-gray-300 px-4 py-3">
-                              <span
-                                className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                                  participant.is_completed
-                                    ? "bg-green-100 text-green-800"
-                                    : "bg-yellow-100 text-yellow-800"
-                                }`}
-                              >
-                                {participant.is_completed ? "완료" : "미완료"}
-                              </span>
-                            </td>
-                            <td className="border border-gray-300 px-4 py-3 text-lg">
-                              {new Date(participant.created_at).toLocaleDateString("ko-KR")}
-                            </td>
-                            <td className="border border-gray-300 px-4 py-3">
-                              <div className="flex space-x-2">
-                                <Button
-                                  onClick={() => copyToClipboard(participant.token)}
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-sm"
-                                >
-                                  <Copy className="w-4 h-4 mr-1" />
-                                  링크 복사
-                                </Button>
-                                <Button
-                                  onClick={() => window.open(`/${participant.token}`, "_blank")}
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-sm"
-                                >
-                                  <ExternalLink className="w-4 h-4 mr-1" />
-                                  열기
-                                </Button>
-                              </div>
-                            </td>
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-4 p-4 bg-gray-50 rounded-lg">
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">병원명 검색</label>
+                        <input
+                          type="text"
+                          placeholder="병원명을 입력하세요"
+                          value={hospitalFilter}
+                          onChange={(e) => setHospitalFilter(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">완료 상태</label>
+                        <select
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="all">전체</option>
+                          <option value="completed">완료</option>
+                          <option value="incomplete">미완료</option>
+                        </select>
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          onClick={() => {
+                            setHospitalFilter("")
+                            setStatusFilter("all")
+                          }}
+                          variant="outline"
+                          className="px-4 py-2"
+                        >
+                          필터 초기화
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="text-sm text-gray-600 mb-2">
+                      총 {participants.length}명 중 {filteredParticipants.length}명 표시
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border border-gray-300">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">병원명</th>
+                            <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
+                              참여자명
+                            </th>
+                            <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
+                              휴대폰번호
+                            </th>
+                            <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">상태</th>
+                            <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">등록일</th>
+                            <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
+                              설문 링크
+                            </th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {filteredParticipants.map((participant) => (
+                            <tr key={participant.id} className="hover:bg-gray-50">
+                              <td className="border border-gray-300 px-4 py-3 text-lg">{participant.hospital_name}</td>
+                              <td className="border border-gray-300 px-4 py-3 text-lg">
+                                {participant.participant_name}
+                              </td>
+                              <td className="border border-gray-300 px-4 py-3 text-lg">{participant.phone_number}</td>
+                              <td className="border border-gray-300 px-4 py-3">
+                                <span
+                                  className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                                    participant.is_completed
+                                      ? "bg-green-100 text-green-800"
+                                      : "bg-yellow-100 text-yellow-800"
+                                  }`}
+                                >
+                                  {participant.is_completed ? "완료" : "미완료"}
+                                </span>
+                              </td>
+                              <td className="border border-gray-300 px-4 py-3 text-lg">
+                                {new Date(participant.created_at).toLocaleDateString("ko-KR")}
+                              </td>
+                              <td className="border border-gray-300 px-4 py-3">
+                                <div className="flex space-x-2">
+                                  <Button
+                                    onClick={() => copyToClipboard(participant.token)}
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-sm"
+                                  >
+                                    <Copy className="w-4 h-4 mr-1" />
+                                    링크 복사
+                                  </Button>
+                                  <Button
+                                    onClick={() => window.open(`/${participant.token}`, "_blank")}
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-sm"
+                                  >
+                                    <ExternalLink className="w-4 h-4 mr-1" />
+                                    열기
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </CardContent>
