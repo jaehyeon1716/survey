@@ -158,171 +158,300 @@ export default function AdminPage() {
   }
 
   const downloadGuide = () => {
-    import("jspdf")
-      .then(({ jsPDF }) => {
-        const doc = new jsPDF()
+    // HTML 기반 가이드 생성
+    const guideHTML = `
+      <!DOCTYPE html>
+      <html lang="ko">
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: 'Malgun Gothic', '맑은 고딕', Arial, sans-serif; line-height: 1.6; margin: 20px; }
+          .header { text-align: center; color: #2563eb; border-bottom: 3px solid #2563eb; padding-bottom: 10px; margin-bottom: 30px; }
+          .section { margin-bottom: 30px; page-break-inside: avoid; }
+          .section-title { color: #1e40af; font-size: 18px; font-weight: bold; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+          .step { margin-bottom: 20px; padding: 15px; background-color: #f8fafc; border-radius: 8px; border-left: 4px solid #10b981; }
+          .step-title { font-weight: bold; color: #065f46; margin-bottom: 10px; }
+          .step-content { margin-left: 15px; }
+          .highlight { background-color: #fef3c7; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+          .warning { background-color: #fee2e2; padding: 10px; border-radius: 6px; border-left: 4px solid #ef4444; margin: 10px 0; }
+          .info { background-color: #dbeafe; padding: 10px; border-radius: 6px; border-left: 4px solid #3b82f6; margin: 10px 0; }
+          .code { background-color: #f1f5f9; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 14px; }
+          .screenshot { width: 100%; max-width: 600px; border: 2px solid #e5e7eb; border-radius: 8px; margin: 10px 0; }
+          ul { margin-left: 20px; }
+          li { margin-bottom: 8px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>🏥 병원 만족도 조사 시스템</h1>
+          <h2>관리자 페이지 사용 가이드</h2>
+          <p>버전 1.0 | ${new Date().toLocaleDateString("ko-KR")}</p>
+        </div>
 
-        // 한글 폰트 설정을 위한 기본 설정
-        doc.setFont("helvetica")
-        doc.setFontSize(16)
+        <div class="section">
+          <div class="section-title">📋 1. 설문지 생성 및 관리</div>
+          
+          <div class="step">
+            <div class="step-title">1-1. 새 설문지 만들기</div>
+            <div class="step-content">
+              <ul>
+                <li><span class="highlight">'설문지 생성'</span> 탭을 클릭합니다</li>
+                <li>설문지 제목과 설명을 입력합니다</li>
+                <li>문항을 하나씩 추가합니다 (예: "의료진의 친절도에 만족하십니까?")</li>
+                <li>모든 문항은 5점 척도로 평가됩니다</li>
+              </ul>
+              <div class="info">
+                💡 <strong>팁:</strong> 문항은 명확하고 이해하기 쉽게 작성하세요. 고령자가 주 대상이므로 간단한 표현을 사용하는 것이 좋습니다.
+              </div>
+            </div>
+          </div>
 
-        const guideContent = [
-          "관리자 페이지 사용 가이드",
-          "",
-          "1. 설문지 생성",
-          "   - '설문지 생성' 탭에서 새로운 설문지를 만들 수 있습니다.",
-          "   - 설문지 제목, 설명을 입력하고 문항들을 추가합니다.",
-          "   - 각 문항은 5점 척도(매우 그렇다 ~ 전혀 그렇지 않다)로 평가됩니다.",
-          "",
-          "2. 설문지 관리",
-          "   - '설문지 목록' 탭에서 생성된 설문지를 확인할 수 있습니다.",
-          "   - 수정 버튼으로 설문지 내용을 변경할 수 있습니다.",
-          "   - 삭제 시에는 관리자 비밀번호(hospital2024) 재입력이 필요합니다.",
-          "",
-          "3. 참여자 등록",
-          "   - 특정 설문지를 선택한 후 CSV 파일로 참여자를 등록합니다.",
-          "   - CSV 형식: 병원명|참여자명|휴대폰번호 (파이프 구분자 사용)",
-          "   - 기존 참여자는 새로운 CSV 업로드 시 초기화됩니다.",
-          "   - 중복 참여자(병원명, 참여자명, 휴대폰번호 모두 동일)는 자동 제거됩니다.",
-          "",
-          "4. 참여자 관리",
-          "   - '참여자 목록' 탭에서 등록된 참여자를 확인할 수 있습니다.",
-          "   - 병원명으로 검색하거나 완료/미완료 상태로 필터링 가능합니다.",
-          "   - '연락처 다운로드' 버튼으로 문자 발송용 CSV 파일을 다운로드할 수 있습니다.",
-          "   - 각 참여자의 설문 링크를 복사하여 개별 발송도 가능합니다.",
-          "",
-          "5. 설문 결과 조회",
-          "   - '설문 결과' 탭에서 완료된 설문 응답을 확인할 수 있습니다.",
-          "   - 참여자별 상세 응답과 총점을 볼 수 있습니다.",
-          "   - CSV 다운로드로 결과 데이터를 추출할 수 있습니다.",
-          "",
-          "6. 통계 분석",
-          "   - '통계' 탭에서 설문 결과를 분석할 수 있습니다.",
-          "   - 전체 평균점수, 참여율, 병원별 통계를 확인할 수 있습니다.",
-          "   - 병원명을 입력하여 특정 병원의 문항별 평균점수를 조회할 수 있습니다.",
-          "   - '통계 다운로드' 버튼으로 상세한 통계 보고서를 엑셀로 다운로드할 수 있습니다.",
-          "",
-          "7. 설문 링크 형식",
-          "   - 각 참여자에게는 고유한 토큰이 부여됩니다.",
-          "   - 설문 링크: https://사이트주소/토큰",
-          "   - 중복 응답은 자동으로 방지됩니다.",
-          "",
-          "8. 보안 기능",
-          "   - 관리자 페이지 접속 시 비밀번호 인증 필요",
-          "   - 설문지 삭제 시 추가 비밀번호 확인",
-          "   - 참여자별 고유 토큰으로 보안 강화",
-          "",
-          "9. 문자 발송 가이드",
-          "   - '참여자 목록'에서 '연락처 다운로드'로 CSV 파일 생성",
-          "   - 외부 문자 발송 플랫폼에 CSV 파일 업로드",
-          "   - 각 참여자에게 개별 설문 링크가 포함된 문자 발송",
-          "",
-          "관리자 비밀번호: hospital2024",
-          "문의사항이 있으시면 시스템 관리자에게 연락하시기 바랍니다.",
-        ]
+          <div class="step">
+            <div class="step-title">1-2. 설문지 수정 및 삭제</div>
+            <div class="step-content">
+              <ul>
+                <li><span class="highlight">'설문지 목록'</span> 탭에서 기존 설문지를 확인할 수 있습니다</li>
+                <li><span class="highlight">'수정'</span> 버튼으로 설문지 내용을 변경할 수 있습니다</li>
+                <li><span class="highlight">'삭제'</span> 시에는 보안을 위해 관리자 비밀번호를 다시 입력해야 합니다</li>
+              </ul>
+              <div class="warning">
+                ⚠️ <strong>주의:</strong> 설문지를 삭제하면 관련된 모든 참여자 데이터와 응답 결과도 함께 삭제됩니다.
+              </div>
+            </div>
+          </div>
+        </div>
 
-        // PDF에 텍스트 추가
-        let yPosition = 20
-        doc.setFontSize(18)
-        doc.text("관리자 페이지 사용 가이드", 20, yPosition)
-        yPosition += 15
+        <div class="section">
+          <div class="section-title">👥 2. 참여자 등록 및 관리</div>
+          
+          <div class="step">
+            <div class="step-title">2-1. CSV 파일로 참여자 등록</div>
+            <div class="step-content">
+              <ul>
+                <li>설문지를 선택한 후 <span class="highlight">'참여자 등록'</span> 탭으로 이동합니다</li>
+                <li>CSV 파일을 준비합니다 (파이프 구분자 사용)</li>
+              </ul>
+              <div class="code">
+                CSV 파일 형식 예시:<br>
+                서울대병원|김철수|010-1234-5678<br>
+                연세대병원|이영희|010-9876-5432<br>
+                고려대병원|박민수|010-5555-1234
+              </div>
+              <div class="info">
+                💡 <strong>중요:</strong> 새로운 CSV 파일을 업로드하면 기존 참여자 목록은 초기화됩니다. 중복된 참여자(병원명, 이름, 전화번호가 모두 동일)는 자동으로 제거됩니다.
+              </div>
+            </div>
+          </div>
 
-        doc.setFontSize(12)
-        guideContent.forEach((line, index) => {
-          if (index === 0) return // 제목은 이미 추가했으므로 스킵
+          <div class="step">
+            <div class="step-title">2-2. 참여자 목록 관리</div>
+            <div class="step-content">
+              <ul>
+                <li><span class="highlight">'참여자 목록'</span> 탭에서 등록된 참여자를 확인할 수 있습니다</li>
+                <li>병원명으로 검색하거나 완료/미완료 상태로 필터링할 수 있습니다</li>
+                <li><span class="highlight">'연락처 다운로드'</span> 버튼으로 문자 발송용 파일을 다운로드할 수 있습니다</li>
+                <li>각 참여자의 설문 링크를 개별적으로 복사할 수 있습니다</li>
+              </ul>
+            </div>
+          </div>
+        </div>
 
-          if (yPosition > 270) {
-            // 페이지 끝에 도달하면 새 페이지 추가
-            doc.addPage()
-            yPosition = 20
-          }
+        <div class="section">
+          <div class="section-title">📱 3. 문자 발송 가이드</div>
+          
+          <div class="step">
+            <div class="step-title">3-1. 연락처 파일 준비</div>
+            <div class="step-content">
+              <ul>
+                <li><span class="highlight">'참여자 목록'</span>에서 <span class="highlight">'연락처 다운로드'</span> 클릭</li>
+                <li>다운로드된 CSV 파일에는 다음 정보가 포함됩니다:</li>
+              </ul>
+              <div class="code">
+                - 병원명<br>
+                - 참여자명<br>
+                - 휴대폰번호<br>
+                - 고유토큰<br>
+                - 개별 설문링크
+              </div>
+            </div>
+          </div>
 
-          if (line.startsWith("관리자 비밀번호:")) {
-            doc.setFontSize(14)
-            doc.setFont("helvetica", "bold")
-          } else if (line.match(/^\d+\./)) {
-            doc.setFontSize(14)
-            doc.setFont("helvetica", "bold")
-          } else {
-            doc.setFontSize(12)
-            doc.setFont("helvetica", "normal")
-          }
+          <div class="step">
+            <div class="step-title">3-2. 외부 문자 발송 플랫폼 활용</div>
+            <div class="step-content">
+              <ul>
+                <li>다운로드한 CSV 파일을 문자 발송 플랫폼에 업로드합니다</li>
+                <li>각 참여자에게 개별 설문 링크가 포함된 문자를 발송합니다</li>
+                <li>문자 내용 예시:</li>
+              </ul>
+              <div class="code">
+                안녕하세요 [참여자명]님,<br>
+                [병원명] 만족도 조사에 참여해 주세요.<br>
+                링크: https://사이트주소/[토큰]<br>
+                감사합니다.
+              </div>
+            </div>
+          </div>
+        </div>
 
-          doc.text(line, 20, yPosition)
-          yPosition += 7
+        <div class="section">
+          <div class="section-title">📊 4. 결과 조회 및 통계 분석</div>
+          
+          <div class="step">
+            <div class="step-title">4-1. 설문 결과 조회</div>
+            <div class="step-content">
+              <ul>
+                <li><span class="highlight">'설문 결과'</span> 탭에서 완료된 응답을 확인할 수 있습니다</li>
+                <li>참여자별 상세 응답과 총점을 볼 수 있습니다</li>
+                <li>CSV 다운로드로 결과 데이터를 추출할 수 있습니다</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-title">4-2. 통계 분석</div>
+            <div class="step-content">
+              <ul>
+                <li><span class="highlight">'통계'</span> 탭에서 다양한 분석 결과를 확인할 수 있습니다</li>
+                <li>전체 평균점수, 참여율, 병원별 통계를 제공합니다</li>
+                <li>병원명을 입력하여 특정 병원의 문항별 평균점수를 조회할 수 있습니다</li>
+                <li><span class="highlight">'통계 다운로드'</span> 버튼으로 상세한 엑셀 보고서를 다운로드할 수 있습니다</li>
+              </ul>
+              <div class="info">
+                💡 <strong>통계 보고서 내용:</strong> 기본 통계, 문항별 평균점수, 병원별 통계, 병원별 문항별 상세 분석이 포함됩니다.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">🔒 5. 보안 및 주의사항</div>
+          
+          <div class="step">
+            <div class="step-title">5-1. 보안 기능</div>
+            <div class="step-content">
+              <ul>
+                <li>관리자 페이지 접속 시 비밀번호 인증이 필요합니다</li>
+                <li>설문지 삭제 시 추가 비밀번호 확인이 있습니다</li>
+                <li>각 참여자에게는 고유한 토큰이 부여되어 보안이 강화됩니다</li>
+                <li>중복 응답은 자동으로 방지됩니다</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-title">5-2. 설문 링크 형식</div>
+            <div class="step-content">
+              <div class="code">
+                설문 링크 형식: https://사이트주소/[고유토큰]<br>
+                예시: https://bohunsurvey.netlify.app/ABC123DEF456
+              </div>
+              <div class="warning">
+                ⚠️ <strong>주의:</strong> 토큰은 각 참여자마다 고유하므로 다른 사람과 공유하면 안 됩니다.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">🔧 6. 시스템 정보</div>
+          
+          <div class="step">
+            <div class="step-content">
+              <ul>
+                <li><strong>관리자 비밀번호:</strong> <span class="highlight">hospital2024</span></li>
+                <li><strong>지원 브라우저:</strong> Chrome, Firefox, Safari, Edge 최신 버전</li>
+                <li><strong>권장 해상도:</strong> 1280x720 이상</li>
+                <li><strong>CSV 파일 인코딩:</strong> UTF-8</li>
+              </ul>
+              <div class="info">
+                📞 <strong>문의사항:</strong> 시스템 사용 중 문제가 발생하면 시스템 관리자에게 연락하시기 바랍니다.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 50px; padding: 20px; background-color: #f8fafc; border-radius: 8px;">
+          <p><strong>🏥 병원 만족도 조사 시스템 v1.0</strong></p>
+          <p>© 2024 Hospital Survey System. All rights reserved.</p>
+        </div>
+      </body>
+      </html>
+    `
+
+    // HTML을 PDF로 변환
+    import("html2canvas")
+      .then((html2canvas) => {
+        import("jspdf").then(({ jsPDF }) => {
+          // 임시 div 생성
+          const tempDiv = document.createElement("div")
+          tempDiv.innerHTML = guideHTML
+          tempDiv.style.width = "800px"
+          tempDiv.style.position = "absolute"
+          tempDiv.style.left = "-9999px"
+          document.body.appendChild(tempDiv)
+
+          html2canvas
+            .default(tempDiv, {
+              scale: 2,
+              useCORS: true,
+              allowTaint: true,
+              width: 800,
+              height: tempDiv.scrollHeight,
+            })
+            .then((canvas) => {
+              const imgData = canvas.toDataURL("image/png")
+              const pdf = new jsPDF("p", "mm", "a4")
+
+              const imgWidth = 190
+              const pageHeight = 297
+              const imgHeight = (canvas.height * imgWidth) / canvas.width
+              let heightLeft = imgHeight
+              let position = 10
+
+              // 첫 페이지 추가
+              pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight)
+              heightLeft -= pageHeight
+
+              // 필요한 경우 추가 페이지 생성
+              while (heightLeft >= 0) {
+                position = heightLeft - imgHeight + 10
+                pdf.addPage()
+                pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight)
+                heightLeft -= pageHeight
+              }
+
+              // PDF 다운로드
+              const fileName = `관리자페이지_사용가이드_${new Date().toISOString().split("T")[0]}.pdf`
+              pdf.save(fileName)
+
+              // 임시 div 제거
+              document.body.removeChild(tempDiv)
+            })
+            .catch((error) => {
+              console.error("PDF 생성 중 오류:", error)
+              document.body.removeChild(tempDiv)
+
+              // 실패 시 텍스트 파일로 대체
+              const textContent = guideHTML
+                .replace(/<[^>]*>/g, "")
+                .replace(/\s+/g, " ")
+                .trim()
+              const blob = new Blob([textContent], { type: "text/plain;charset=utf-8" })
+              const link = document.createElement("a")
+              const url = URL.createObjectURL(blob)
+              link.setAttribute("href", url)
+              link.setAttribute("download", `관리자페이지_사용가이드_${new Date().toISOString().split("T")[0]}.txt`)
+              link.style.visibility = "hidden"
+              document.body.appendChild(link)
+              link.click()
+              document.body.removeChild(link)
+            })
         })
-
-        // PDF 다운로드
-        const fileName = `관리자페이지_사용가이드_${new Date().toISOString().split("T")[0]}.pdf`
-        doc.save(fileName)
       })
       .catch((error) => {
-        console.error("PDF 생성 중 오류 발생:", error)
-        // PDF 생성 실패 시 텍스트 파일로 대체
-        const guideContent = `
-관리자 페이지 사용 가이드
-
-1. 설문지 생성
-   - "설문지 생성" 탭에서 새로운 설문지를 만들 수 있습니다.
-   - 설문지 제목, 설명을 입력하고 문항들을 추가합니다.
-   - 각 문항은 5점 척도(매우 그렇다 ~ 전혀 그렇지 않다)로 평가됩니다.
-
-2. 설문지 관리
-   - "설문지 목록" 탭에서 생성된 설문지를 확인할 수 있습니다.
-   - 수정 버튼으로 설문지 내용을 변경할 수 있습니다.
-   - 삭제 시에는 관리자 비밀번호(hospital2024) 재입력이 필요합니다.
-
-3. 참여자 등록
-   - 특정 설문지를 선택한 후 CSV 파일로 참여자를 등록합니다.
-   - CSV 형식: 병원명|참여자명|휴대폰번호 (파이프 구분자 사용)
-   - 기존 참여자는 새로운 CSV 업로드 시 초기화됩니다.
-   - 중복 참여자(병원명, 참여자명, 휴대폰번호 모두 동일)는 자동 제거됩니다.
-
-4. 참여자 관리
-   - "참여자 목록" 탭에서 등록된 참여자를 확인할 수 있습니다.
-   - 병원명으로 검색하거나 완료/미완료 상태로 필터링 가능합니다.
-   - "연락처 다운로드" 버튼으로 문자 발송용 CSV 파일을 다운로드할 수 있습니다.",
-   - 각 참여자의 설문 링크를 복사하여 개별 발송도 가능합니다.
-
-5. 설문 결과 조회
-   - "설문 결과" 탭에서 완료된 설문 응답을 확인할 수 있습니다.
-   - 참여자별 상세 응답과 총점을 볼 수 있습니다.
-   - CSV 다운로드로 결과 데이터를 추출할 수 있습니다.
-
-6. 통계 분석
-   - "통계" 탭에서 설문 결과를 분석할 수 있습니다.
-   - 전체 평균점수, 참여율, 병원별 통계를 확인할 수 있습니다.
-   - 병원명을 입력하여 특정 병원의 문항별 평균점수를 조회할 수 있습니다.
-   - "통계 다운로드" 버튼으로 상세한 통계 보고서를 엑셀로 다운로드할 수 있습니다.
-
-7. 설문 링크 형식
-   - 각 참여자에게는 고유한 토큰이 부여됩니다.
-   - 설문 링크: https://사이트주소/토큰
-   - 중복 응답은 자동으로 방지됩니다.
-
-8. 보안 기능
-   - 관리자 페이지 접속 시 비밀번호 인증 필요
-   - 설문지 삭제 시 추가 비밀번호 확인
-   - 참여자별 고유 토큰으로 보안 강화
-
-9. 문자 발송 가이드
-   - "참여자 목록"에서 "연락처 다운로드"로 CSV 파일 생성
-   - 외부 문자 발송 플랫폼에 CSV 파일 업로드
-   - 각 참여자에게 개별 설문 링크가 포함된 문자 발송
-
-관리자 비밀번호: hospital2024
-문의사항이 있으시면 시스템 관리자에게 연락하시기 바랍니다.
-      `
-
-        const blob = new Blob([guideContent], { type: "text/plain;charset=utf-8" })
-        const link = document.createElement("a")
-        const url = URL.createObjectURL(blob)
-        link.setAttribute("href", url)
-        link.setAttribute("download", `관리자페이지_사용가이드_${new Date().toISOString().split("T")[0]}.txt`)
-        link.style.visibility = "hidden"
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+        console.error("라이브러리 로드 실패:", error)
+        alert("PDF 생성에 실패했습니다. 브라우저를 새로고침 후 다시 시도해주세요.")
       })
   }
 
