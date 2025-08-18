@@ -67,18 +67,23 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   const surveyId = params.id
 
   try {
-    // 1. 설문 응답 삭제
-    const { error: responsesError } = await supabase
-      .from("survey_responses")
-      .delete()
-      .in(
-        "participant_token",
-        supabase.from("survey_participants").select("token").eq("survey_id", Number.parseInt(surveyId)),
-      )
+    // 1. 먼저 해당 설문의 참여자 토큰들을 조회
+    const { data: participants, error: participantsSelectError } = await supabase
+      .from("survey_participants")
+      .select("token")
+      .eq("survey_id", Number.parseInt(surveyId))
 
-    if (responsesError) throw responsesError
+    if (participantsSelectError) throw participantsSelectError
 
-    // 2. 참여자 삭제
+    // 2. 참여자 토큰이 있으면 설문 응답 삭제
+    if (participants && participants.length > 0) {
+      const tokens = participants.map((p) => p.token)
+      const { error: responsesError } = await supabase.from("survey_responses").delete().in("participant_token", tokens)
+
+      if (responsesError) throw responsesError
+    }
+
+    // 3. 참여자 삭제
     const { error: participantsError } = await supabase
       .from("survey_participants")
       .delete()
@@ -86,7 +91,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
     if (participantsError) throw participantsError
 
-    // 3. 설문 문항 삭제
+    // 4. 설문 문항 삭제
     const { error: questionsError } = await supabase
       .from("survey_questions")
       .delete()
@@ -94,7 +99,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
     if (questionsError) throw questionsError
 
-    // 4. 설문지 삭제
+    // 5. 설문지 삭제
     const { error: surveyError } = await supabase.from("surveys").delete().eq("id", Number.parseInt(surveyId))
 
     if (surveyError) throw surveyError
