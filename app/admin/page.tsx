@@ -122,17 +122,15 @@ export default function AdminPage() {
     }
 
     const excelData = filteredParticipants.map((participant) => ({
-      병원명: participant.hospital_name,
       참여자명: participant.participant_name,
       휴대폰번호: participant.phone_number,
-      토큰: participant.token,
+      병원명: participant.hospital_name,
       설문링크: `${window.location.origin}/${participant.token}`,
     }))
 
     const headers = Object.keys(excelData[0])
-    const csvContent = [
-      headers.join(","),
-      ...excelData.map((row) =>
+    const csvContent = excelData
+      .map((row) =>
         headers
           .map((header) => {
             const value = row[header as keyof typeof row]
@@ -141,8 +139,8 @@ export default function AdminPage() {
               : value
           })
           .join(","),
-      ),
-    ].join("\n")
+      )
+      .join("\n")
 
     const BOM = "\uFEFF"
     const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" })
