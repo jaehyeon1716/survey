@@ -322,23 +322,23 @@ export default function HospitalSurvey() {
         </div>
 
         {/* 현재 질문 */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="text-2xl text-center text-gray-800">문항 {currentQuestion + 1}</CardTitle>
+        <Card className="mb-6">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl text-center text-gray-800">문항 {currentQuestion + 1}</CardTitle>
           </CardHeader>
           <CardContent>
-            <h2 className="text-3xl font-medium text-center text-gray-800 mb-8 leading-relaxed">
+            <h2 className="text-xl font-medium text-center text-gray-800 mb-6 leading-relaxed px-2">
               {currentQuestionData?.question_text}
             </h2>
 
             {/* 네비게이션 버튼 */}
-            <div className="flex justify-between items-center mb-8">
+            <div className="flex justify-between items-center mb-6">
               <Button
                 onClick={handlePrevious}
                 disabled={currentQuestion === 0}
                 variant="outline"
                 size="lg"
-                className="text-xl px-8 py-4 h-auto bg-transparent"
+                className="text-lg px-6 py-3 h-auto bg-transparent"
               >
                 이전
               </Button>
@@ -349,25 +349,24 @@ export default function HospitalSurvey() {
                     onClick={handleSubmit}
                     disabled={!currentAnswer || isSubmitting}
                     size="lg"
-                    className="text-xl px-12 py-4 h-auto bg-green-600 hover:bg-green-700"
+                    className="text-lg px-8 py-3 h-auto bg-green-600 hover:bg-green-700"
                   >
                     {isSubmitting ? "제출 중..." : "설문 완료"}
                   </Button>
                 ) : (
-                  <Button onClick={handleNext} disabled={!currentAnswer} size="lg" className="text-xl px-8 py-4 h-auto">
+                  <Button onClick={handleNext} disabled={!currentAnswer} size="lg" className="text-lg px-6 py-3 h-auto">
                     다음
                   </Button>
                 )}
               </div>
             </div>
 
-            {/* 답변 선택지 */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               {scaleLabels.map((scale) => (
                 <button
                   key={scale.value}
                   onClick={() => handleAnswer(currentQuestionData.id, scale.value)}
-                  className={`w-full p-6 rounded-xl border-2 transition-all duration-200 text-xl font-medium ${
+                  className={`w-full p-4 rounded-xl border-2 transition-all duration-200 text-lg font-medium ${
                     currentAnswer === scale.value
                       ? `${scale.color} text-white border-gray-400 shadow-lg scale-105`
                       : "bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:shadow-md"
@@ -375,7 +374,7 @@ export default function HospitalSurvey() {
                 >
                   <div className="flex items-center justify-between">
                     <span>{scale.label}</span>
-                    <span className="text-2xl font-bold">{scale.value}점</span>
+                    <span className="text-xl font-bold">{scale.value}점</span>
                   </div>
                 </button>
               ))}
@@ -383,8 +382,7 @@ export default function HospitalSurvey() {
           </CardContent>
         </Card>
 
-        {/* 답변 현황 표시 */}
-        <div className="mt-8 p-6 bg-white rounded-xl shadow-sm">
+        <div className="mt-6 p-4 bg-white rounded-xl shadow-sm">
           <h3 className="text-xl font-medium text-gray-800 mb-4">답변 현황</h3>
           <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
             {questions.map((question, index) => {
