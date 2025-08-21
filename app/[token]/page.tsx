@@ -285,106 +285,109 @@ export default function HospitalSurvey() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-2 sm:p-4">
       <div className="max-w-4xl mx-auto">
         {/* 헤더 */}
-        <div className="text-center mb-8">
-          <Heart className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">{survey?.title || "설문조사"}</h1>
-          <p className="text-xl text-gray-600 mb-6">
+        <div className="text-center mb-4 sm:mb-8">
+          <Heart className="w-12 h-12 sm:w-16 sm:h-16 text-red-500 mx-auto mb-2 sm:mb-4" />
+          <h1 className="text-2xl sm:text-4xl font-bold text-gray-800 mb-2">{survey?.title || "설문조사"}</h1>
+          <p className="text-base sm:text-xl text-gray-600 mb-4 sm:mb-6">
             {survey?.description || "더 나은 서비스를 위한 여러분의 소중한 의견을 들려주세요"}
           </p>
 
           {participant && (
-            <div className="bg-white p-6 rounded-xl shadow-sm max-w-md mx-auto">
+            <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm max-w-md mx-auto">
               <div className="text-center">
-                <p className="text-2xl font-bold text-gray-800 mb-2">{participant.participant_name}님 안녕하세요</p>
-                <p className="text-xl text-blue-600 font-medium">{participant.hospital_name} 만족도조사입니다</p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-800 mb-2">
+                  {participant.participant_name}님 안녕하세요
+                </p>
+                <p className="text-base sm:text-xl text-blue-600 font-medium">
+                  {participant.hospital_name} 만족도조사입니다
+                </p>
               </div>
             </div>
           )}
         </div>
 
         {/* 진행률 표시 */}
-        <div className="mb-8">
+        <div className="mb-4 sm:mb-8">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-lg font-medium text-gray-700">
+            <span className="text-sm sm:text-lg font-medium text-gray-700">
               진행률: {currentQuestion + 1} / {questions.length}
             </span>
-            <span className="text-lg font-medium text-gray-700">{Math.round(progress)}%</span>
+            <span className="text-sm sm:text-lg font-medium text-gray-700">{Math.round(progress)}%</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-3">
+          <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3">
             <div
-              className="bg-blue-500 h-3 rounded-full transition-all duration-300"
+              className="bg-blue-500 h-2 sm:h-3 rounded-full transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
 
         {/* 현재 질문 */}
-        <Card className="mb-6">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl text-center text-gray-800">문항 {currentQuestion + 1}</CardTitle>
+        <Card className="mb-4 sm:mb-6">
+          <CardHeader className="pb-2 sm:pb-4">
+            <CardTitle className="text-lg sm:text-xl text-center text-gray-800">문항 {currentQuestion + 1}</CardTitle>
           </CardHeader>
-          <CardContent>
-            <h2 className="text-xl font-medium text-center text-gray-800 mb-6 leading-relaxed px-2">
+          <CardContent className="space-y-4">
+            <h2 className="text-base sm:text-lg font-medium text-center text-gray-800 mb-4 leading-relaxed px-1 sm:px-2">
               {currentQuestionData?.question_text}
             </h2>
 
-            {/* 네비게이션 버튼 */}
-            <div className="flex justify-between items-center mb-6">
+            <div className="space-y-2">
+              {scaleLabels.map((scale) => (
+                <button
+                  key={scale.value}
+                  onClick={() => handleAnswer(currentQuestionData.id, scale.value)}
+                  className={`w-full p-2 sm:p-3 rounded-lg border-2 transition-all duration-200 text-sm sm:text-base font-medium ${
+                    currentAnswer === scale.value
+                      ? `${scale.color} text-white border-gray-400 shadow-md scale-[1.02]`
+                      : "bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="flex-1 text-left">{scale.label}</span>
+                    <span className="text-base sm:text-lg font-bold ml-2">{scale.value}점</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
               <Button
                 onClick={handlePrevious}
                 disabled={currentQuestion === 0}
                 variant="outline"
-                size="lg"
-                className="text-lg px-6 py-3 h-auto bg-transparent"
+                size="sm"
+                className="text-sm px-4 py-2 h-auto bg-transparent"
               >
                 이전
               </Button>
 
-              <div className="flex space-x-4">
+              <div className="flex space-x-2">
                 {currentQuestion === questions.length - 1 ? (
                   <Button
                     onClick={handleSubmit}
                     disabled={!currentAnswer || isSubmitting}
-                    size="lg"
-                    className="text-lg px-8 py-3 h-auto bg-green-600 hover:bg-green-700"
+                    size="sm"
+                    className="text-sm px-6 py-2 h-auto bg-green-600 hover:bg-green-700"
                   >
                     {isSubmitting ? "제출 중..." : "설문 완료"}
                   </Button>
                 ) : (
-                  <Button onClick={handleNext} disabled={!currentAnswer} size="lg" className="text-lg px-6 py-3 h-auto">
+                  <Button onClick={handleNext} disabled={!currentAnswer} size="sm" className="text-sm px-4 py-2 h-auto">
                     다음
                   </Button>
                 )}
               </div>
             </div>
-
-            <div className="space-y-3">
-              {scaleLabels.map((scale) => (
-                <button
-                  key={scale.value}
-                  onClick={() => handleAnswer(currentQuestionData.id, scale.value)}
-                  className={`w-full p-4 rounded-xl border-2 transition-all duration-200 text-lg font-medium ${
-                    currentAnswer === scale.value
-                      ? `${scale.color} text-white border-gray-400 shadow-lg scale-105`
-                      : "bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:shadow-md"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span>{scale.label}</span>
-                    <span className="text-xl font-bold">{scale.value}점</span>
-                  </div>
-                </button>
-              ))}
-            </div>
           </CardContent>
         </Card>
 
-        <div className="mt-6 p-4 bg-white rounded-xl shadow-sm">
-          <h3 className="text-xl font-medium text-gray-800 mb-4">답변 현황</h3>
-          <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
+        <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-white rounded-xl shadow-sm">
+          <h3 className="text-base sm:text-xl font-medium text-gray-800 mb-3 sm:mb-4">답변 현황</h3>
+          <div className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-9 gap-1 sm:gap-2">
             {questions.map((question, index) => {
               const isAnswered = answers[question.id] !== undefined
               const isCurrent = index === currentQuestion
@@ -392,9 +395,9 @@ export default function HospitalSurvey() {
               return (
                 <div
                   key={question.id}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${
+                  className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-sm sm:text-base md:text-lg font-bold ${
                     isCurrent
-                      ? "bg-blue-500 text-white ring-4 ring-blue-200"
+                      ? "bg-blue-500 text-white ring-2 sm:ring-4 ring-blue-200"
                       : isAnswered
                         ? "bg-green-500 text-white"
                         : "bg-gray-200 text-gray-500"

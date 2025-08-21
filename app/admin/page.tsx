@@ -9,24 +9,6 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { supabase } from "@/lib/supabase/client"
 import { Copy, Download, ExternalLink, Eye, Plus, Trash2, Edit, FileText } from "lucide-react"
 
@@ -96,7 +78,9 @@ export default function AdminPage() {
 
   const [newSurveyTitle, setNewSurveyTitle] = useState("")
   const [newSurveyDescription, setNewSurveyDescription] = useState("")
-  const [newSurveyQuestions, setNewSurveyQuestions] = useState([""])
+  const [newSurveyQuestions, setNewSurveyQuestions] = useState([
+    { question: "", answers: ["매우 그렇다", "그렇다", "보통이다", "그렇지 않다", "전혀 그렇지 않다"] },
+  ])
   const [createLoading, setCreateLoading] = useState(false)
 
   const [questionStats, setQuestionStats] = useState<QuestionStat[]>([])
@@ -606,7 +590,7 @@ export default function AdminPage() {
       return
     }
 
-    const validQuestions = newSurveyQuestions.filter((q) => q.trim() !== "")
+    const validQuestions = newSurveyQuestions.filter((q) => q.question.trim() !== "")
     if (validQuestions.length === 0) {
       setError("최소 1개의 문항을 입력해주세요.")
       return
@@ -624,7 +608,10 @@ export default function AdminPage() {
         body: JSON.stringify({
           title: newSurveyTitle.trim(),
           description: newSurveyDescription.trim(),
-          questions: validQuestions,
+          questions: validQuestions.map((q) => ({
+            question: q.question.trim(),
+            answers: q.answers.filter((a) => a.trim() !== ""),
+          })),
         }),
       })
 
@@ -634,7 +621,9 @@ export default function AdminPage() {
         setUploadSuccess("설문지가 성공적으로 생성되었습니다.")
         setNewSurveyTitle("")
         setNewSurveyDescription("")
-        setNewSurveyQuestions([""])
+        setNewSurveyQuestions([
+          { question: "", answers: ["매우 그렇다", "그렇다", "보통이다", "그렇지 않다", "전혀 그렇지 않다"] },
+        ])
         fetchSurveys()
       } else {
         setError(data.error || "설문지 생성 중 오류가 발생했습니다.")
@@ -647,7 +636,10 @@ export default function AdminPage() {
   }
 
   const addQuestion = () => {
-    setNewSurveyQuestions([...newSurveyQuestions, ""])
+    setNewSurveyQuestions([
+      ...newSurveyQuestions,
+      { question: "", answers: ["매우 그렇다", "그렇다", "보통이다", "그렇지 않다", "전혀 그렇지 않다"] },
+    ])
   }
 
   const removeQuestion = (index: number) => {
@@ -656,9 +648,33 @@ export default function AdminPage() {
     }
   }
 
-  const updateQuestion = (index: number, value: string) => {
+  const updateQuestion = (index: number, field: "question" | "answers", value: string | string[]) => {
     const updated = [...newSurveyQuestions]
-    updated[index] = value
+    if (field === "question") {
+      updated[index].question = value as string
+    } else {
+      updated[index].answers = value as string[]
+    }
+    setNewSurveyQuestions(updated)
+  }
+
+  const addAnswer = (questionIndex: number) => {
+    const updated = [...newSurveyQuestions]
+    updated[questionIndex].answers.push("")
+    setNewSurveyQuestions(updated)
+  }
+
+  const removeAnswer = (questionIndex: number, answerIndex: number) => {
+    const updated = [...newSurveyQuestions]
+    if (updated[questionIndex].answers.length > 1) {
+      updated[questionIndex].answers = updated[questionIndex].answers.filter((_, i) => i !== answerIndex)
+      setNewSurveyQuestions(updated)
+    }
+  }
+
+  const updateAnswer = (questionIndex: number, answerIndex: number, value: string) => {
+    const updated = [...newSurveyQuestions]
+    updated[questionIndex].answers[answerIndex] = value
     setNewSurveyQuestions(updated)
   }
 
@@ -1113,367 +1129,479 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">병원 만족도 조사 관리 시스템</h1>
-          <Button onClick={() => setIsAuthenticated(false)} variant="outline" className="text-lg px-6 py-2">
-            로그아웃
-          </Button>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
+      {!isAuthenticated ? (
+        <></>
+      ) : (
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-3xl font-bold text-gray-900">병원 만족도 조사 관리 시스템</h1>
+            <Button onClick={() => setIsAuthenticated(false)} variant="outline" className="text-lg px-6 py-2">
+              로그아웃
+            </Button>
+          </div>
 
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">병원 만족도 조사 관리자</h1>
-          <Button onClick={downloadGuide} variant="outline" className="flex items-center space-x-2 bg-transparent">
-            <FileText className="w-4 h-4" />
-            <span>사용 가이드 다운로드</span>
-          </Button>
-        </div>
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-3xl font-bold text-gray-900">병원 만족도 조사 관리자</h1>
+            <Button onClick={downloadGuide} variant="outline" className="flex items-center space-x-2 bg-transparent">
+              <FileText className="w-4 h-4" />
+              <span>사용 가이드 다운로드</span>
+            </Button>
+          </div>
 
-        {error && (
-          <Alert className="mb-6 border-red-200 bg-red-50">
-            <AlertDescription className="text-red-700 text-lg">{error}</AlertDescription>
-          </Alert>
-        )}
+          {error && (
+            <Alert className="mb-6 border-red-200 bg-red-50">
+              <AlertDescription className="text-red-700 text-lg">{error}</AlertDescription>
+            </Alert>
+          )}
 
-        {uploadSuccess && (
-          <Alert className="mb-6 border-green-200 bg-green-50">
-            <AlertDescription className="text-green-700 text-lg">{uploadSuccess}</AlertDescription>
-          </Alert>
-        )}
+          {uploadSuccess && (
+            <Alert className="mb-6 border-green-200 bg-green-50">
+              <AlertDescription className="text-green-700 text-lg">{uploadSuccess}</AlertDescription>
+            </Alert>
+          )}
 
-        <Tabs defaultValue="surveys" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 h-12">
-            <TabsTrigger value="surveys" className="text-lg">
-              설문지 관리
-            </TabsTrigger>
-            <TabsTrigger value="upload" className="text-lg">
-              참여자 등록
-            </TabsTrigger>
-            <TabsTrigger value="participants" className="text-lg">
-              참여자 목록
-            </TabsTrigger>
-            <TabsTrigger value="responses" className="text-lg">
-              설문 결과
-            </TabsTrigger>
-            <TabsTrigger value="stats" className="text-lg">
-              통계
-            </TabsTrigger>
-          </TabsList>
+          <Tabs defaultValue="surveys" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-5 h-12">
+              <TabsTrigger value="surveys" className="text-lg">
+                설문지 관리
+              </TabsTrigger>
+              <TabsTrigger value="upload" className="text-lg">
+                참여자 등록
+              </TabsTrigger>
+              <TabsTrigger value="participants" className="text-lg">
+                참여자 목록
+              </TabsTrigger>
+              <TabsTrigger value="responses" className="text-lg">
+                설문 결과
+              </TabsTrigger>
+              <TabsTrigger value="stats" className="text-lg">
+                통계
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="surveys">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <TabsContent value="surveys">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-2xl">새 설문지 생성</CardTitle>
+                    <CardDescription className="text-lg">
+                      설문지 제목과 문항들을 입력하여 새로운 설문지를 만드세요
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div>
+                      <Label htmlFor="surveyTitle" className="text-lg font-medium">
+                        설문지 제목 *
+                      </Label>
+                      <Input
+                        id="surveyTitle"
+                        value={newSurveyTitle}
+                        onChange={(e) => setNewSurveyTitle(e.target.value)}
+                        className="mt-2 h-12 text-lg"
+                        placeholder="예: 2024년 병원 만족도 조사"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="surveyDescription" className="text-lg font-medium">
+                        설문지 설명
+                      </Label>
+                      <Textarea
+                        id="surveyDescription"
+                        value={newSurveyDescription}
+                        onChange={(e) => setNewSurveyDescription(e.target.value)}
+                        className="mt-2 text-lg"
+                        placeholder="설문지에 대한 간단한 설명을 입력하세요"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-4">
+                        <Label className="text-lg font-medium">설문 문항 *</Label>
+                        <Button onClick={addQuestion} size="sm" variant="outline">
+                          <Plus className="w-4 h-4 mr-1" />
+                          문항 추가
+                        </Button>
+                      </div>
+                      <div className="space-y-3">
+                        {newSurveyQuestions.map((question, index) => (
+                          <div key={index} className="flex gap-2">
+                            <div className="flex-1">
+                              <Input
+                                value={question}
+                                onChange={(e) => updateQuestion(index, e.target.value)}
+                                placeholder={`문항 ${index + 1}을 입력하세요`}
+                                className="h-12 text-lg"
+                              />
+                            </div>
+                            {newSurveyQuestions.length > 1 && (
+                              <Button onClick={() => removeQuestion(index)} size="sm" variant="outline">
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={handleCreateSurvey}
+                      disabled={createLoading}
+                      className="w-full h-12 text-lg font-semibold bg-green-600 hover:bg-green-700"
+                    >
+                      {createLoading ? "생성 중..." : "설문지 생성"}
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-2xl">설문지 목록</CardTitle>
+                    <CardDescription className="text-lg">생성된 설문지를 확인하고 관리하세요</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loading ? (
+                      <div className="text-center py-8">
+                        <p className="text-xl">데이터를 불러오는 중...</p>
+                      </div>
+                    ) : surveys.length === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-xl text-gray-500">생성된 설문지가 없습니다</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {surveys.map((survey) => (
+                          <div
+                            key={survey.id}
+                            className={`p-4 border rounded-lg transition-colors ${
+                              selectedSurvey?.id === survey.id
+                                ? "border-blue-500 bg-blue-50"
+                                : "border-gray-200 hover:bg-gray-50"
+                            }`}
+                          >
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1 cursor-pointer" onClick={() => setSelectedSurvey(survey)}>
+                                <h3 className="text-lg font-semibold">{survey.title}</h3>
+                                {survey.description && <p className="text-gray-600 mt-1">{survey.description}</p>}
+                                <p className="text-sm text-gray-500 mt-2">
+                                  문항 수: {survey.survey_questions?.length || 0}개 | 생성일:{" "}
+                                  {new Date(survey.created_at).toLocaleDateString("ko-KR")}
+                                </p>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                    survey.is_active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+                                  }`}
+                                >
+                                  {survey.is_active ? "활성" : "비활성"}
+                                </span>
+                                <Button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleEditSurvey(survey)
+                                  }}
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs"
+                                >
+                                  <Edit className="w-3 h-3 mr-1" />
+                                  수정
+                                </Button>
+                                <Button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDeleteConfirm(survey)
+                                  }}
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="w-3 h-3 mr-1" />
+                                  삭제
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="upload">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-2xl">새 설문지 생성</CardTitle>
+                  <CardTitle className="text-2xl">참여자 CSV 업로드</CardTitle>
                   <CardDescription className="text-lg">
-                    설문지 제목과 문항들을 입력하여 새로운 설문지를 만드세요
+                    선택한 설문지에 참여자를 등록합니다. 병원명|대상자이름|휴대폰번호 형식의 CSV 파일을 업로드하세요
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div>
-                    <Label htmlFor="surveyTitle" className="text-lg font-medium">
-                      설문지 제목 *
-                    </Label>
-                    <Input
-                      id="surveyTitle"
-                      value={newSurveyTitle}
-                      onChange={(e) => setNewSurveyTitle(e.target.value)}
-                      className="mt-2 h-12 text-lg"
-                      placeholder="예: 2024년 병원 만족도 조사"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="surveyDescription" className="text-lg font-medium">
-                      설문지 설명
-                    </Label>
-                    <Textarea
-                      id="surveyDescription"
-                      value={newSurveyDescription}
-                      onChange={(e) => setNewSurveyDescription(e.target.value)}
-                      className="mt-2 text-lg"
-                      placeholder="설문지에 대한 간단한 설명을 입력하세요"
-                      rows={3}
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-4">
-                      <Label className="text-lg font-medium">설문 문항 *</Label>
-                      <Button onClick={addQuestion} size="sm" variant="outline">
-                        <Plus className="w-4 h-4 mr-1" />
-                        문항 추가
-                      </Button>
-                    </div>
-                    <div className="space-y-3">
-                      {newSurveyQuestions.map((question, index) => (
-                        <div key={index} className="flex gap-2">
-                          <div className="flex-1">
-                            <Input
-                              value={question}
-                              onChange={(e) => updateQuestion(index, e.target.value)}
-                              placeholder={`문항 ${index + 1}을 입력하세요`}
-                              className="h-12 text-lg"
-                            />
+                    <Label className="text-lg font-medium">설문지 선택 *</Label>
+                    <div className="mt-2 p-4 border rounded-lg">
+                      {selectedSurvey ? (
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h3 className="text-lg font-semibold">{selectedSurvey.title}</h3>
+                            <p className="text-gray-600">{selectedSurvey.description}</p>
                           </div>
-                          {newSurveyQuestions.length > 1 && (
-                            <Button onClick={() => removeQuestion(index)} size="sm" variant="outline">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
+                          <Button onClick={() => setSelectedSurvey(null)} variant="outline" size="sm">
+                            변경
+                          </Button>
                         </div>
-                      ))}
+                      ) : (
+                        <p className="text-gray-500">위의 설문지 관리 탭에서 설문지를 선택해주세요</p>
+                      )}
                     </div>
                   </div>
 
-                  <Button
-                    onClick={handleCreateSurvey}
-                    disabled={createLoading}
-                    className="w-full h-12 text-lg font-semibold bg-green-600 hover:bg-green-700"
-                  >
-                    {createLoading ? "생성 중..." : "설문지 생성"}
-                  </Button>
+                  {selectedSurvey && (
+                    <>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="csvFile" className="text-lg font-medium">
+                            CSV 파일 선택
+                          </Label>
+                          <Input
+                            id="csvFile"
+                            type="file"
+                            accept=".csv"
+                            onChange={handleFileSelect}
+                            className="mt-2 h-12 text-lg"
+                          />
+                        </div>
+
+                        {selectedFile && (
+                          <div className="p-4 bg-blue-50 rounded-lg">
+                            <p className="text-lg font-medium text-blue-800">선택된 파일:</p>
+                            <p className="text-lg text-blue-600">{selectedFile.name}</p>
+                            <p className="text-sm text-blue-500">크기: {(selectedFile.size / 1024).toFixed(2)} KB</p>
+                          </div>
+                        )}
+
+                        <Button
+                          onClick={handleUpload}
+                          disabled={!selectedFile || loading}
+                          className="w-full h-12 text-lg font-semibold bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
+                        >
+                          {loading ? "업로드 중..." : "CSV 파일 업로드"}
+                        </Button>
+                      </div>
+
+                      <div className="mt-8 p-6 bg-gray-50 rounded-lg">
+                        <h3 className="text-xl font-semibold mb-4">CSV 파일 형식 안내</h3>
+                        <div className="space-y-3">
+                          <p className="text-lg">
+                            <strong>형식:</strong> 병원명|대상자이름|휴대폰번호
+                          </p>
+                          <p className="text-lg">
+                            <strong>예시:</strong>
+                          </p>
+                          <div className="bg-white p-4 rounded border font-mono text-sm">
+                            서울대학교병원|김철수|010-1234-5678
+                            <br />
+                            연세대학교병원|이영희|010-9876-5432
+                            <br />
+                            고려대학교병원|박민수|010-5555-6666
+                          </div>
+                          <p className="text-lg text-red-600">
+                            <strong>주의:</strong> 기존 참여자는 초기화되고 새로운 참여자로 교체됩니다.
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
+            </TabsContent>
 
+            <TabsContent value="participants">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-2xl">설문지 목록</CardTitle>
-                  <CardDescription className="text-lg">생성된 설문지를 확인하고 관리하세요</CardDescription>
+                  <CardTitle className="text-2xl">참여자 목록</CardTitle>
+                  <CardDescription className="text-lg">
+                    등록된 참여자들의 정보와 설문 진행 상황을 확인하세요
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {loading ? (
+                  {!selectedSurvey ? (
+                    <div className="text-center py-8">
+                      <p className="text-xl text-gray-500">설문지를 선택해주세요</p>
+                    </div>
+                  ) : loading ? (
                     <div className="text-center py-8">
                       <p className="text-xl">데이터를 불러오는 중...</p>
                     </div>
-                  ) : surveys.length === 0 ? (
+                  ) : participants.length === 0 ? (
                     <div className="text-center py-8">
-                      <p className="text-xl text-gray-500">생성된 설문지가 없습니다</p>
+                      <p className="text-xl text-gray-500">등록된 참여자가 없습니다</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {surveys.map((survey) => (
-                        <div
-                          key={survey.id}
-                          className={`p-4 border rounded-lg transition-colors ${
-                            selectedSurvey?.id === survey.id
-                              ? "border-blue-500 bg-blue-50"
-                              : "border-gray-200 hover:bg-gray-50"
-                          }`}
-                        >
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1 cursor-pointer" onClick={() => setSelectedSurvey(survey)}>
-                              <h3 className="text-lg font-semibold">{survey.title}</h3>
-                              {survey.description && <p className="text-gray-600 mt-1">{survey.description}</p>}
-                              <p className="text-sm text-gray-500 mt-2">
-                                문항 수: {survey.survey_questions?.length || 0}개 | 생성일:{" "}
-                                {new Date(survey.created_at).toLocaleDateString("ko-KR")}
-                              </p>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <span
-                                className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                  survey.is_active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
-                                }`}
-                              >
-                                {survey.is_active ? "활성" : "비활성"}
-                              </span>
-                              <Button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleEditSurvey(survey)
-                                }}
-                                size="sm"
-                                variant="outline"
-                                className="text-xs"
-                              >
-                                <Edit className="w-3 h-3 mr-1" />
-                                수정
-                              </Button>
-                              <Button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDeleteConfirm(survey)
-                                }}
-                                size="sm"
-                                variant="outline"
-                                className="text-xs text-red-600 hover:text-red-700"
-                              >
-                                <Trash2 className="w-3 h-3 mr-1" />
-                                삭제
-                              </Button>
-                            </div>
-                          </div>
+                      <div className="flex flex-col sm:flex-row gap-4 p-4 bg-gray-50 rounded-lg">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">병원명 검색</label>
+                          <input
+                            type="text"
+                            placeholder="병원명을 입력하세요"
+                            value={hospitalFilter}
+                            onChange={(e) => setHospitalFilter(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
                         </div>
-                      ))}
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">완료 상태</label>
+                          <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="all">전체</option>
+                            <option value="completed">완료</option>
+                            <option value="incomplete">미완료</option>
+                          </select>
+                        </div>
+                        <div className="flex items-end gap-2">
+                          <Button
+                            onClick={downloadParticipantsExcel}
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white"
+                            disabled={filteredParticipants.length === 0}
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            연락처 다운로드
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              setHospitalFilter("")
+                              setStatusFilter("all")
+                            }}
+                            variant="outline"
+                            className="px-4 py-2"
+                          >
+                            필터 초기화
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="text-sm text-gray-600 mb-2">
+                        총 {participants.length}명 중 {filteredParticipants.length}명 표시
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse border border-gray-300">
+                          <thead>
+                            <tr className="bg-gray-100">
+                              <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
+                                병원명
+                              </th>
+                              <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
+                                참여자명
+                              </th>
+                              <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
+                                휴대폰번호
+                              </th>
+                              <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">상태</th>
+                              <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
+                                등록일
+                              </th>
+                              <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
+                                설문 링크
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredParticipants.map((participant) => (
+                              <tr key={participant.id} className="hover:bg-gray-50">
+                                <td className="border border-gray-300 px-4 py-3 text-lg">
+                                  {participant.hospital_name}
+                                </td>
+                                <td className="border border-gray-300 px-4 py-3 text-lg">
+                                  {participant.participant_name}
+                                </td>
+                                <td className="border border-gray-300 px-4 py-3 text-lg">{participant.phone_number}</td>
+                                <td className="border border-gray-300 px-4 py-3">
+                                  <span
+                                    className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                                      participant.is_completed
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-yellow-100 text-yellow-800"
+                                    }`}
+                                  >
+                                    {participant.is_completed ? "완료" : "미완료"}
+                                  </span>
+                                </td>
+                                <td className="border border-gray-300 px-4 py-3 text-lg">
+                                  {new Date(participant.created_at).toLocaleDateString("ko-KR")}
+                                </td>
+                                <td className="border border-gray-300 px-4 py-3">
+                                  <div className="flex space-x-2">
+                                    <Button
+                                      onClick={() => copyToClipboard(participant.token)}
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-sm"
+                                    >
+                                      <Copy className="w-4 h-4 mr-1" />
+                                      링크 복사
+                                    </Button>
+                                    <Button
+                                      onClick={() => window.open(`/${participant.token}`, "_blank")}
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-sm"
+                                    >
+                                      <ExternalLink className="w-4 h-4 mr-1" />
+                                      열기
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
                 </CardContent>
               </Card>
-            </div>
-          </TabsContent>
+            </TabsContent>
 
-          <TabsContent value="upload">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-2xl">참여자 CSV 업로드</CardTitle>
-                <CardDescription className="text-lg">
-                  선택한 설문지에 참여자를 등록합니다. 병원명|대상자이름|휴대폰번호 형식의 CSV 파일을 업로드하세요
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <Label className="text-lg font-medium">설문지 선택 *</Label>
-                  <div className="mt-2 p-4 border rounded-lg">
-                    {selectedSurvey ? (
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h3 className="text-lg font-semibold">{selectedSurvey.title}</h3>
-                          <p className="text-gray-600">{selectedSurvey.description}</p>
-                        </div>
-                        <Button onClick={() => setSelectedSurvey(null)} variant="outline" size="sm">
-                          변경
-                        </Button>
-                      </div>
-                    ) : (
-                      <p className="text-gray-500">위의 설문지 관리 탭에서 설문지를 선택해주세요</p>
+            <TabsContent value="responses">
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle className="text-2xl">설문 결과</CardTitle>
+                      <CardDescription className="text-lg">완료된 설문 응답을 확인하고 다운로드하세요</CardDescription>
+                    </div>
+                    {responses.length > 0 && (
+                      <Button onClick={downloadCSV} className="bg-green-600 hover:bg-green-700">
+                        <Download className="w-4 h-4 mr-2" />
+                        CSV 다운로드
+                      </Button>
                     )}
                   </div>
-                </div>
-
-                {selectedSurvey && (
-                  <>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="csvFile" className="text-lg font-medium">
-                          CSV 파일 선택
-                        </Label>
-                        <Input
-                          id="csvFile"
-                          type="file"
-                          accept=".csv"
-                          onChange={handleFileSelect}
-                          className="mt-2 h-12 text-lg"
-                        />
-                      </div>
-
-                      {selectedFile && (
-                        <div className="p-4 bg-blue-50 rounded-lg">
-                          <p className="text-lg font-medium text-blue-800">선택된 파일:</p>
-                          <p className="text-lg text-blue-600">{selectedFile.name}</p>
-                          <p className="text-sm text-blue-500">크기: {(selectedFile.size / 1024).toFixed(2)} KB</p>
-                        </div>
-                      )}
-
-                      <Button
-                        onClick={handleUpload}
-                        disabled={!selectedFile || loading}
-                        className="w-full h-12 text-lg font-semibold bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
-                      >
-                        {loading ? "업로드 중..." : "CSV 파일 업로드"}
-                      </Button>
+                </CardHeader>
+                <CardContent>
+                  {!selectedSurvey ? (
+                    <div className="text-center py-8">
+                      <p className="text-xl text-gray-500">설문지를 선택해주세요</p>
                     </div>
-
-                    <div className="mt-8 p-6 bg-gray-50 rounded-lg">
-                      <h3 className="text-xl font-semibold mb-4">CSV 파일 형식 안내</h3>
-                      <div className="space-y-3">
-                        <p className="text-lg">
-                          <strong>형식:</strong> 병원명|대상자이름|휴대폰번호
-                        </p>
-                        <p className="text-lg">
-                          <strong>예시:</strong>
-                        </p>
-                        <div className="bg-white p-4 rounded border font-mono text-sm">
-                          서울대학교병원|김철수|010-1234-5678
-                          <br />
-                          연세대학교병원|이영희|010-9876-5432
-                          <br />
-                          고려대학교병원|박민수|010-5555-6666
-                        </div>
-                        <p className="text-lg text-red-600">
-                          <strong>주의:</strong> 기존 참여자는 초기화되고 새로운 참여자로 교체됩니다.
-                        </p>
-                      </div>
+                  ) : loading ? (
+                    <div className="text-center py-8">
+                      <p className="text-xl">데이터를 불러오는 중...</p>
                     </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="participants">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-2xl">참여자 목록</CardTitle>
-                <CardDescription className="text-lg">
-                  등록된 참여자들의 정보와 설문 진행 상황을 확인하세요
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!selectedSurvey ? (
-                  <div className="text-center py-8">
-                    <p className="text-xl text-gray-500">설문지를 선택해주세요</p>
-                  </div>
-                ) : loading ? (
-                  <div className="text-center py-8">
-                    <p className="text-xl">데이터를 불러오는 중...</p>
-                  </div>
-                ) : participants.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-xl text-gray-500">등록된 참여자가 없습니다</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row gap-4 p-4 bg-gray-50 rounded-lg">
-                      <div className="flex-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">병원명 검색</label>
-                        <input
-                          type="text"
-                          placeholder="병원명을 입력하세요"
-                          value={hospitalFilter}
-                          onChange={(e) => setHospitalFilter(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">완료 상태</label>
-                        <select
-                          value={statusFilter}
-                          onChange={(e) => setStatusFilter(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="all">전체</option>
-                          <option value="completed">완료</option>
-                          <option value="incomplete">미완료</option>
-                        </select>
-                      </div>
-                      <div className="flex items-end gap-2">
-                        <Button
-                          onClick={downloadParticipantsExcel}
-                          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white"
-                          disabled={filteredParticipants.length === 0}
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          연락처 다운로드
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            setHospitalFilter("")
-                            setStatusFilter("all")
-                          }}
-                          variant="outline"
-                          className="px-4 py-2"
-                        >
-                          필터 초기화
-                        </Button>
-                      </div>
+                  ) : responses.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-xl text-gray-500">완료된 설문이 없습니다</p>
                     </div>
-
-                    <div className="text-sm text-gray-600 mb-2">
-                      총 {participants.length}명 중 {filteredParticipants.length}명 표시
-                    </div>
-
+                  ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full border-collapse border border-gray-300">
                         <thead>
@@ -1485,234 +1613,172 @@ export default function AdminPage() {
                             <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
                               휴대폰번호
                             </th>
-                            <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">상태</th>
-                            <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">등록일</th>
+                            <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">총점</th>
                             <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
-                              설문 링크
+                              완료일시
+                            </th>
+                            <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
+                              상세보기
                             </th>
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredParticipants.map((participant) => (
-                            <tr key={participant.id} className="hover:bg-gray-50">
-                              <td className="border border-gray-300 px-4 py-3 text-lg">{participant.hospital_name}</td>
+                          {responses.map((response) => (
+                            <tr key={response.id} className="hover:bg-gray-50">
                               <td className="border border-gray-300 px-4 py-3 text-lg">
-                                {participant.participant_name}
+                                {response.survey_participants?.hospital_name || ""}
                               </td>
-                              <td className="border border-gray-300 px-4 py-3 text-lg">{participant.phone_number}</td>
+                              <td className="border border-gray-300 px-4 py-3 text-lg">
+                                {response.survey_participants?.participant_name || ""}
+                              </td>
+                              <td className="border border-gray-300 px-4 py-3 text-lg">
+                                {response.survey_participants?.phone_number || ""}
+                              </td>
+                              <td className="border border-gray-300 px-4 py-3 text-lg">
+                                {response.total_score || 0} / {response.max_possible_score || 0}
+                              </td>
+                              <td className="border border-gray-300 px-4 py-3 text-lg">
+                                {new Date(response.created_at).toLocaleString("ko-KR")}
+                              </td>
                               <td className="border border-gray-300 px-4 py-3">
-                                <span
-                                  className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                                    participant.is_completed
-                                      ? "bg-green-100 text-green-800"
-                                      : "bg-yellow-100 text-yellow-800"
-                                  }`}
+                                <Button
+                                  onClick={() => openDetailModal(response)}
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-sm"
                                 >
-                                  {participant.is_completed ? "완료" : "미완료"}
-                                </span>
-                              </td>
-                              <td className="border border-gray-300 px-4 py-3 text-lg">
-                                {new Date(participant.created_at).toLocaleDateString("ko-KR")}
-                              </td>
-                              <td className="border border-gray-300 px-4 py-3">
-                                <div className="flex space-x-2">
-                                  <Button
-                                    onClick={() => copyToClipboard(participant.token)}
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-sm"
-                                  >
-                                    <Copy className="w-4 h-4 mr-1" />
-                                    링크 복사
-                                  </Button>
-                                  <Button
-                                    onClick={() => window.open(`/${participant.token}`, "_blank")}
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-sm"
-                                  >
-                                    <ExternalLink className="w-4 h-4 mr-1" />
-                                    열기
-                                  </Button>
-                                </div>
+                                  <Eye className="w-4 h-4 mr-1" />
+                                  상세보기
+                                </Button>
                               </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="responses">
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle className="text-2xl">설문 결과</CardTitle>
-                    <CardDescription className="text-lg">완료된 설문 응답을 확인하고 다운로드하세요</CardDescription>
-                  </div>
-                  {responses.length > 0 && (
-                    <Button onClick={downloadCSV} className="bg-green-600 hover:bg-green-700">
-                      <Download className="w-4 h-4 mr-2" />
-                      CSV 다운로드
-                    </Button>
                   )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {!selectedSurvey ? (
-                  <div className="text-center py-8">
-                    <p className="text-xl text-gray-500">설문지를 선택해주세요</p>
-                  </div>
-                ) : loading ? (
-                  <div className="text-center py-8">
-                    <p className="text-xl">데이터를 불러오는 중...</p>
-                  </div>
-                ) : responses.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-xl text-gray-500">완료된 설문이 없습니다</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse border border-gray-300">
-                      <thead>
-                        <tr className="bg-gray-100">
-                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">병원명</th>
-                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">참여자명</th>
-                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
-                            휴대폰번호
-                          </th>
-                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">총점</th>
-                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">완료일시</th>
-                          <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">상세보기</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {responses.map((response) => (
-                          <tr key={response.id} className="hover:bg-gray-50">
-                            <td className="border border-gray-300 px-4 py-3 text-lg">
-                              {response.survey_participants?.hospital_name || ""}
-                            </td>
-                            <td className="border border-gray-300 px-4 py-3 text-lg">
-                              {response.survey_participants?.participant_name || ""}
-                            </td>
-                            <td className="border border-gray-300 px-4 py-3 text-lg">
-                              {response.survey_participants?.phone_number || ""}
-                            </td>
-                            <td className="border border-gray-300 px-4 py-3 text-lg">
-                              {response.total_score || 0} / {response.max_possible_score || 0}
-                            </td>
-                            <td className="border border-gray-300 px-4 py-3 text-lg">
-                              {new Date(response.created_at).toLocaleString("ko-KR")}
-                            </td>
-                            <td className="border border-gray-300 px-4 py-3">
-                              <Button
-                                onClick={() => openDetailModal(response)}
-                                size="sm"
-                                variant="outline"
-                                className="text-sm"
-                              >
-                                <Eye className="w-4 h-4 mr-1" />
-                                상세보기
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-          <TabsContent value="stats">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <CardTitle className="text-2xl">통계</CardTitle>
-                      <CardDescription className="text-lg">설문 결과에 대한 상세 통계를 확인하세요</CardDescription>
-                    </div>
-                    {selectedSurvey && responses.length > 0 && (
-                      <Button onClick={downloadStatsExcel} className="bg-green-600 hover:bg-green-700">
-                        <Download className="w-4 h-4 mr-2" />
-                        통계 엑셀 다운로드
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {!selectedSurvey ? (
-                    <div className="text-center py-8">
-                      <p className="text-xl text-gray-500">설문지를 선택해주세요</p>
-                    </div>
-                  ) : responses.length === 0 ? (
-                    <div className="text-center py-8">
-                      <p className="text-xl text-gray-500">통계를 표시할 데이터가 없습니다</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-8">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                        <div className="bg-blue-50 p-6 rounded-lg">
-                          <h3 className="text-lg font-semibold text-blue-800">총 참여자</h3>
-                          <p className="text-3xl font-bold text-blue-600">{participants.length}명</p>
-                        </div>
-                        <div className="bg-green-50 p-6 rounded-lg">
-                          <h3 className="text-lg font-semibold text-green-800">완료된 설문</h3>
-                          <p className="text-3xl font-bold text-green-600">{responses.length}명</p>
-                        </div>
-                        <div className="bg-yellow-50 p-6 rounded-lg">
-                          <h3 className="text-lg font-semibold text-yellow-800">완료율</h3>
-                          <p className="text-3xl font-bold text-yellow-600">
-                            {participants.length > 0 ? Math.round((responses.length / participants.length) * 100) : 0}%
-                          </p>
-                        </div>
-                        <div className="bg-purple-50 p-6 rounded-lg">
-                          <h3 className="text-lg font-semibold text-purple-800">평균 점수</h3>
-                          <p className="text-3xl font-bold text-purple-600">
-                            {responses.length > 0
-                              ? (
-                                  responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length
-                                ).toFixed(1)
-                              : "0"}
-                            /{responses.length > 0 ? responses[0].max_possible_score : 0}
-                          </p>
-                        </div>
-                      </div>
-
+            <TabsContent value="stats">
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <div className="flex justify-between items-center">
                       <div>
-                        <div className="flex justify-between items-center mb-4">
-                          <h3 className="text-xl font-semibold">문항별 평균점수</h3>
-                          <div className="flex items-center space-x-2">
-                            <Label htmlFor="hospitalFilter" className="text-sm">
-                              병원 필터:
-                            </Label>
-                            <Input
-                              id="hospitalFilter"
-                              value={hospitalFilter}
-                              onChange={(e) => setHospitalFilter(e.target.value)}
-                              placeholder="병원명 입력"
-                              className="w-48"
-                            />
+                        <CardTitle className="text-2xl">통계</CardTitle>
+                        <CardDescription className="text-lg">설문 결과에 대한 상세 통계를 확인하세요</CardDescription>
+                      </div>
+                      {selectedSurvey && responses.length > 0 && (
+                        <Button onClick={downloadStatsExcel} className="bg-green-600 hover:bg-green-700">
+                          <Download className="w-4 h-4 mr-2" />
+                          통계 엑셀 다운로드
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {!selectedSurvey ? (
+                      <div className="text-center py-8">
+                        <p className="text-xl text-gray-500">설문지를 선택해주세요</p>
+                      </div>
+                    ) : responses.length === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-xl text-gray-500">통계를 표시할 데이터가 없습니다</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-8">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                          <div className="bg-blue-50 p-6 rounded-lg">
+                            <h3 className="text-lg font-semibold text-blue-800">총 참여자</h3>
+                            <p className="text-3xl font-bold text-blue-600">{participants.length}명</p>
+                          </div>
+                          <div className="bg-green-50 p-6 rounded-lg">
+                            <h3 className="text-lg font-semibold text-green-800">완료된 설문</h3>
+                            <p className="text-3xl font-bold text-green-600">{responses.length}명</p>
+                          </div>
+                          <div className="bg-yellow-50 p-6 rounded-lg">
+                            <h3 className="text-lg font-semibold text-yellow-800">완료율</h3>
+                            <p className="text-3xl font-bold text-yellow-600">
+                              {participants.length > 0 ? Math.round((responses.length / participants.length) * 100) : 0}
+                              %
+                            </p>
+                          </div>
+                          <div className="bg-purple-50 p-6 rounded-lg">
+                            <h3 className="text-lg font-semibold text-purple-800">평균 점수</h3>
+                            <p className="text-3xl font-bold text-purple-600">
+                              {responses.length > 0
+                                ? (
+                                    responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length
+                                  ).toFixed(1)
+                                : "0"}
+                              /{responses.length > 0 ? responses[0].max_possible_score : 0}
+                            </p>
                           </div>
                         </div>
-                        {questionStats.length > 0 ? (
+
+                        <div>
+                          <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-semibold">문항별 평균점수</h3>
+                            <div className="flex items-center space-x-2">
+                              <Label htmlFor="hospitalFilter" className="text-sm">
+                                병원 필터:
+                              </Label>
+                              <Input
+                                id="hospitalFilter"
+                                value={hospitalFilter}
+                                onChange={(e) => setHospitalFilter(e.target.value)}
+                                placeholder="병원명 입력"
+                                className="w-48"
+                              />
+                            </div>
+                          </div>
+                          {questionStats.length > 0 ? (
+                            <div className="overflow-x-auto">
+                              <table className="w-full border-collapse border border-gray-300">
+                                <thead>
+                                  <tr className="bg-gray-100">
+                                    <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                                      문항 번호
+                                    </th>
+                                    <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                                      문항 내용
+                                    </th>
+                                    <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                                      응답 수
+                                    </th>
+                                    <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                                      평균 점수
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {questionStats.map((stat) => (
+                                    <tr key={stat.id} className="hover:bg-gray-50">
+                                      <td className="border border-gray-300 px-4 py-3">{stat.questionNumber}</td>
+                                      <td className="border border-gray-300 px-4 py-3">{stat.questionText}</td>
+                                      <td className="border border-gray-300 px-4 py-3">{stat.totalResponses}</td>
+                                      <td className="border border-gray-300 px-4 py-3">
+                                        {stat.averageScore}/{stat.maxScore}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <p className="text-gray-500">문항별 통계 데이터가 없습니다.</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <h3 className="text-xl font-semibold mb-4">병원별 통계</h3>
                           <div className="overflow-x-auto">
                             <table className="w-full border-collapse border border-gray-300">
                               <thead>
                                 <tr className="bg-gray-100">
-                                  <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
-                                    문항 번호
-                                  </th>
-                                  <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
-                                    문항 내용
-                                  </th>
+                                  <th className="border border-gray-300 px-4 py-3 text-left font-semibold">병원명</th>
                                   <th className="border border-gray-300 px-4 py-3 text-left font-semibold">응답 수</th>
                                   <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
                                     평균 점수
@@ -1720,209 +1786,165 @@ export default function AdminPage() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {questionStats.map((stat) => (
-                                  <tr key={stat.id} className="hover:bg-gray-50">
-                                    <td className="border border-gray-300 px-4 py-3">{stat.questionNumber}</td>
-                                    <td className="border border-gray-300 px-4 py-3">{stat.questionText}</td>
-                                    <td className="border border-gray-300 px-4 py-3">{stat.totalResponses}</td>
+                                {Object.entries(
+                                  responses.reduce((acc: Record<string, any>, response) => {
+                                    const hospital = response.survey_participants?.hospital_name || "알 수 없음"
+                                    if (!acc[hospital]) {
+                                      acc[hospital] = { count: 0, totalScore: 0, maxScore: response.max_possible_score }
+                                    }
+                                    acc[hospital].count += 1
+                                    acc[hospital].totalScore += response.total_score || 0
+                                    return acc
+                                  }, {}),
+                                ).map(([hospital, stats]: [string, any]) => (
+                                  <tr key={hospital} className="hover:bg-gray-50">
+                                    <td className="border border-gray-300 px-4 py-3">{hospital}</td>
+                                    <td className="border border-gray-300 px-4 py-3">{stats.count}</td>
                                     <td className="border border-gray-300 px-4 py-3">
-                                      {stat.averageScore}/{stat.maxScore}
+                                      {(stats.totalScore / stats.count).toFixed(1)}/{stats.maxScore}
                                     </td>
                                   </tr>
                                 ))}
                               </tbody>
                             </table>
                           </div>
-                        ) : (
-                          <p className="text-gray-500">문항별 통계 데이터가 없습니다.</p>
-                        )}
-                      </div>
-
-                      <div>
-                        <h3 className="text-xl font-semibold mb-4">병원별 통계</h3>
-                        <div className="overflow-x-auto">
-                          <table className="w-full border-collapse border border-gray-300">
-                            <thead>
-                              <tr className="bg-gray-100">
-                                <th className="border border-gray-300 px-4 py-3 text-left font-semibold">병원명</th>
-                                <th className="border border-gray-300 px-4 py-3 text-left font-semibold">응답 수</th>
-                                <th className="border border-gray-300 px-4 py-3 text-left font-semibold">평균 점수</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {Object.entries(
-                                responses.reduce((acc: Record<string, any>, response) => {
-                                  const hospital = response.survey_participants?.hospital_name || "알 수 없음"
-                                  if (!acc[hospital]) {
-                                    acc[hospital] = { count: 0, totalScore: 0, maxScore: response.max_possible_score }
-                                  }
-                                  acc[hospital].count += 1
-                                  acc[hospital].totalScore += response.total_score || 0
-                                  return acc
-                                }, {}),
-                              ).map(([hospital, stats]: [string, any]) => (
-                                <tr key={hospital} className="hover:bg-gray-50">
-                                  <td className="border border-gray-300 px-4 py-3">{hospital}</td>
-                                  <td className="border border-gray-300 px-4 py-3">{stats.count}</td>
-                                  <td className="border border-gray-300 px-4 py-3">
-                                    {(stats.totalScore / stats.count).toFixed(1)}/{stats.maxScore}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
                         </div>
                       </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="create" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-2xl">새 설문지 생성</CardTitle>
+                  <CardDescription>설문지 제목, 설명, 문항과 답변 옵션을 입력하세요.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="title">설문지 제목 *</Label>
+                      <Input
+                        id="title"
+                        value={newSurveyTitle}
+                        onChange={(e) => setNewSurveyTitle(e.target.value)}
+                        placeholder="예: 2024년 병원 만족도 조사"
+                      />
                     </div>
+                    <div>
+                      <Label htmlFor="description">설문지 설명</Label>
+                      <Textarea
+                        id="description"
+                        value={newSurveyDescription}
+                        onChange={(e) => setNewSurveyDescription(e.target.value)}
+                        placeholder="설문지에 대한 간단한 설명을 입력하세요"
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-lg font-semibold">설문 문항 및 답변 옵션</Label>
+                      <Button onClick={addQuestion} size="sm" className="flex items-center gap-2">
+                        <Plus className="w-4 h-4" />
+                        문항 추가
+                      </Button>
+                    </div>
+
+                    {newSurveyQuestions.map((questionData, questionIndex) => (
+                      <Card key={questionIndex} className="p-4 border-l-4 border-blue-500">
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <Label className="font-medium">문항 {questionIndex + 1}</Label>
+                            {newSurveyQuestions.length > 1 && (
+                              <Button
+                                onClick={() => removeQuestion(questionIndex)}
+                                size="sm"
+                                variant="destructive"
+                                className="flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                삭제
+                              </Button>
+                            )}
+                          </div>
+
+                          <div>
+                            <Label htmlFor={`question-${questionIndex}`}>질문 내용 *</Label>
+                            <Textarea
+                              id={`question-${questionIndex}`}
+                              value={questionData.question}
+                              onChange={(e) => updateQuestion(questionIndex, "question", e.target.value)}
+                              placeholder="예: 의료진의 친절도에 만족하십니까?"
+                              rows={2}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label className="font-medium">답변 옵션</Label>
+                              <Button
+                                onClick={() => addAnswer(questionIndex)}
+                                size="sm"
+                                variant="outline"
+                                className="flex items-center gap-1"
+                              >
+                                <Plus className="w-3 h-3" />
+                                답변 추가
+                              </Button>
+                            </div>
+
+                            {questionData.answers.map((answer, answerIndex) => (
+                              <div key={answerIndex} className="flex items-center gap-2">
+                                <span className="text-sm font-medium w-8">{answerIndex + 1}.</span>
+                                <Input
+                                  value={answer}
+                                  onChange={(e) => updateAnswer(questionIndex, answerIndex, e.target.value)}
+                                  placeholder={`답변 옵션 ${answerIndex + 1}`}
+                                  className="flex-1"
+                                />
+                                {questionData.answers.length > 1 && (
+                                  <Button
+                                    onClick={() => removeAnswer(questionIndex, answerIndex)}
+                                    size="sm"
+                                    variant="ghost"
+                                    className="p-1 h-8 w-8"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {error && (
+                    <Alert>
+                      <AlertDescription className="text-red-600">{error}</AlertDescription>
+                    </Alert>
                   )}
+
+                  {uploadSuccess && (
+                    <Alert>
+                      <AlertDescription className="text-green-600">{uploadSuccess}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <Button onClick={handleCreateSurvey} disabled={createLoading} className="w-full" size="lg">
+                    {createLoading ? "생성 중..." : "설문지 생성"}
+                  </Button>
                 </CardContent>
               </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>설문지 수정</DialogTitle>
-              <DialogDescription>설문지 정보를 수정하세요</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="editTitle">설문지 제목 *</Label>
-                <Input
-                  id="editTitle"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="mt-2"
-                />
-              </div>
-              <div>
-                <Label htmlFor="editDescription">설문지 설명</Label>
-                <Textarea
-                  id="editDescription"
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  className="mt-2"
-                  rows={3}
-                />
-              </div>
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <Label>설문 문항 *</Label>
-                  <Button onClick={addEditQuestion} size="sm" variant="outline">
-                    <Plus className="w-4 h-4 mr-1" />
-                    문항 추가
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {editQuestions.map((question, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
-                        value={question}
-                        onChange={(e) => updateEditQuestion(index, e.target.value)}
-                        placeholder={`문항 ${index + 1}`}
-                        className="flex-1"
-                      />
-                      {editQuestions.length > 1 && (
-                        <Button onClick={() => removeEditQuestion(index)} size="sm" variant="outline">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowEditModal(false)}>
-                취소
-              </Button>
-              <Button onClick={handleSaveEdit} disabled={editLoading}>
-                {editLoading ? "저장 중..." : "저장"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>설문지 삭제</AlertDialogTitle>
-              <AlertDialogDescription>
-                정말로 이 설문지를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
-                <br />
-                <br />
-                삭제하려면 관리자 비밀번호를 입력하세요:
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="my-4">
-              <Input
-                type="password"
-                value={deletePassword}
-                onChange={(e) => setDeletePassword(e.target.value)}
-                placeholder="관리자 비밀번호"
-              />
-            </div>
-            <AlertDialogFooter>
-              <AlertDialogCancel
-                onClick={() => {
-                  setShowDeleteConfirm(false)
-                  setDeletePassword("")
-                }}
-              >
-                취소
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDeleteSurvey}
-                disabled={deleteLoading}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                {deleteLoading ? "삭제 중..." : "삭제"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>설문 응답 상세</DialogTitle>
-            </DialogHeader>
-            {selectedResponse && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>병원명</Label>
-                    <p className="text-lg">{selectedResponse.survey_participants?.hospital_name || ""}</p>
-                  </div>
-                  <div>
-                    <Label>참여자명</Label>
-                    <p className="text-lg">{selectedResponse.survey_participants?.participant_name || ""}</p>
-                  </div>
-                  <div>
-                    <Label>휴대폰번호</Label>
-                    <p className="text-lg">{selectedResponse.survey_participants?.phone_number || ""}</p>
-                  </div>
-                  <div>
-                    <Label>완료일시</Label>
-                    <p className="text-lg">{new Date(selectedResponse.created_at).toLocaleString("ko-KR")}</p>
-                  </div>
-                </div>
-                <div>
-                  <Label>총점</Label>
-                  <p className="text-2xl font-bold">
-                    {selectedResponse.total_score || 0} / {selectedResponse.max_possible_score || 0}
-                  </p>
-                </div>
-              </div>
-            )}
-            <DialogFooter>
-              <Button onClick={() => setShowDetailModal(false)}>닫기</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      )}
     </div>
   )
 }
