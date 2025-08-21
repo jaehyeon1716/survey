@@ -63,11 +63,11 @@ export async function POST(request: NextRequest) {
 
     if (surveyError) throw surveyError
 
-    // 문항들 생성
-    const questionsData = questions.map((questionText: string, index: number) => ({
+    const questionsData = questions.map((q: { question: string; answers: string[] }, index: number) => ({
       survey_id: survey.id,
       question_number: index + 1,
-      question_text: questionText,
+      question_text: q.question,
+      answer_options: q.answers, // JSON 배열로 저장
     }))
 
     const { error: questionsError } = await supabase.from("survey_questions").insert(questionsData)

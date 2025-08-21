@@ -642,13 +642,13 @@ export default function AdminPage() {
     ])
   }
 
-  const removeQuestion = (index: number) => {
+  const removeQuestionOld = (index: number) => {
     if (newSurveyQuestions.length > 1) {
       setNewSurveyQuestions(newSurveyQuestions.filter((_, i) => i !== index))
     }
   }
 
-  const updateQuestion = (index: number, field: "question" | "answers", value: string | string[]) => {
+  const updateQuestionOld = (index: number, field: "question" | "answers", value: string | string[]) => {
     const updated = [...newSurveyQuestions]
     if (field === "question") {
       updated[index].question = value as string
@@ -658,13 +658,13 @@ export default function AdminPage() {
     setNewSurveyQuestions(updated)
   }
 
-  const addAnswer = (questionIndex: number) => {
+  const addAnswerOld = (questionIndex: number) => {
     const updated = [...newSurveyQuestions]
     updated[questionIndex].answers.push("")
     setNewSurveyQuestions(updated)
   }
 
-  const removeAnswer = (questionIndex: number, answerIndex: number) => {
+  const removeAnswerOld = (questionIndex: number, answerIndex: number) => {
     const updated = [...newSurveyQuestions]
     if (updated[questionIndex].answers.length > 1) {
       updated[questionIndex].answers = updated[questionIndex].answers.filter((_, i) => i !== answerIndex)
@@ -672,7 +672,7 @@ export default function AdminPage() {
     }
   }
 
-  const updateAnswer = (questionIndex: number, answerIndex: number, value: string) => {
+  const updateAnswerOld = (questionIndex: number, answerIndex: number, value: string) => {
     const updated = [...newSurveyQuestions]
     updated[questionIndex].answers[answerIndex] = value
     setNewSurveyQuestions(updated)
@@ -1227,20 +1227,64 @@ export default function AdminPage() {
                       </div>
                       <div className="space-y-3">
                         {newSurveyQuestions.map((question, index) => (
-                          <div key={index} className="flex gap-2">
-                            <div className="flex-1">
-                              <Input
-                                value={question}
-                                onChange={(e) => updateQuestion(index, e.target.value)}
-                                placeholder={`문항 ${index + 1}을 입력하세요`}
-                                className="h-12 text-lg"
-                              />
+                          <div key={index} className="space-y-3 p-4 border rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <Label htmlFor={`question-${index}`} className="text-sm font-medium">
+                                문항 {index + 1}
+                              </Label>
+                              {newSurveyQuestions.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => removeQuestion(index)}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  삭제
+                                </Button>
+                              )}
                             </div>
-                            {newSurveyQuestions.length > 1 && (
-                              <Button onClick={() => removeQuestion(index)} size="sm" variant="outline">
-                                <Trash2 className="w-4 h-4" />
+                            <Textarea
+                              id={`question-${index}`}
+                              placeholder="질문을 입력하세요"
+                              value={question.question}
+                              onChange={(e) => updateQuestion(index, e.target.value)}
+                              className="min-h-[80px]"
+                            />
+
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium">답변 옵션</Label>
+                              {question.answers.map((answer, answerIndex) => (
+                                <div key={answerIndex} className="flex items-center gap-2">
+                                  <Input
+                                    placeholder={`답변 옵션 ${answerIndex + 1}`}
+                                    value={answer}
+                                    onChange={(e) => updateAnswer(index, answerIndex, e.target.value)}
+                                    className="flex-1"
+                                  />
+                                  {question.answers.length > 2 && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => removeAnswer(index, answerIndex)}
+                                      className="text-red-600 hover:text-red-700"
+                                    >
+                                      삭제
+                                    </Button>
+                                  )}
+                                </div>
+                              ))}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => addAnswer(index)}
+                                className="w-full"
+                              >
+                                답변 옵션 추가
                               </Button>
-                            )}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -1947,4 +1991,37 @@ export default function AdminPage() {
       )}
     </div>
   )
+
+  const updateQuestion = (index: number, value: string) => {
+    const updated = [...newSurveyQuestions]
+    updated[index].question = value
+    setNewSurveyQuestions(updated)
+  }
+
+  const updateAnswer = (questionIndex: number, answerIndex: number, value: string) => {
+    const updated = [...newSurveyQuestions]
+    updated[questionIndex].answers[answerIndex] = value
+    setNewSurveyQuestions(updated)
+  }
+
+  const addAnswer = (questionIndex: number) => {
+    const updated = [...newSurveyQuestions]
+    updated[questionIndex].answers.push("")
+    setNewSurveyQuestions(updated)
+  }
+
+  const removeAnswer = (questionIndex: number, answerIndex: number) => {
+    const updated = [...newSurveyQuestions]
+    if (updated[questionIndex].answers.length > 2) {
+      updated[questionIndex].answers.splice(answerIndex, 1)
+      setNewSurveyQuestions(updated)
+    }
+  }
+
+  const removeQuestion = (index: number) => {
+    if (newSurveyQuestions.length > 1) {
+      const updated = newSurveyQuestions.filter((_, i) => i !== index)
+      setNewSurveyQuestions(updated)
+    }
+  }
 }
