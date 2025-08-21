@@ -19,7 +19,8 @@ export async function GET() {
         survey_questions (
           id,
           question_number,
-          question_text
+          question_text,
+          answer_options
         )
       `)
       .order("created_at", { ascending: false })
@@ -63,12 +64,14 @@ export async function POST(request: NextRequest) {
 
     if (surveyError) throw surveyError
 
-    const questionsData = questions.map((q: { question: string; answers: string[] }, index: number) => ({
-      survey_id: survey.id,
-      question_number: index + 1,
-      question_text: q.question,
-      answer_options: q.answers, // JSON 배열로 저장
-    }))
+    const questionsData = questions.map(
+      (q: { question: string; answers: { text: string; score: number }[] }, index: number) => ({
+        survey_id: survey.id,
+        question_number: index + 1,
+        question_text: q.question,
+        answer_options: q.answers, // 점수 포함한 답변 옵션을 JSON으로 저장
+      }),
+    )
 
     const { error: questionsError } = await supabase.from("survey_questions").insert(questionsData)
 
