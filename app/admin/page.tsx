@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus, Trash2, FileText, Eye } from "lucide-react"
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/client"
 
 interface AnswerOption {
   text: string
@@ -60,6 +60,7 @@ interface SurveyResponse {
     hospital_name: string
     participant_name: string
     phone_number: string
+    token: string
   }
   total_score: number
   max_possible_score: number
@@ -123,28 +124,35 @@ export default function AdminPage() {
   const [selectedSurvey, setSelectedSurvey] = useState<any>(null)
   const [showTokens, setShowTokens] = useState(false)
 
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-
   const downloadParticipantsExcel = () => {
-    if (!selectedSurvey || filteredParticipants.length === 0) {
+    if (!selectedSurvey) {
+      alert("설문지를 선택해주세요.")
+      return
+    }
+
+    const surveyParticipants = participants.filter((p) => p.survey_id === selectedSurvey.id)
+
+    if (surveyParticipants.length === 0) {
       alert("다운로드할 참여자 데이터가 없습니다.")
       return
     }
 
-    const excelData = filteredParticipants.map((participant) => ({
-      참여자명: participant.participant_name,
-      휴대폰번호: participant.phone_number,
-      병원명: participant.hospital_name,
-      설문링크: `${window.location.origin}/${participant.token}`,
-    }))
+    // Create CSV data in the exact format requested: 이름,휴대폰번호,병원이름,토큰이포함된설문지주소
+    const headers = ["이름", "휴대폰번호", "병원이름", "토큰이포함된설문지주소"]
 
-    const headers = Object.keys(excelData[0])
-    const csvContent = excelData
+    const csvData = surveyParticipants.map((participant) => [
+      participant.participant_name,
+      participant.phone_number,
+      participant.hospital_name,
+      `${window.location.origin}/${participant.token}`,
+    ])
+
+    const csvContent = [headers, ...csvData]
       .map((row) =>
-        headers
-          .map((header) => {
-            const value = row[header as keyof typeof row]
-            return typeof value === "string" && (value.includes(",") || value.includes('"'))
+        row
+          .map((field) => {
+            const value = String(field || "")
+            return value.includes(",") || value.includes('"') || value.includes("\n")
               ? `"${value.replace(/"/g, '""')}"`
               : value
           })
@@ -221,11 +229,11 @@ export default function AdminPage() {
   }
 
   const fetchParticipants = async (surveyId?: number) => {
-    if (!supabase) return
+    const supabase = createClient()
 
     try {
       const { data, error } = await supabase
-        .from("survey_responses")
+        .from("survey_participants")
         .select("*")
         .eq("survey_id", surveyId || selectedSurvey?.id)
         .order("created_at", { ascending: false })
@@ -238,24 +246,29 @@ export default function AdminPage() {
   }
 
   const fetchResponses = async (surveyId?: number) => {
-    if (!supabase) return
+    const supabase = createClient()
 
     setLoading(true)
     try {
       let query = supabase
-        .from("survey_response_summaries")
+        .from("survey_responses")
         .select(`
           *,
-          survey_participants (
+          survey_participants!inner (
             hospital_name,
             participant_name,
-            phone_number
+            phone_number,
+            token
+          ),
+          survey_questions!inner (
+            question_text,
+            question_order
           )
         `)
         .order("created_at", { ascending: false })
 
       if (surveyId) {
-        query = query.eq("survey_id", surveyId)
+        query = query.eq("survey_participants.survey_id", surveyId)
       }
 
       const { data, error } = await query
@@ -267,70 +280,38 @@ export default function AdminPage() {
         await fetchQuestionStats(surveyId)
       }
     } catch (err) {
+      console.error("응답 데이터 조회 오류:", err)
       setError("설문 응답 데이터를 불러오는데 실패했습니다.")
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchQuestionStats = async (surveyId: number, hospitalName?: string) => {
-    if (!supabase) return
+  const fetchQuestionStats = async (surveyId: number) => {
+    const supabase = createClient()
 
     try {
-      const { data: questionsData, error: questionsError } = await supabase
-        .from("survey_questions")
-        .select("*")
-        .eq("survey_id", surveyId)
-        .order("question_number", { ascending: true })
-
-      if (questionsError || !questionsData) return
-
-      let responsesQuery = supabase
+      const { data, error } = await supabase
         .from("survey_responses")
         .select(`
-          question_id,
-          response_value,
-          participant_token,
+          answer_text,
+          answer_value,
           survey_questions (
             question_text,
-            question_number
+            question_order
           ),
           survey_participants!inner (
             hospital_name
           )
         `)
-        .in(
-          "question_id",
-          questionsData.map((q) => q.id),
-        )
+        .eq("survey_questions.survey_id", surveyId)
 
-      if (hospitalName && hospitalName.trim() !== "") {
-        responsesQuery = responsesQuery.ilike("survey_participants.hospital_name", `%${hospitalName.trim()}%`)
-      }
+      if (error) throw error
 
-      const { data: responsesData, error: responsesError } = await responsesQuery
-
-      if (responsesError || !responsesData) return
-
-      const questionStatsMap = questionsData.map((question) => {
-        const questionResponses = responsesData.filter((r: any) => r.question_id === question.id)
-        const totalResponses = questionResponses.length
-        const averageScore =
-          totalResponses > 0 ? questionResponses.reduce((sum, r: any) => sum + r.response_value, 0) / totalResponses : 0
-
-        return {
-          id: question.id,
-          questionNumber: question.question_number,
-          questionText: question.question_text,
-          totalResponses,
-          averageScore: averageScore.toFixed(1),
-          maxScore: 5,
-        }
-      })
-
-      setQuestionStats(questionStatsMap)
+      // Process stats data here if needed
+      console.log("Question stats:", data)
     } catch (err) {
-      console.error("문항별 통계 조회 오류:", err)
+      console.error("질문 통계 조회 오류:", err)
     }
   }
 
@@ -779,51 +760,50 @@ export default function AdminPage() {
     const hospitalQuestionStats: Record<string, Record<number, any>> = {}
 
     try {
-      if (supabase) {
-        const { data: detailedResponses, error } = await supabase
-          .from("survey_responses")
-          .select(`
-            question_id,
-            response_value,
-            survey_questions (
-              question_text,
-              question_number
-            ),
-            survey_participants!inner (
-              hospital_name
-            )
-          `)
-          .in(
-            "question_id",
-            questionStats.map((q) => q.id),
+      const supabase = createClient()
+      const { data: detailedResponses, error } = await supabase
+        .from("survey_responses")
+        .select(`
+          question_id,
+          response_value,
+          survey_questions (
+            question_text,
+            question_order
+          ),
+          survey_participants!inner (
+            hospital_name
           )
+        `)
+        .in(
+          "question_id",
+          questionStats.map((q) => q.id),
+        )
 
-        if (!error && detailedResponses) {
-          detailedResponses.forEach((response: any) => {
-            const hospital = response.survey_participants?.hospital_name || "알 수 없음"
-            const questionId = response.question_id
-            const questionNumber = response.survey_questions?.question_number || 0
-            const questionText = response.survey_questions?.question_text || ""
+      if (!error && detailedResponses) {
+        detailedResponses.forEach((response: any) => {
+          const hospital = response.survey_participants?.hospital_name || "알 수 없음"
+          const questionId = response.question_id
+          const questionNumber = response.survey_questions?.question_order || 0
+          const questionText = response.survey_questions?.question_text || ""
 
-            if (!hospitalQuestionStats[hospital]) {
-              hospitalQuestionStats[hospital] = {}
+          if (!hospitalQuestionStats[hospital]) {
+            hospitalQuestionStats[hospital] = {}
+          }
+
+          if (!hospitalQuestionStats[hospital][questionId]) {
+            hospitalQuestionStats[hospital][questionId] = {
+              questionNumber,
+              questionText,
+              responses: [],
+              total: 0,
+              count: 0,
             }
+          }
 
-            if (!hospitalQuestionStats[hospital][questionId]) {
-              hospitalQuestionStats[hospital][questionId] = {
-                questionNumber,
-                questionText,
-                responses: [],
-                total: 0,
-                count: 0,
-              }
-            }
-
-            hospitalQuestionStats[hospital][questionId].responses.push(response.response_value)
-            hospitalQuestionStats[hospital][questionId].total += response.response_value
-            hospitalQuestionStats[hospital][questionId].count += 1
-          })
-        }
+          hospitalQuestionStats[hospital][questionId].responses.push(response.response_value)
+          hospitalQuestionStats[hospital][questionId].total += response.response_value
+          hospitalQuestionStats[hospital][questionId].count += 1
+        })
       }
     } catch (err) {
       console.error("병원별 문항별 통계 조회 오류:", err)
@@ -1169,45 +1149,129 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="manage">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-xl font-semibold">설문지 관리</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {surveys.length === 0 ? (
-                  <Alert>
-                    <AlertDescription>생성된 설문지가 없습니다.</AlertDescription>
-                  </Alert>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {surveys.map((survey) => (
-                      <Card key={survey.id} className="p-4">
-                        <CardHeader>
-                          <CardTitle className="text-lg font-semibold">{survey.title}</CardTitle>
-                          <CardDescription>{survey.description}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-2">
-                          <Badge variant="secondary">
-                            참여자 수: {participants.filter((p) => p.survey_id === survey.id).length}
-                          </Badge>
-                          <Badge variant="outline">상태: {survey.is_active ? "활성" : "비활성"}</Badge>
-                          <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="outline" onClick={() => setSelectedSurvey(survey)}>
-                              <Eye className="w-4 h-4 mr-2" />
-                              보기
-                            </Button>
-                            <Button size="sm" variant="destructive" onClick={() => handleDeleteConfirm(survey)}>
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              삭제
-                            </Button>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-xl font-semibold">설문지 관리</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {surveys.length === 0 ? (
+                    <Alert>
+                      <AlertDescription>생성된 설문지가 없습니다.</AlertDescription>
+                    </Alert>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {surveys.map((survey) => (
+                        <Card key={survey.id} className="p-4">
+                          <CardHeader>
+                            <CardTitle className="text-lg font-semibold">{survey.title}</CardTitle>
+                            <CardDescription>{survey.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent className="flex flex-col gap-2">
+                            <Badge variant="secondary">
+                              참여자 수: {participants.filter((p) => p.survey_id === survey.id).length}
+                            </Badge>
+                            <Badge variant="outline">상태: {survey.is_active ? "활성" : "비활성"}</Badge>
+                            <div className="flex justify-end gap-2">
+                              <Button size="sm" variant="outline" onClick={() => setSelectedSurvey(survey)}>
+                                <Eye className="w-4 h-4 mr-2" />
+                                보기
+                              </Button>
+                              <Button size="sm" variant="destructive" onClick={() => handleDeleteConfirm(survey)}>
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                삭제
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {selectedSurvey && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-xl font-semibold">선택된 설문지: {selectedSurvey.title}</CardTitle>
+                      <Button variant="outline" onClick={() => setSelectedSurvey(null)}>
+                        닫기
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label className="font-medium">설명:</Label>
+                      <p className="text-gray-600 mt-1">{selectedSurvey.description || "설명이 없습니다."}</p>
+                    </div>
+
+                    <div>
+                      <Label className="font-medium">생성일:</Label>
+                      <p className="text-gray-600 mt-1">
+                        {new Date(selectedSurvey.created_at).toLocaleString("ko-KR")}
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label className="font-medium">참여자 현황:</Label>
+                      <div className="mt-2 grid grid-cols-2 gap-4">
+                        <div className="bg-blue-50 p-3 rounded-lg">
+                          <div className="text-2xl font-bold text-blue-600">
+                            {participants.filter((p) => p.survey_id === selectedSurvey.id).length}
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                          <div className="text-sm text-blue-600">총 참여자</div>
+                        </div>
+                        <div className="bg-green-50 p-3 rounded-lg">
+                          <div className="text-2xl font-bold text-green-600">
+                            {participants.filter((p) => p.survey_id === selectedSurvey.id && p.is_completed).length}
+                          </div>
+                          <div className="text-sm text-green-600">완료된 응답</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t pt-4">
+                      <Label className="font-medium text-lg">참여자 CSV 업로드</Label>
+                      <div className="mt-3 space-y-3">
+                        <div className="bg-yellow-50 p-3 rounded-lg">
+                          <p className="text-sm text-yellow-800">
+                            <strong>CSV 파일 형식:</strong> 병원이름|사람이름|휴대폰번호
+                          </p>
+                          <p className="text-sm text-yellow-800 mt-1">예시: 서울대병원|홍길동|010-1234-5678</p>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <Input
+                            id="csvFile"
+                            type="file"
+                            accept=".csv"
+                            onChange={handleFileSelect}
+                            className="flex-1"
+                          />
+                          <Button
+                            onClick={handleUpload}
+                            disabled={!selectedFile || loading}
+                            className="whitespace-nowrap"
+                          >
+                            {loading ? "업로드 중..." : "업로드"}
+                          </Button>
+                        </div>
+
+                        {selectedFile && <p className="text-sm text-gray-600">선택된 파일: {selectedFile.name}</p>}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button onClick={() => downloadParticipantsExcel()} className="flex items-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        참여자 목록 다운로드
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="analytics">
@@ -1260,6 +1324,62 @@ export default function AdminPage() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <Card className="w-full max-w-md mx-4">
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold text-red-600">설문지 삭제 확인</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-gray-700">
+                    <strong>"{surveyToDelete?.title}"</strong> 설문지를 삭제하시겠습니까?
+                  </p>
+                  <p className="text-sm text-red-600 mt-2">
+                    ⚠️ 이 작업은 되돌릴 수 없으며, 모든 참여자 데이터와 응답이 함께 삭제됩니다.
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="deletePassword" className="font-medium">
+                    관리자 비밀번호 확인
+                  </Label>
+                  <Input
+                    id="deletePassword"
+                    type="password"
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    placeholder="비밀번호를 입력하세요"
+                    className="mt-2"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowDeleteConfirm(false)
+                      setSurveyToDelete(null)
+                      setDeletePassword("")
+                      setError("")
+                    }}
+                    disabled={deleteLoading}
+                  >
+                    취소
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleDeleteSurvey}
+                    disabled={deleteLoading || !deletePassword}
+                  >
+                    {deleteLoading ? "삭제 중..." : "삭제"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   )
