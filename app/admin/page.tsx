@@ -1860,7 +1860,7 @@ export default function AdminPage() {
                           ) : (
                             <Alert>
                               <AlertDescription>
-                                병원이 많아 개별 통계를 보려면 위의 검색창에서 병원명을 검색해주세요.
+                                병원별 통계를 확인하려면 위의 검색창에서 병원명을 검색해주세요.
                               </AlertDescription>
                             </Alert>
                           )}
