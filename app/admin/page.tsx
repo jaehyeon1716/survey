@@ -1000,9 +1000,13 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (selectedSurvey) {
-      fetchQuestionStats(selectedSurvey.id, hospitalFilter)
+      fetchQuestionStats(selectedSurvey.id, hospitalSearchFilter)
     }
-  }, [selectedSurvey, hospitalFilter])
+  }, [selectedSurvey, hospitalSearchFilter])
+
+  useEffect(() => {
+    setHospitalFilter(hospitalSearchFilter)
+  }, [hospitalSearchFilter])
 
   useEffect(() => {
     filterParticipants()
@@ -1791,7 +1795,7 @@ export default function AdminPage() {
                                         )
                                         if (participantResponses.length > 0) {
                                           acc[hospital].totalScore += participantResponses.reduce(
-                                            (sum, r) => sum + (r.response_value || 0),
+                                            (sum, r) => sum + (r.answer_value || 0),
                                             0,
                                           )
                                           acc[hospital].responseCount += participantResponses.length
@@ -1814,6 +1818,22 @@ export default function AdminPage() {
                                       if (!acc[hospital]) {
                                         acc[hospital] = { total: 0, completed: 0, totalScore: 0, responseCount: 0 }
                                       }
+                                      acc[hospital].total += 1
+                                      if (participant.is_completed) {
+                                        acc[hospital].completed += 1
+                                      }
+
+                                      const participantResponses = responses.filter(
+                                        (r) => r.survey_participants?.token === participant.token,
+                                      )
+                                      if (participantResponses.length > 0) {
+                                        acc[hospital].totalScore += participantResponses.reduce(
+                                          (sum, r) => sum + (r.answer_value || 0),
+                                          0,
+                                        )
+                                        acc[hospital].responseCount += participantResponses.length
+                                      }
+
                                       return acc
                                     }, {}),
                                 )
@@ -1866,6 +1886,22 @@ export default function AdminPage() {
                                     if (!acc[hospital]) {
                                       acc[hospital] = { total: 0, completed: 0, totalScore: 0, responseCount: 0 }
                                     }
+                                    acc[hospital].total += 1
+                                    if (participant.is_completed) {
+                                      acc[hospital].completed += 1
+                                    }
+
+                                    const participantResponses = responses.filter(
+                                      (r) => r.survey_participants?.token === participant.token,
+                                    )
+                                    if (participantResponses.length > 0) {
+                                      acc[hospital].totalScore += participantResponses.reduce(
+                                        (sum, r) => sum + (r.answer_value || 0),
+                                        0,
+                                      )
+                                      acc[hospital].responseCount += participantResponses.length
+                                    }
+
                                     return acc
                                   }, {}),
                               ).filter(([hospital]) =>
@@ -1881,7 +1917,7 @@ export default function AdminPage() {
                           ) : (
                             <Alert>
                               <AlertDescription>
-                                병원이 많아 개별 통계를 보려면 위의 검색창에서 병원명을 검색해주세요.
+                                병원별 통계를 보려면 위의 검색창에서 병원명을 검색해 주세요.
                               </AlertDescription>
                             </Alert>
                           )}
@@ -1892,38 +1928,23 @@ export default function AdminPage() {
 
                   <Card>
                     <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg font-semibold">문항별 통계</CardTitle>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            placeholder="병원명 검색..."
-                            value={hospitalFilter}
-                            onChange={(e) => setHospitalFilter(e.target.value)}
-                            className="w-64"
-                          />
-                          {hospitalFilter && (
-                            <Button variant="outline" size="sm" onClick={() => setHospitalFilter("")}>
-                              초기화
-                            </Button>
-                          )}
-                        </div>
-                      </div>
+                      <CardTitle className="text-lg font-semibold">문항별 통계</CardTitle>
                     </CardHeader>
                     <CardContent>
                       {questionStats.length === 0 ? (
                         <Alert>
                           <AlertDescription>
-                            {hospitalFilter
-                              ? `"${hospitalFilter}" 병원의 문항별 통계 데이터가 없습니다.`
+                            {hospitalSearchFilter
+                              ? `"${hospitalSearchFilter}" 병원의 문항별 통계 데이터가 없습니다.`
                               : "문항별 통계 데이터가 없습니다."}
                           </AlertDescription>
                         </Alert>
                       ) : (
                         <div className="space-y-4">
-                          {hospitalFilter && (
+                          {hospitalSearchFilter && (
                             <div className="bg-blue-50 p-3 rounded-lg">
                               <p className="text-sm text-blue-800">
-                                <strong>"{hospitalFilter}"</strong> 병원의 문항별 통계를 표시하고 있습니다.
+                                <strong>"{hospitalSearchFilter}"</strong> 병원의 문항별 통계를 표시하고 있습니다.
                               </p>
                             </div>
                           )}
@@ -1932,9 +1953,9 @@ export default function AdminPage() {
                           <div>
                             <h4 className="text-md font-semibold mb-3">
                               문항별 상세 통계
-                              {hospitalFilter && (
+                              {hospitalSearchFilter && (
                                 <span className="text-sm font-normal text-blue-600 ml-2">
-                                  ("{hospitalFilter}" 병원)
+                                  ("{hospitalSearchFilter}" 병원)
                                 </span>
                               )}
                             </h4>
