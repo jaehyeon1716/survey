@@ -90,6 +90,7 @@ export default function AdminPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [selectedResponse, setSelectedResponse] = useState<SurveyResponse | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
+  const [activeTab, setActiveTab] = useState("create")
 
   const [newSurveyTitle, setNewSurveyTitle] = useState("")
   const [newSurveyDescription, setNewSurveyDescription] = useState("")
@@ -1005,7 +1006,7 @@ export default function AdminPage() {
           </Alert>
         )}
 
-        <Tabs defaultValue="create" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="create">설문지 생성</TabsTrigger>
             <TabsTrigger value="manage">설문지 관리</TabsTrigger>
@@ -1217,8 +1218,14 @@ export default function AdminPage() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-xl font-semibold">선택된 설문지: {selectedSurvey.title}</CardTitle>
-                      <Button variant="outline" onClick={() => setSelectedSurvey(null)}>
-                        닫기
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedSurvey(null)
+                          setActiveTab("manage")
+                        }}
+                      >
+                        다른 설문지 선택
                       </Button>
                     </div>
                   </CardHeader>
@@ -1347,7 +1354,7 @@ export default function AdminPage() {
                           <div className="text-2xl font-bold text-orange-600">
                             {participants.filter((p) => p.survey_id === selectedSurvey.id && !p.is_completed).length}
                           </div>
-                          <div className="text-sm text-orange-600">응답 대기</div>
+                          <div className="text-sm text-orange-600">응답 미완료</div>
                         </div>
                         <div className="bg-purple-50 p-4 rounded-lg">
                           <div className="text-2xl font-bold text-purple-600">
@@ -1397,7 +1404,7 @@ export default function AdminPage() {
                           >
                             <option value="all">전체</option>
                             <option value="completed">응답 완료</option>
-                            <option value="pending">응답 대기</option>
+                            <option value="pending">응답 미완료</option>
                           </select>
                         </div>
                         <div className="flex items-end">
@@ -1461,8 +1468,15 @@ export default function AdminPage() {
                                     <td className="border border-gray-300 px-4 py-2">{participant.participant_name}</td>
                                     <td className="border border-gray-300 px-4 py-2">{participant.phone_number}</td>
                                     <td className="border border-gray-300 px-4 py-2">
-                                      <Badge variant={participant.is_completed ? "default" : "secondary"}>
-                                        {participant.is_completed ? "완료" : "대기"}
+                                      <Badge
+                                        variant={participant.is_completed ? "default" : "secondary"}
+                                        className={
+                                          participant.is_completed
+                                            ? "bg-green-100 text-green-800 hover:bg-green-200"
+                                            : "bg-orange-100 text-orange-800 hover:bg-orange-200"
+                                        }
+                                      >
+                                        {participant.is_completed ? "완료" : "미완료"}
                                       </Badge>
                                     </td>
                                     <td className="border border-gray-300 px-4 py-2">
@@ -1499,276 +1513,316 @@ export default function AdminPage() {
 
           <TabsContent value="statistics">
             <div className="space-y-6">
-              {/* 전체 시스템 통계 */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-xl font-semibold flex items-center gap-2">
-                    <BarChart3 className="w-6 h-6" />
-                    전체 시스템 통계
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 rounded-lg text-white">
-                      <div className="text-3xl font-bold">{surveys.length}</div>
-                      <div className="text-blue-100">총 설문지 수</div>
-                    </div>
-                    <div className="bg-gradient-to-r from-green-500 to-green-600 p-6 rounded-lg text-white">
-                      <div className="text-3xl font-bold">{participants.length}</div>
-                      <div className="text-green-100">총 참여자 수</div>
-                    </div>
-                    <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 rounded-lg text-white">
-                      <div className="text-3xl font-bold">{participants.filter((p) => p.is_completed).length}</div>
-                      <div className="text-purple-100">완료된 응답</div>
-                    </div>
-                    <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 rounded-lg text-white">
-                      <div className="text-3xl font-bold">
-                        {participants.length > 0
-                          ? Math.round((participants.filter((p) => p.is_completed).length / participants.length) * 100)
-                          : 0}
-                        %
+              {!selectedSurvey ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-xl font-semibold flex items-center gap-2">
+                      <BarChart3 className="w-6 h-6" />
+                      통계
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Alert>
+                      <AlertDescription>
+                        설문지 관리 탭에서 설문지를 선택하면 해당 설문지의 통계를 확인할 수 있습니다.
+                      </AlertDescription>
+                    </Alert>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-xl font-semibold flex items-center gap-2">
+                          <BarChart3 className="w-6 h-6" />
+                          {selectedSurvey.title} - 통계
+                        </CardTitle>
+                        <Button variant="outline" onClick={() => setActiveTab("manage")}>
+                          다른 설문지 선택
+                        </Button>
                       </div>
-                      <div className="text-orange-100">전체 완료율</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 rounded-lg text-white">
+                          <div className="text-3xl font-bold">
+                            {participants.filter((p) => p.survey_id === selectedSurvey.id).length}
+                          </div>
+                          <div className="text-blue-100">총 대상자 수</div>
+                        </div>
+                        <div className="bg-gradient-to-r from-green-500 to-green-600 p-6 rounded-lg text-white">
+                          <div className="text-3xl font-bold">
+                            {participants.filter((p) => p.survey_id === selectedSurvey.id && p.is_completed).length}
+                          </div>
+                          <div className="text-green-100">응답 완료</div>
+                        </div>
+                        <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 rounded-lg text-white">
+                          <div className="text-3xl font-bold">
+                            {participants.filter((p) => p.survey_id === selectedSurvey.id && !p.is_completed).length}
+                          </div>
+                          <div className="text-purple-100">응답 미완료</div>
+                        </div>
+                        <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 rounded-lg text-white">
+                          <div className="text-3xl font-bold">
+                            {participants.filter((p) => p.survey_id === selectedSurvey.id).length > 0
+                              ? Math.round(
+                                  (participants.filter((p) => p.survey_id === selectedSurvey.id && p.is_completed)
+                                    .length /
+                                    participants.filter((p) => p.survey_id === selectedSurvey.id).length) *
+                                    100,
+                                )
+                              : 0}
+                            %
+                          </div>
+                          <div className="text-orange-100">완료율</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-              {/* 설문지별 상세 통계 */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg font-semibold">설문지별 상세 통계</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {surveys.length === 0 ? (
-                    <Alert>
-                      <AlertDescription>생성된 설문지가 없습니다.</AlertDescription>
-                    </Alert>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse border border-gray-300">
-                        <thead>
-                          <tr className="bg-gray-50">
-                            <th className="border border-gray-300 px-4 py-2 text-left">설문지 제목</th>
-                            <th className="border border-gray-300 px-4 py-2 text-center">총 대상자</th>
-                            <th className="border border-gray-300 px-4 py-2 text-center">응답 완료</th>
-                            <th className="border border-gray-300 px-4 py-2 text-center">완료율</th>
-                            <th className="border border-gray-300 px-4 py-2 text-center">평균 점수</th>
-                            <th className="border border-gray-300 px-4 py-2 text-center">생성일</th>
-                            <th className="border border-gray-300 px-4 py-2 text-center">상태</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {surveys.map((survey) => {
-                            const surveyParticipants = participants.filter((p) => p.survey_id === survey.id)
-                            const completedParticipants = surveyParticipants.filter((p) => p.is_completed)
-                            const surveyResponses = responses.filter(
-                              (r) =>
-                                r.survey_participants &&
-                                surveyParticipants.some((p) => p.token === r.survey_participants?.token),
-                            )
-                            const averageScore =
-                              surveyResponses.length > 0
-                                ? (
-                                    surveyResponses.reduce((sum, r) => sum + (r.total_score || 0), 0) /
-                                    surveyResponses.length
-                                  ).toFixed(1)
-                                : "-"
-
-                            return (
-                              <tr key={survey.id} className="hover:bg-gray-50">
-                                <td className="border border-gray-300 px-4 py-2 font-medium">{survey.title}</td>
-                                <td className="border border-gray-300 px-4 py-2 text-center">
-                                  {surveyParticipants.length}
-                                </td>
-                                <td className="border border-gray-300 px-4 py-2 text-center">
-                                  {completedParticipants.length}
-                                </td>
-                                <td className="border border-gray-300 px-4 py-2 text-center">
-                                  <Badge
-                                    variant={
-                                      surveyParticipants.length > 0 &&
-                                      completedParticipants.length / surveyParticipants.length >= 0.7
-                                        ? "default"
-                                        : "secondary"
-                                    }
-                                  >
-                                    {surveyParticipants.length > 0
-                                      ? Math.round((completedParticipants.length / surveyParticipants.length) * 100)
-                                      : 0}
-                                    %
-                                  </Badge>
-                                </td>
-                                <td className="border border-gray-300 px-4 py-2 text-center">{averageScore}</td>
-                                <td className="border border-gray-300 px-4 py-2 text-center">
-                                  {new Date(survey.created_at).toLocaleDateString("ko-KR")}
-                                </td>
-                                <td className="border border-gray-300 px-4 py-2 text-center">
-                                  <Badge variant={survey.is_active ? "default" : "secondary"}>
-                                    {survey.is_active ? "활성" : "비활성"}
-                                  </Badge>
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* 병원별 종합 통계 */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg font-semibold">병원별 종합 통계</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {participants.length === 0 ? (
-                    <Alert>
-                      <AlertDescription>참여자 데이터가 없습니다.</AlertDescription>
-                    </Alert>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {Object.entries(
-                          participants.reduce((acc: Record<string, any>, participant) => {
-                            const hospital = participant.hospital_name
-                            if (!acc[hospital]) {
-                              acc[hospital] = {
-                                total: 0,
-                                completed: 0,
-                                totalScore: 0,
-                                responseCount: 0,
-                                surveys: new Set(),
-                              }
-                            }
-                            acc[hospital].total += 1
-                            acc[hospital].surveys.add(participant.survey_id)
-                            if (participant.is_completed) {
-                              acc[hospital].completed += 1
-                            }
-
-                            // 응답 점수 계산
-                            const participantResponses = responses.filter(
-                              (r) => r.survey_participants?.token === participant.token,
-                            )
-                            if (participantResponses.length > 0) {
-                              acc[hospital].totalScore += participantResponses.reduce(
-                                (sum, r) => sum + (r.total_score || 0),
-                                0,
-                              )
-                              acc[hospital].responseCount += participantResponses.length
-                            }
-
-                            return acc
-                          }, {}),
-                        ).map(([hospital, stats]: [string, any]) => (
-                          <Card key={hospital} className="p-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg font-semibold">병원별 통계</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {participants.filter((p) => p.survey_id === selectedSurvey.id).length === 0 ? (
+                        <Alert>
+                          <AlertDescription>이 설문지에 참여자 데이터가 없습니다.</AlertDescription>
+                        </Alert>
+                      ) : (
+                        <div className="space-y-4">
+                          {/* 전체 병원 합계 */}
+                          <Card className="bg-gray-50">
                             <CardHeader className="pb-2">
-                              <CardTitle className="text-lg font-semibold">{hospital}</CardTitle>
+                              <CardTitle className="text-lg font-semibold text-gray-800">전체 병원 합계</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3">
                               <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-600">참여 설문지</span>
-                                <span className="font-semibold">{stats.surveys.size}개</span>
+                                <span className="text-sm text-gray-600">참여 병원 수</span>
+                                <span className="font-semibold">
+                                  {
+                                    new Set(
+                                      participants
+                                        .filter((p) => p.survey_id === selectedSurvey.id)
+                                        .map((p) => p.hospital_name),
+                                    ).size
+                                  }
+                                  개
+                                </span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-sm text-gray-600">총 대상자</span>
-                                <span className="font-semibold">{stats.total}명</span>
+                                <span className="font-semibold">
+                                  {participants.filter((p) => p.survey_id === selectedSurvey.id).length}명
+                                </span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-sm text-gray-600">응답 완료</span>
-                                <span className="font-semibold text-green-600">{stats.completed}명</span>
+                                <span className="font-semibold text-green-600">
+                                  {
+                                    participants.filter((p) => p.survey_id === selectedSurvey.id && p.is_completed)
+                                      .length
+                                  }
+                                  명
+                                </span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-sm text-gray-600">완료율</span>
-                                <Badge
-                                  variant={
-                                    stats.total > 0 && stats.completed / stats.total >= 0.7 ? "default" : "secondary"
-                                  }
-                                >
-                                  {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
+                                <Badge variant="default">
+                                  {participants.filter((p) => p.survey_id === selectedSurvey.id).length > 0
+                                    ? Math.round(
+                                        (participants.filter((p) => p.survey_id === selectedSurvey.id && p.is_completed)
+                                          .length /
+                                          participants.filter((p) => p.survey_id === selectedSurvey.id).length) *
+                                          100,
+                                      )
+                                    : 0}
+                                  %
                                 </Badge>
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-sm text-gray-600">평균 점수</span>
                                 <span className="font-semibold text-blue-600">
-                                  {stats.responseCount > 0 ? (stats.totalScore / stats.responseCount).toFixed(1) : "-"}
+                                  {responses.filter(
+                                    (r) =>
+                                      r.survey_participants &&
+                                      participants.some(
+                                        (p) =>
+                                          p.survey_id === selectedSurvey.id && p.token === r.survey_participants?.token,
+                                      ),
+                                  ).length > 0
+                                    ? (
+                                        responses
+                                          .filter(
+                                            (r) =>
+                                              r.survey_participants &&
+                                              participants.some(
+                                                (p) =>
+                                                  p.survey_id === selectedSurvey.id &&
+                                                  p.token === r.survey_participants?.token,
+                                              ),
+                                          )
+                                          .reduce((sum, r) => sum + (r.total_score || 0), 0) /
+                                        responses.filter(
+                                          (r) =>
+                                            r.survey_participants &&
+                                            participants.some(
+                                              (p) =>
+                                                p.survey_id === selectedSurvey.id &&
+                                                p.token === r.survey_participants?.token,
+                                            ),
+                                        ).length
+                                      ).toFixed(1)
+                                    : "-"}
                                 </span>
                               </div>
                             </CardContent>
                           </Card>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
 
-              {/* 최근 활동 */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg font-semibold">최근 활동</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {responses.length === 0 ? (
-                    <Alert>
-                      <AlertDescription>아직 응답 데이터가 없습니다.</AlertDescription>
-                    </Alert>
-                  ) : (
-                    <div className="space-y-3">
-                      {responses.slice(0, 10).map((response) => (
-                        <div key={response.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                              <Users className="w-5 h-5 text-blue-600" />
-                            </div>
-                            <div>
-                              <div className="font-medium">{response.survey_participants?.participant_name}</div>
-                              <div className="text-sm text-gray-600">
-                                {response.survey_participants?.hospital_name} •{" "}
-                                {new Date(response.created_at).toLocaleString("ko-KR")}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-bold text-lg text-green-600">
-                              {response.total_score} / {response.max_possible_score}
-                            </div>
-                            <div className="text-sm text-gray-600">점수</div>
+                          {/* 병원별 개별 통계 */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {Object.entries(
+                              participants
+                                .filter((p) => p.survey_id === selectedSurvey.id)
+                                .reduce((acc: Record<string, any>, participant) => {
+                                  const hospital = participant.hospital_name
+                                  if (!acc[hospital]) {
+                                    acc[hospital] = {
+                                      total: 0,
+                                      completed: 0,
+                                      totalScore: 0,
+                                      responseCount: 0,
+                                    }
+                                  }
+                                  acc[hospital].total += 1
+                                  if (participant.is_completed) {
+                                    acc[hospital].completed += 1
+                                  }
+
+                                  // 응답 점수 계산
+                                  const participantResponses = responses.filter(
+                                    (r) => r.survey_participants?.token === participant.token,
+                                  )
+                                  if (participantResponses.length > 0) {
+                                    acc[hospital].totalScore += participantResponses.reduce(
+                                      (sum, r) => sum + (r.total_score || 0),
+                                      0,
+                                    )
+                                    acc[hospital].responseCount += participantResponses.length
+                                  }
+
+                                  return acc
+                                }, {}),
+                            ).map(([hospital, stats]: [string, any]) => (
+                              <Card key={hospital} className="p-4">
+                                <CardHeader className="pb-2">
+                                  <CardTitle className="text-lg font-semibold">{hospital}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-3">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-gray-600">총 대상자</span>
+                                    <span className="font-semibold">{stats.total}명</span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-gray-600">응답 완료</span>
+                                    <span className="font-semibold text-green-600">{stats.completed}명</span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-gray-600">완료율</span>
+                                    <Badge
+                                      variant={
+                                        stats.total > 0 && stats.completed / stats.total >= 0.7
+                                          ? "default"
+                                          : "secondary"
+                                      }
+                                    >
+                                      {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
+                                    </Badge>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-gray-600">평균 점수</span>
+                                    <span className="font-semibold text-blue-600">
+                                      {stats.responseCount > 0
+                                        ? (stats.totalScore / stats.responseCount).toFixed(1)
+                                        : "-"}
+                                    </span>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                      )}
+                    </CardContent>
+                  </Card>
 
-              {/* 통계 다운로드 */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg font-semibold">데이터 내보내기</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-4">
-                    <Button onClick={downloadCSV} className="flex items-center gap-2">
-                      <FileText className="w-4 h-4" />
-                      전체 응답 데이터 다운로드
-                    </Button>
-                    {selectedSurvey && (
-                      <Button
-                        onClick={downloadStatsExcel}
-                        variant="outline"
-                        className="flex items-center gap-2 bg-transparent"
-                      >
-                        <BarChart3 className="w-4 h-4" />
-                        선택된 설문지 통계 다운로드
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                  {/* 통계 다운로드 */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg font-semibold">데이터 내보내기</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-4">
+                        <Button
+                          onClick={() => {
+                            const selectedSurveyResponses = responses.filter(
+                              (r) =>
+                                r.survey_participants &&
+                                participants.some(
+                                  (p) => p.survey_id === selectedSurvey.id && p.token === r.survey_participants?.token,
+                                ),
+                            )
+
+                            if (selectedSurveyResponses.length === 0) {
+                              alert("다운로드할 데이터가 없습니다.")
+                              return
+                            }
+
+                            const headers = ["병원명", "참여자명", "휴대폰번호", "총점", "최대점수", "완료일시"]
+                            const csvData = selectedSurveyResponses.map((response) => [
+                              response.survey_participants?.hospital_name || "",
+                              response.survey_participants?.participant_name || "",
+                              response.survey_participants?.phone_number || "",
+                              response.total_score || "",
+                              response.max_possible_score || "",
+                              new Date(response.created_at).toLocaleString("ko-KR"),
+                            ])
+
+                            const csvContent = [headers, ...csvData]
+                              .map((row) => row.map((field) => `"${field}"`).join(","))
+                              .join("\n")
+                            const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" })
+                            const link = document.createElement("a")
+                            const url = URL.createObjectURL(blob)
+                            link.setAttribute("href", url)
+                            link.setAttribute(
+                              "download",
+                              `${selectedSurvey.title}_응답데이터_${new Date().toISOString().split("T")[0]}.csv`,
+                            )
+                            link.style.visibility = "hidden"
+                            document.body.appendChild(link)
+                            link.click()
+                            document.body.removeChild(link)
+                          }}
+                          className="flex items-center gap-2"
+                        >
+                          <FileText className="w-4 h-4" />
+                          선택된 설문지 응답 데이터 다운로드
+                        </Button>
+                        <Button
+                          onClick={downloadStatsExcel}
+                          variant="outline"
+                          className="flex items-center gap-2 bg-transparent"
+                        >
+                          <BarChart3 className="w-4 h-4" />
+                          선택된 설문지 통계 다운로드
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
             </div>
           </TabsContent>
         </Tabs>
