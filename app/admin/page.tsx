@@ -74,7 +74,7 @@ interface QuestionStat {
   maxScore: number
 }
 
-const ADMIN_PASSWORD = "admin123"
+const ADMIN_PASSWORD = "hospital2024"
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -194,7 +194,7 @@ export default function AdminPage() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
-    if (password === "admin123") {
+    if (password === "hospital2024") {
       setIsAuthenticated(true)
       setError("")
     } else {

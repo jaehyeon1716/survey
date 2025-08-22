@@ -3,8 +3,11 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Heart, Building2, Users, BarChart3 } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export default function HomePage() {
+  const router = useRouter()
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-2xl">
@@ -33,7 +36,7 @@ export default function HomePage() {
 
           <div className="space-y-4">
             <Button
-              onClick={() => (window.location.href = "/admin")}
+              onClick={() => router.push("/admin")}
               className="text-xl px-8 py-4 h-auto bg-blue-600 hover:bg-blue-700"
             >
               관리자 페이지로 이동
