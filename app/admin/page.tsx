@@ -883,17 +883,20 @@ export default function AdminPage() {
       console.error("병원별 문항별 통계 조회 오류:", err)
     }
 
+    const completedParticipants = participants.filter((p) => p.is_completed).length
+
+    const totalScore = responses.reduce((sum, r) => sum + (r.answer_value || 0), 0)
+    const averageScore = responses.length > 0 ? (totalScore / responses.length).toFixed(1) : "0"
+
     const basicStats = [
       ["통계 항목", "값"],
       ["설문지 제목", selectedSurvey.title],
       ["총 참여자 수", participants.length.toString()],
-      ["완료된 설문 수", responses.length.toString()],
-      ["완료율", `${participants.length > 0 ? Math.round((responses.length / participants.length) * 100) : 0}%`],
+      ["완료된 설문 수", completedParticipants.toString()], // 완료된 참여자 수로 수정
+      ["완료율", `${participants.length > 0 ? Math.round((completedParticipants / participants.length) * 100) : 0}%`], // 올바른 완료율 계산
       [
         "전체 평균 점수",
-        responses.length > 0
-          ? `${(responses.reduce((sum, r) => sum + (r.response_value || 0), 0) / responses.length).toFixed(1)}/5`
-          : "0",
+        responses.length > 0 ? `${averageScore}/5` : "0", // answer_value 기반 평균 점수
       ],
       [""],
     ]
@@ -916,7 +919,7 @@ export default function AdminPage() {
         acc[hospital] = { count: 0, totalScore: 0, maxScore: 5 }
       }
       acc[hospital].count += 1
-      acc[hospital].totalScore += response.response_value || 0
+      acc[hospital].totalScore += response.answer_value || 0 // answer_value 사용
       return acc
     }, {})
 
