@@ -112,6 +112,7 @@ export default function AdminPage() {
   const [hospitalFilter, setHospitalFilter] = useState<string>("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [filteredParticipants, setFilteredParticipants] = useState<Participant[]>([])
+  const [hospitalSearchFilter, setHospitalSearchFilter] = useState<string>("")
 
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingSurvey, setEditingSurvey] = useState<Survey | null>(null)
@@ -300,22 +301,68 @@ export default function AdminPage() {
       const { data, error } = await supabase
         .from("survey_responses")
         .select(`
-          answer_text,
-          answer_value,
+          response_value,
           survey_questions (
+            id,
             question_text,
             question_order
           ),
           survey_participants!inner (
-            hospital_name
+            survey_id
           )
         `)
-        .eq("survey_questions.survey_id", surveyId)
+        .eq("survey_participants.survey_id", surveyId)
 
       if (error) throw error
 
-      // Process stats data here if needed
-      console.log("Question stats:", data)
+      // 문항별 통계 계산
+      const questionStatsMap: Record<
+        number,
+        {
+          id: number
+          questionNumber: number
+          questionText: string
+          responses: number[]
+          totalResponses: number
+          totalScore: number
+        }
+      > = {}
+
+      data?.forEach((response: any) => {
+        const questionId = response.survey_questions?.id
+        const questionOrder = response.survey_questions?.question_order || 0
+        const questionText = response.survey_questions?.question_text || ""
+        const responseValue = response.response_value || 0
+
+        if (!questionStatsMap[questionId]) {
+          questionStatsMap[questionId] = {
+            id: questionId,
+            questionNumber: questionOrder,
+            questionText: questionText,
+            responses: [],
+            totalResponses: 0,
+            totalScore: 0,
+          }
+        }
+
+        questionStatsMap[questionId].responses.push(responseValue)
+        questionStatsMap[questionId].totalResponses += 1
+        questionStatsMap[questionId].totalScore += responseValue
+      })
+
+      // QuestionStat 형태로 변환
+      const processedStats: QuestionStat[] = Object.values(questionStatsMap)
+        .map((stat) => ({
+          id: stat.id,
+          questionNumber: stat.questionNumber,
+          questionText: stat.questionText,
+          totalResponses: stat.totalResponses,
+          averageScore: stat.totalResponses > 0 ? (stat.totalScore / stat.totalResponses).toFixed(1) : "0",
+          maxScore: 5,
+        }))
+        .sort((a, b) => a.questionNumber - b.questionNumber)
+
+      setQuestionStats(processedStats)
     } catch (err) {
       console.error("질문 통계 조회 오류:", err)
     }
@@ -824,7 +871,7 @@ export default function AdminPage() {
       [
         "전체 평균 점수",
         responses.length > 0
-          ? `${(responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length).toFixed(1)}/${responses.length > 0 ? responses[0].max_possible_score : 0}`
+          ? `${(responses.reduce((sum, r) => sum + (r.response_value || 0), 0) / responses.length).toFixed(1)}/5`
           : "0",
       ],
       [""],
@@ -845,10 +892,10 @@ export default function AdminPage() {
     const hospitalStats = responses.reduce((acc: Record<string, any>, response) => {
       const hospital = response.survey_participants?.hospital_name || "알 수 없음"
       if (!acc[hospital]) {
-        acc[hospital] = { count: 0, totalScore: 0, maxScore: response.max_possible_score }
+        acc[hospital] = { count: 0, totalScore: 0, maxScore: 5 }
       }
       acc[hospital].count += 1
-      acc[hospital].totalScore += response.total_score || 0
+      acc[hospital].totalScore += response.response_value || 0
       return acc
     }, {})
 
@@ -1583,7 +1630,22 @@ export default function AdminPage() {
 
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-lg font-semibold">병원별 통계</CardTitle>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg font-semibold">병원별 통계</CardTitle>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            placeholder="병원명 검색..."
+                            value={hospitalSearchFilter}
+                            onChange={(e) => setHospitalSearchFilter(e.target.value)}
+                            className="w-64"
+                          />
+                          {hospitalSearchFilter && (
+                            <Button variant="outline" size="sm" onClick={() => setHospitalSearchFilter("")}>
+                              초기화
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     </CardHeader>
                     <CardContent>
                       {participants.filter((p) => p.survey_id === selectedSurvey.id).length === 0 ? (
@@ -1663,7 +1725,7 @@ export default function AdminPage() {
                                                   p.token === r.survey_participants?.token,
                                               ),
                                           )
-                                          .reduce((sum, r) => sum + (r.total_score || 0), 0) /
+                                          .reduce((sum, r) => sum + (r.response_value || 0), 0) /
                                         responses.filter(
                                           (r) =>
                                             r.survey_participants &&
@@ -1680,77 +1742,227 @@ export default function AdminPage() {
                             </CardContent>
                           </Card>
 
-                          {/* 병원별 개별 통계 */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {Object.entries(
-                              participants
-                                .filter((p) => p.survey_id === selectedSurvey.id)
-                                .reduce((acc: Record<string, any>, participant) => {
-                                  const hospital = participant.hospital_name
-                                  if (!acc[hospital]) {
-                                    acc[hospital] = {
-                                      total: 0,
-                                      completed: 0,
-                                      totalScore: 0,
-                                      responseCount: 0,
-                                    }
-                                  }
-                                  acc[hospital].total += 1
-                                  if (participant.is_completed) {
-                                    acc[hospital].completed += 1
-                                  }
+                          {hospitalSearchFilter ? (
+                            <div className="space-y-4">
+                              <div className="text-sm text-gray-600">
+                                검색 결과: "{hospitalSearchFilter}"에 대한{" "}
+                                {
+                                  Object.entries(
+                                    participants
+                                      .filter((p) => p.survey_id === selectedSurvey.id)
+                                      .reduce((acc: Record<string, any>, participant) => {
+                                        const hospital = participant.hospital_name
+                                        if (!acc[hospital]) {
+                                          acc[hospital] = {
+                                            total: 0,
+                                            completed: 0,
+                                            totalScore: 0,
+                                            responseCount: 0,
+                                          }
+                                        }
+                                        acc[hospital].total += 1
+                                        if (participant.is_completed) {
+                                          acc[hospital].completed += 1
+                                        }
 
-                                  // 응답 점수 계산
-                                  const participantResponses = responses.filter(
-                                    (r) => r.survey_participants?.token === participant.token,
+                                        const participantResponses = responses.filter(
+                                          (r) => r.survey_participants?.token === participant.token,
+                                        )
+                                        if (participantResponses.length > 0) {
+                                          acc[hospital].totalScore += participantResponses.reduce(
+                                            (sum, r) => sum + (r.response_value || 0),
+                                            0,
+                                          )
+                                          acc[hospital].responseCount += participantResponses.length
+                                        }
+
+                                        return acc
+                                      }, {}),
+                                  ).filter(([hospital]) =>
+                                    hospital.toLowerCase().includes(hospitalSearchFilter.toLowerCase()),
+                                  ).length
+                                }
+                                개 병원
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {Object.entries(
+                                  participants
+                                    .filter((p) => p.survey_id === selectedSurvey.id)
+                                    .reduce((acc: Record<string, any>, participant) => {
+                                      const hospital = participant.hospital_name
+                                      if (!acc[hospital]) {
+                                        acc[hospital] = { total: 0, completed: 0, totalScore: 0, responseCount: 0 }
+                                      }
+                                      return acc
+                                    }, {}),
+                                )
+                                  .filter(([hospital]) =>
+                                    hospital.toLowerCase().includes(hospitalSearchFilter.toLowerCase()),
                                   )
-                                  if (participantResponses.length > 0) {
-                                    acc[hospital].totalScore += participantResponses.reduce(
-                                      (sum, r) => sum + (r.total_score || 0),
-                                      0,
-                                    )
-                                    acc[hospital].responseCount += participantResponses.length
-                                  }
+                                  .map(([hospital, stats]: [string, any]) => (
+                                    <Card key={hospital} className="p-4">
+                                      <CardHeader className="pb-2">
+                                        <CardTitle className="text-lg font-semibold">{hospital}</CardTitle>
+                                      </CardHeader>
+                                      <CardContent className="space-y-3">
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-sm text-gray-600">총 대상자</span>
+                                          <span className="font-semibold">{stats.total}명</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-sm text-gray-600">응답 완료</span>
+                                          <span className="font-semibold text-green-600">{stats.completed}명</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-sm text-gray-600">완료율</span>
+                                          <Badge
+                                            variant={
+                                              stats.total > 0 && stats.completed / stats.total >= 0.7
+                                                ? "default"
+                                                : "secondary"
+                                            }
+                                          >
+                                            {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
+                                          </Badge>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-sm text-gray-600">평균 점수</span>
+                                          <span className="font-semibold text-blue-600">
+                                            {stats.responseCount > 0
+                                              ? (stats.totalScore / stats.responseCount).toFixed(1)
+                                              : "-"}
+                                          </span>
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  ))}
+                              </div>
+                              {Object.entries(
+                                participants
+                                  .filter((p) => p.survey_id === selectedSurvey.id)
+                                  .reduce((acc: Record<string, any>, participant) => {
+                                    const hospital = participant.hospital_name
+                                    if (!acc[hospital]) {
+                                      acc[hospital] = { total: 0, completed: 0, totalScore: 0, responseCount: 0 }
+                                    }
+                                    return acc
+                                  }, {}),
+                              ).filter(([hospital]) =>
+                                hospital.toLowerCase().includes(hospitalSearchFilter.toLowerCase()),
+                              ).length === 0 && (
+                                <Alert>
+                                  <AlertDescription>
+                                    "{hospitalSearchFilter}"와 일치하는 병원이 없습니다.
+                                  </AlertDescription>
+                                </Alert>
+                              )}
+                            </div>
+                          ) : (
+                            <Alert>
+                              <AlertDescription>
+                                병원이 많아 개별 통계를 보려면 위의 검색창에서 병원명을 검색해주세요.
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
 
-                                  return acc
-                                }, {}),
-                            ).map(([hospital, stats]: [string, any]) => (
-                              <Card key={hospital} className="p-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg font-semibold">문항별 통계</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {questionStats.length === 0 ? (
+                        <Alert>
+                          <AlertDescription>문항별 통계 데이터가 없습니다.</AlertDescription>
+                        </Alert>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {questionStats.map((stat) => (
+                              <Card key={stat.id} className="p-4 border-l-4 border-indigo-500">
                                 <CardHeader className="pb-2">
-                                  <CardTitle className="text-lg font-semibold">{hospital}</CardTitle>
+                                  <CardTitle className="text-base font-semibold text-indigo-800">
+                                    문항 {stat.questionNumber}
+                                  </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-3">
+                                  <div className="text-sm text-gray-700 line-clamp-2">{stat.questionText}</div>
                                   <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">총 대상자</span>
-                                    <span className="font-semibold">{stats.total}명</span>
-                                  </div>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">응답 완료</span>
-                                    <span className="font-semibold text-green-600">{stats.completed}명</span>
-                                  </div>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">완료율</span>
-                                    <Badge
-                                      variant={
-                                        stats.total > 0 && stats.completed / stats.total >= 0.7
-                                          ? "default"
-                                          : "secondary"
-                                      }
-                                    >
-                                      {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
-                                    </Badge>
+                                    <span className="text-sm text-gray-600">응답 수</span>
+                                    <span className="font-semibold">{stat.totalResponses}명</span>
                                   </div>
                                   <div className="flex justify-between items-center">
                                     <span className="text-sm text-gray-600">평균 점수</span>
-                                    <span className="font-semibold text-blue-600">
-                                      {stats.responseCount > 0
-                                        ? (stats.totalScore / stats.responseCount).toFixed(1)
-                                        : "-"}
-                                    </span>
+                                    <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
+                                      {stat.averageScore}/{stat.maxScore}
+                                    </Badge>
+                                  </div>
+                                  <div className="w-full bg-gray-200 rounded-full h-2">
+                                    <div
+                                      className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                                      style={{
+                                        width: `${(Number.parseFloat(stat.averageScore) / stat.maxScore) * 100}%`,
+                                      }}
+                                    ></div>
+                                  </div>
+                                  <div className="text-xs text-gray-500 text-center">
+                                    만족도: {((Number.parseFloat(stat.averageScore) / stat.maxScore) * 100).toFixed(0)}%
                                   </div>
                                 </CardContent>
                               </Card>
                             ))}
+                          </div>
+
+                          {/* 문항별 상세 테이블 */}
+                          <div className="mt-6">
+                            <h4 className="text-md font-semibold mb-3">문항별 상세 통계</h4>
+                            <div className="overflow-x-auto">
+                              <table className="w-full border-collapse border border-gray-300">
+                                <thead>
+                                  <tr className="bg-indigo-50">
+                                    <th className="border border-gray-300 px-4 py-2 text-left">문항 번호</th>
+                                    <th className="border border-gray-300 px-4 py-2 text-left">문항 내용</th>
+                                    <th className="border border-gray-300 px-4 py-2 text-center">응답 수</th>
+                                    <th className="border border-gray-300 px-4 py-2 text-center">평균 점수</th>
+                                    <th className="border border-gray-300 px-4 py-2 text-center">만족도</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {questionStats.map((stat) => (
+                                    <tr key={stat.id} className="hover:bg-gray-50">
+                                      <td className="border border-gray-300 px-4 py-2 font-medium">
+                                        문항 {stat.questionNumber}
+                                      </td>
+                                      <td className="border border-gray-300 px-4 py-2">{stat.questionText}</td>
+                                      <td className="border border-gray-300 px-4 py-2 text-center">
+                                        {stat.totalResponses}명
+                                      </td>
+                                      <td className="border border-gray-300 px-4 py-2 text-center">
+                                        <Badge variant="outline" className="bg-indigo-50 text-indigo-700">
+                                          {stat.averageScore}/{stat.maxScore}
+                                        </Badge>
+                                      </td>
+                                      <td className="border border-gray-300 px-4 py-2 text-center">
+                                        <span
+                                          className={`font-semibold ${
+                                            Number.parseFloat(stat.averageScore) >= 4
+                                              ? "text-green-600"
+                                              : Number.parseFloat(stat.averageScore) >= 3
+                                                ? "text-yellow-600"
+                                                : "text-red-600"
+                                          }`}
+                                        >
+                                          {((Number.parseFloat(stat.averageScore) / stat.maxScore) * 100).toFixed(0)}%
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -1764,52 +1976,6 @@ export default function AdminPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="flex flex-wrap gap-4">
-                        <Button
-                          onClick={() => {
-                            const selectedSurveyResponses = responses.filter(
-                              (r) =>
-                                r.survey_participants &&
-                                participants.some(
-                                  (p) => p.survey_id === selectedSurvey.id && p.token === r.survey_participants?.token,
-                                ),
-                            )
-
-                            if (selectedSurveyResponses.length === 0) {
-                              alert("다운로드할 데이터가 없습니다.")
-                              return
-                            }
-
-                            const headers = ["병원명", "참여자명", "휴대폰번호", "총점", "최대점수", "완료일시"]
-                            const csvData = selectedSurveyResponses.map((response) => [
-                              response.survey_participants?.hospital_name || "",
-                              response.survey_participants?.participant_name || "",
-                              response.survey_participants?.phone_number || "",
-                              response.total_score || "",
-                              response.max_possible_score || "",
-                              new Date(response.created_at).toLocaleString("ko-KR"),
-                            ])
-
-                            const csvContent = [headers, ...csvData]
-                              .map((row) => row.map((field) => `"${field}"`).join(","))
-                              .join("\n")
-                            const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" })
-                            const link = document.createElement("a")
-                            const url = URL.createObjectURL(blob)
-                            link.setAttribute("href", url)
-                            link.setAttribute(
-                              "download",
-                              `${selectedSurvey.title}_응답데이터_${new Date().toISOString().split("T")[0]}.csv`,
-                            )
-                            link.style.visibility = "hidden"
-                            document.body.appendChild(link)
-                            link.click()
-                            document.body.removeChild(link)
-                          }}
-                          className="flex items-center gap-2"
-                        >
-                          <FileText className="w-4 h-4" />
-                          선택된 설문지 응답 데이터 다운로드
-                        </Button>
                         <Button
                           onClick={downloadStatsExcel}
                           variant="outline"
