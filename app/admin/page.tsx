@@ -1731,40 +1731,41 @@ export default function AdminPage() {
                                   %
                                 </Badge>
                               </div>
+                              {(() => {
+                                const totalParticipants = participants.filter(
+                                  (p) => p.survey_id === selectedSurvey.id,
+                                ).length
+                                const completedParticipants = participants.filter(
+                                  (p) => p.survey_id === selectedSurvey.id && p.is_completed,
+                                ).length
+
+                                const totalScore = responses.reduce((sum, r) => sum + (r.answer_value || 0), 0)
+                                const averageScore =
+                                  responses.length > 0 ? (totalScore / responses.length).toFixed(1) : "0"
+
+                                return {
+                                  total: totalParticipants,
+                                  completed: completedParticipants,
+                                  totalScore: totalScore,
+                                  averageScore: averageScore,
+                                }
+                              })()}
                               <div className="flex justify-between items-center">
                                 <span className="text-sm text-gray-600">평균 점수</span>
                                 <span className="font-semibold text-blue-600">
-                                  {responses.filter(
-                                    (r) =>
-                                      r.survey_participants &&
-                                      participants.some(
-                                        (p) =>
-                                          p.survey_id === selectedSurvey.id && p.token === r.survey_participants?.token,
-                                      ),
-                                  ).length > 0
-                                    ? (
-                                        responses
-                                          .filter(
-                                            (r) =>
-                                              r.survey_participants &&
-                                              participants.some(
-                                                (p) =>
-                                                  p.survey_id === selectedSurvey.id &&
-                                                  p.token === r.survey_participants?.token,
-                                              ),
-                                          )
-                                          .reduce((sum, r) => sum + (r.answer_value || 0), 0) /
-                                        responses.filter(
-                                          (r) =>
-                                            r.survey_participants &&
-                                            participants.some(
-                                              (p) =>
-                                                p.survey_id === selectedSurvey.id &&
-                                                p.token === r.survey_participants?.token,
-                                            ),
-                                        ).length
-                                      ).toFixed(1)
-                                    : "-"}
+                                  {(() => {
+                                    const totalParticipants = participants.filter(
+                                      (p) => p.survey_id === selectedSurvey.id,
+                                    ).length
+                                    const completedParticipants = participants.filter(
+                                      (p) => p.survey_id === selectedSurvey.id && p.is_completed,
+                                    ).length
+                                    const totalScore = responses.reduce((sum, r) => sum + (r.answer_value || 0), 0)
+
+                                    return completedParticipants > 0
+                                      ? (totalScore / completedParticipants).toFixed(1)
+                                      : "-"
+                                  })()}
                                 </span>
                               </div>
                             </CardContent>
