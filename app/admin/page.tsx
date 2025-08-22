@@ -294,26 +294,49 @@ export default function AdminPage() {
     }
   }
 
-  const fetchQuestionStats = async (surveyId: number) => {
+  const fetchQuestionStats = async (surveyId: number, hospitalFilter?: string) => {
     const supabase = createClient()
 
     try {
+      console.log("[v0] fetchQuestionStats 시작 - surveyId:", surveyId, "hospitalFilter:", hospitalFilter)
+
       const { data, error } = await supabase
         .from("survey_responses")
         .select(`
-          response_value,
-          survey_questions (
+          question_id,
+          answer_value,
+          survey_questions!inner (
             id,
             question_text,
             question_order
           ),
           survey_participants!inner (
-            survey_id
+            survey_id,
+            hospital_name
           )
         `)
         .eq("survey_participants.survey_id", surveyId)
 
-      if (error) throw error
+      console.log("[v0] 쿼리 결과:", { data, error, dataLength: data?.length })
+
+      if (error) {
+        console.error("[v0] 쿼리 에러:", error)
+        throw error
+      }
+
+      if (!data || data.length === 0) {
+        console.log("[v0] 응답 데이터가 없습니다.")
+        setQuestionStats([])
+        return
+      }
+
+      let filteredData = data
+      if (hospitalFilter && hospitalFilter.trim()) {
+        filteredData = data.filter((response: any) =>
+          response.survey_participants?.hospital_name?.toLowerCase().includes(hospitalFilter.toLowerCase()),
+        )
+        console.log("[v0] 병원 필터링 후 데이터:", filteredData.length)
+      }
 
       // 문항별 통계 계산
       const questionStatsMap: Record<
@@ -328,11 +351,13 @@ export default function AdminPage() {
         }
       > = {}
 
-      data?.forEach((response: any) => {
+      filteredData.forEach((response: any) => {
         const questionId = response.survey_questions?.id
         const questionOrder = response.survey_questions?.question_order || 0
         const questionText = response.survey_questions?.question_text || ""
-        const responseValue = response.response_value || 0
+        const responseValue = response.answer_value || 0
+
+        console.log("[v0] 응답 처리:", { questionId, questionOrder, questionText, responseValue })
 
         if (!questionStatsMap[questionId]) {
           questionStatsMap[questionId] = {
@@ -350,6 +375,8 @@ export default function AdminPage() {
         questionStatsMap[questionId].totalScore += responseValue
       })
 
+      console.log("[v0] 문항별 통계 맵:", questionStatsMap)
+
       // QuestionStat 형태로 변환
       const processedStats: QuestionStat[] = Object.values(questionStatsMap)
         .map((stat) => ({
@@ -362,9 +389,11 @@ export default function AdminPage() {
         }))
         .sort((a, b) => a.questionNumber - b.questionNumber)
 
+      console.log("[v0] 최종 처리된 통계:", processedStats)
       setQuestionStats(processedStats)
     } catch (err) {
-      console.error("질문 통계 조회 오류:", err)
+      console.error("[v0] 질문 통계 조회 오류:", err)
+      setQuestionStats([])
     }
   }
 
@@ -411,6 +440,7 @@ export default function AdminPage() {
             answers: [
               { text: "매우 그렇다", score: 5 },
               { text: "그렇다", score: 4 },
+              { text: "보통이다", score: 3 },
               { text: "보통이다", score: 3 },
               { text: "그렇지 않다", score: 2 },
               { text: "전혀 그렇지 않다", score: 1 },
@@ -818,7 +848,7 @@ export default function AdminPage() {
         .from("survey_responses")
         .select(`
           question_id,
-          response_value,
+          answer_value,
           survey_questions (
             question_text,
             question_order
@@ -853,8 +883,8 @@ export default function AdminPage() {
             }
           }
 
-          hospitalQuestionStats[hospital][questionId].responses.push(response.response_value)
-          hospitalQuestionStats[hospital][questionId].total += response.response_value
+          hospitalQuestionStats[hospital][questionId].responses.push(response.answer_value)
+          hospitalQuestionStats[hospital][questionId].total += response.answer_value
           hospitalQuestionStats[hospital][questionId].count += 1
         })
       }
@@ -1725,7 +1755,7 @@ export default function AdminPage() {
                                                   p.token === r.survey_participants?.token,
                                               ),
                                           )
-                                          .reduce((sum, r) => sum + (r.response_value || 0), 0) /
+                                          .reduce((sum, r) => sum + (r.answer_value || 0), 0) /
                                         responses.filter(
                                           (r) =>
                                             r.survey_participants &&
@@ -1860,7 +1890,7 @@ export default function AdminPage() {
                           ) : (
                             <Alert>
                               <AlertDescription>
-                                병원별 통계를 확인하려면 위의 검색창에서 병원명을 검색해주세요.
+                                병원이 많아 개별 통계를 보려면 위의 검색창에서 병원명을 검색해주세요.
                               </AlertDescription>
                             </Alert>
                           )}
