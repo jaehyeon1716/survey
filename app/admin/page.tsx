@@ -1356,7 +1356,7 @@ export default function AdminPage() {
                                   (participants.filter((p) => p.survey_id === selectedSurvey.id && p.is_completed)
                                     .length /
                                     participants.filter((p) => p.survey_id === selectedSurvey.id).length) *
-                                    100
+                                    100,
                                 )
                               : 0}
                             %
@@ -1422,7 +1422,11 @@ export default function AdminPage() {
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-lg font-semibold">대상자 목록</CardTitle>
                         <div className="flex gap-2">
-                          <Button onClick={() => downloadParticipantsExcel()} size="sm" className="flex items-center gap-2">
+                          <Button
+                            onClick={() => downloadParticipantsExcel()}
+                            size="sm"
+                            className="flex items-center gap-2"
+                          >
                             <FileText className="w-4 h-4" />
                             목록 다운로드
                           </Button>
@@ -1514,12 +1518,15 @@ export default function AdminPage() {
                       <div className="text-green-100">총 참여자 수</div>
                     </div>
                     <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 rounded-lg text-white">
-                      <div className="text-3xl font-bold">{participants.filter(p => p.is_completed).length}</div>
+                      <div className="text-3xl font-bold">{participants.filter((p) => p.is_completed).length}</div>
                       <div className="text-purple-100">완료된 응답</div>
                     </div>
                     <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 rounded-lg text-white">
                       <div className="text-3xl font-bold">
-                        {participants.length > 0 ? Math.round((participants.filter(p => p.is_completed).length / participants.length) * 100) : 0}%
+                        {participants.length > 0
+                          ? Math.round((participants.filter((p) => p.is_completed).length / participants.length) * 100)
+                          : 0}
+                        %
                       </div>
                       <div className="text-orange-100">전체 완료율</div>
                     </div>
@@ -1553,23 +1560,43 @@ export default function AdminPage() {
                         </thead>
                         <tbody>
                           {surveys.map((survey) => {
-                            const surveyParticipants = participants.filter(p => p.survey_id === survey.id)
-                            const completedParticipants = surveyParticipants.filter(p => p.is_completed)
-                            const surveyResponses = responses.filter(r => 
-                              r.survey_participants && surveyParticipants.some(p => p.token === r.survey_participants?.token)
+                            const surveyParticipants = participants.filter((p) => p.survey_id === survey.id)
+                            const completedParticipants = surveyParticipants.filter((p) => p.is_completed)
+                            const surveyResponses = responses.filter(
+                              (r) =>
+                                r.survey_participants &&
+                                surveyParticipants.some((p) => p.token === r.survey_participants?.token),
                             )
-                            const averageScore = surveyResponses.length > 0 
-                              ? (surveyResponses.reduce((sum, r) => sum + (r.total_score || 0), 0) / surveyResponses.length).toFixed(1)
-                              : "-"
-                            
+                            const averageScore =
+                              surveyResponses.length > 0
+                                ? (
+                                    surveyResponses.reduce((sum, r) => sum + (r.total_score || 0), 0) /
+                                    surveyResponses.length
+                                  ).toFixed(1)
+                                : "-"
+
                             return (
                               <tr key={survey.id} className="hover:bg-gray-50">
                                 <td className="border border-gray-300 px-4 py-2 font-medium">{survey.title}</td>
-                                <td className="border border-gray-300 px-4 py-2 text-center">{surveyParticipants.length}</td>
-                                <td className="border border-gray-300 px-4 py-2 text-center">{completedParticipants.length}</td>
                                 <td className="border border-gray-300 px-4 py-2 text-center">
-                                  <Badge variant={surveyParticipants.length > 0 && (completedParticipants.length / surveyParticipants.length) >= 0.7 ? "default" : "secondary"}>
-                                    {surveyParticipants.length > 0 ? Math.round((completedParticipants.length / surveyParticipants.length) * 100) : 0}%
+                                  {surveyParticipants.length}
+                                </td>
+                                <td className="border border-gray-300 px-4 py-2 text-center">
+                                  {completedParticipants.length}
+                                </td>
+                                <td className="border border-gray-300 px-4 py-2 text-center">
+                                  <Badge
+                                    variant={
+                                      surveyParticipants.length > 0 &&
+                                      completedParticipants.length / surveyParticipants.length >= 0.7
+                                        ? "default"
+                                        : "secondary"
+                                    }
+                                  >
+                                    {surveyParticipants.length > 0
+                                      ? Math.round((completedParticipants.length / surveyParticipants.length) * 100)
+                                      : 0}
+                                    %
                                   </Badge>
                                 </td>
                                 <td className="border border-gray-300 px-4 py-2 text-center">{averageScore}</td>
@@ -1613,7 +1640,7 @@ export default function AdminPage() {
                                 completed: 0,
                                 totalScore: 0,
                                 responseCount: 0,
-                                surveys: new Set()
+                                surveys: new Set(),
                               }
                             }
                             acc[hospital].total += 1
@@ -1624,18 +1651,18 @@ export default function AdminPage() {
 
                             // 응답 점수 계산
                             const participantResponses = responses.filter(
-                              (r) => r.survey_participants?.token === participant.token
+                              (r) => r.survey_participants?.token === participant.token,
                             )
                             if (participantResponses.length > 0) {
                               acc[hospital].totalScore += participantResponses.reduce(
                                 (sum, r) => sum + (r.total_score || 0),
-                                0
+                                0,
                               )
                               acc[hospital].responseCount += participantResponses.length
                             }
 
                             return acc
-                          }, {})
+                          }, {}),
                         ).map(([hospital, stats]: [string, any]) => (
                           <Card key={hospital} className="p-4">
                             <CardHeader className="pb-2">
@@ -1656,7 +1683,11 @@ export default function AdminPage() {
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-sm text-gray-600">완료율</span>
-                                <Badge variant={stats.total > 0 && (stats.completed / stats.total) >= 0.7 ? "default" : "secondary"}>
+                                <Badge
+                                  variant={
+                                    stats.total > 0 && stats.completed / stats.total >= 0.7 ? "default" : "secondary"
+                                  }
+                                >
                                   {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
                                 </Badge>
                               </div>
@@ -1694,11 +1725,10 @@ export default function AdminPage() {
                               <Users className="w-5 h-5 text-blue-600" />
                             </div>
                             <div>
-                              <div className="font-medium">
-                                {response.survey_participants?.participant_name}
-                              </div>
+                              <div className="font-medium">{response.survey_participants?.participant_name}</div>
                               <div className="text-sm text-gray-600">
-                                {response.survey_participants?.hospital_name} • {new Date(response.created_at).toLocaleString("ko-KR")}
+                                {response.survey_participants?.hospital_name} •{" "}
+                                {new Date(response.created_at).toLocaleString("ko-KR")}
                               </div>
                             </div>
                           </div>
@@ -1727,7 +1757,11 @@ export default function AdminPage() {
                       전체 응답 데이터 다운로드
                     </Button>
                     {selectedSurvey && (
-                      <Button onClick={downloadStatsExcel} variant="outline" className="flex items-center gap-2 bg-transparent">
+                      <Button
+                        onClick={downloadStatsExcel}
+                        variant="outline"
+                        className="flex items-center gap-2 bg-transparent"
+                      >
                         <BarChart3 className="w-4 h-4" />
                         선택된 설문지 통계 다운로드
                       </Button>
@@ -1737,6 +1771,7 @@ export default function AdminPage() {
               </Card>
             </div>
           </TabsContent>
+        </Tabs>
 
         {showDeleteConfirm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -1796,4 +1831,4 @@ export default function AdminPage() {
       </div>
     </div>
   )
-}\
+}
