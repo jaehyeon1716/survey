@@ -8,6 +8,15 @@ CREATE TABLE IF NOT EXISTS surveys (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 설문지 테이블 RLS 활성화
+ALTER TABLE surveys ENABLE ROW LEVEL SECURITY;
+
+-- 설문지는 모든 사용자가 읽을 수 있도록 (공개 설문)
+CREATE POLICY "Allow public read access to surveys" ON surveys FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access to surveys" ON surveys FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access to surveys" ON surveys FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete access to surveys" ON surveys FOR DELETE USING (true);
+
 -- 설문 문항 테이블 (질문과 답변 옵션 포함)
 CREATE TABLE IF NOT EXISTS survey_questions (
   id SERIAL PRIMARY KEY,
@@ -17,6 +26,14 @@ CREATE TABLE IF NOT EXISTS survey_questions (
   answer_options JSONB NOT NULL, -- 답변 옵션들을 JSON 배열로 저장
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- 설문 문항 테이블 RLS 활성화
+ALTER TABLE survey_questions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access to survey_questions" ON survey_questions FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access to survey_questions" ON survey_questions FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access to survey_questions" ON survey_questions FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete access to survey_questions" ON survey_questions FOR DELETE USING (true);
 
 -- 설문 참여자 테이블
 CREATE TABLE IF NOT EXISTS survey_participants (
@@ -31,6 +48,14 @@ CREATE TABLE IF NOT EXISTS survey_participants (
   completed_at TIMESTAMP WITH TIME ZONE
 );
 
+-- 설문 참여자 테이블 RLS 활성화
+ALTER TABLE survey_participants ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access to survey_participants" ON survey_participants FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access to survey_participants" ON survey_participants FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access to survey_participants" ON survey_participants FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete access to survey_participants" ON survey_participants FOR DELETE USING (true);
+
 -- 설문 응답 테이블
 CREATE TABLE IF NOT EXISTS survey_responses (
   id SERIAL PRIMARY KEY,
@@ -41,6 +66,14 @@ CREATE TABLE IF NOT EXISTS survey_responses (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(participant_id, question_id) -- 중복 응답 방지
 );
+
+-- 설문 응답 테이블 RLS 활성화
+ALTER TABLE survey_responses ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access to survey_responses" ON survey_responses FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access to survey_responses" ON survey_responses FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access to survey_responses" ON survey_responses FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete access to survey_responses" ON survey_responses FOR DELETE USING (true);
 
 -- 인덱스 생성
 CREATE INDEX IF NOT EXISTS idx_survey_questions_survey_id ON survey_questions(survey_id);

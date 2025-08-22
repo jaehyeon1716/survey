@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { supabase } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import { CheckCircle, Heart, AlertCircle } from "lucide-react"
 
 const scaleLabels = [
@@ -60,11 +60,7 @@ export default function HospitalSurvey() {
         return
       }
 
-      if (!supabase) {
-        setError("데이터베이스 연결 설정이 필요합니다.")
-        setLoading(false)
-        return
-      }
+      const supabase = createClient()
 
       try {
         const { data: participantData, error: participantError } = await supabase
@@ -106,7 +102,7 @@ export default function HospitalSurvey() {
           .from("survey_questions")
           .select("*")
           .eq("survey_id", participantData.survey_id)
-          .order("question_number", { ascending: true })
+          .order("question_order", { ascending: true })
 
         if (questionsError || !questionsData || questionsData.length === 0) {
           setError("설문 문항을 불러올 수 없습니다. 관리자에게 문의해 주세요.")
@@ -118,13 +114,13 @@ export default function HospitalSurvey() {
 
         const { data: existingResponses, error: responsesError } = await supabase
           .from("survey_responses")
-          .select("question_id, response_value")
-          .eq("participant_token", token)
+          .select("question_id, answer_value")
+          .eq("participant_id", participantData.id)
 
         if (!responsesError && existingResponses) {
           const existingAnswers: Record<number, number> = {}
           existingResponses.forEach((response) => {
-            existingAnswers[response.question_id] = response.response_value
+            existingAnswers[response.question_id] = response.answer_value
           })
           setAnswers(existingAnswers)
         }
@@ -138,21 +134,6 @@ export default function HospitalSurvey() {
 
     validateTokenAndLoadSurvey()
   }, [token])
-
-  if (!supabase) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-2xl">
-          <CardContent className="text-center py-16">
-            <AlertCircle className="w-24 h-24 text-red-500 mx-auto mb-8" />
-            <h1 className="text-4xl font-bold text-gray-800 mb-4">설정 오류</h1>
-            <p className="text-2xl text-gray-600 mb-8">데이터베이스 연결 설정이 필요합니다.</p>
-            <p className="text-xl text-gray-500">관리자에게 문의해 주세요.</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
 
   if (loading) {
     return (
@@ -213,28 +194,32 @@ export default function HospitalSurvey() {
     setIsSubmitting(true)
 
     try {
-      if (!supabase || !participant) {
+      const supabase = createClient()
+
+      if (!participant) {
         throw new Error("설문 제출에 필요한 정보가 없습니다.")
       }
 
       const responses = questions.map((question) => ({
-        participant_token: participant.token,
+        participant_id: participant.id,
         question_id: question.id,
-        response_value: answers[question.id],
+        answer_text: scaleLabels.find((scale) => scale.value === answers[question.id])?.label || "",
+        answer_value: answers[question.id],
       }))
 
-      await supabase.from("survey_responses").delete().eq("participant_token", participant.token)
+      await supabase.from("survey_responses").delete().eq("participant_id", participant.id)
 
       const { error: insertError } = await supabase.from("survey_responses").insert(responses)
 
       if (insertError) {
-        if (insertError.message.includes("이미 설문을 완료한 참여자입니다")) {
-          setError("이미 완료된 설문입니다. 중복 응답은 불가능합니다.")
-          return
-        }
         console.error("Error submitting survey:", insertError)
         alert("설문 제출 중 오류가 발생했습니다. 다시 시도해 주세요.")
       } else {
+        await supabase
+          .from("survey_participants")
+          .update({ is_completed: true, completed_at: new Date().toISOString() })
+          .eq("id", participant.id)
+
         setIsSubmitted(true)
       }
     } catch (error) {

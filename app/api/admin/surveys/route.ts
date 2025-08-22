@@ -1,24 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/server"
 
 export async function GET() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.json({ error: "Supabase 환경 변수가 설정되지 않았습니다." }, { status: 500 })
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseKey)
-
   try {
+    const supabase = await createClient()
+
     const { data: surveys, error } = await supabase
       .from("surveys")
       .select(`
         *,
         survey_questions (
           id,
-          question_number,
+          question_order,
           question_text,
           answer_options
         )
@@ -35,16 +28,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.json({ error: "Supabase 환경 변수가 설정되지 않았습니다." }, { status: 500 })
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseKey)
-
   try {
+    const supabase = await createClient()
+
     const { title, description, questions } = await request.json()
 
     if (!title || !questions || questions.length === 0) {
@@ -67,7 +53,7 @@ export async function POST(request: NextRequest) {
     const questionsData = questions.map(
       (q: { question: string; answers: { text: string; score: number }[] }, index: number) => ({
         survey_id: survey.id,
-        question_number: index + 1,
+        question_order: index + 1,
         question_text: q.question,
         answer_options: q.answers, // 점수 포함한 답변 옵션을 JSON으로 저장
       }),
