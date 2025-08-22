@@ -298,8 +298,6 @@ export default function AdminPage() {
     const supabase = createClient()
 
     try {
-      console.log("[v0] fetchQuestionStats 시작 - surveyId:", surveyId, "hospitalFilter:", hospitalFilter)
-
       const { data, error } = await supabase
         .from("survey_responses")
         .select(`
@@ -317,15 +315,12 @@ export default function AdminPage() {
         `)
         .eq("survey_participants.survey_id", surveyId)
 
-      console.log("[v0] 쿼리 결과:", { data, error, dataLength: data?.length })
-
       if (error) {
-        console.error("[v0] 쿼리 에러:", error)
+        console.error("문항별 통계 쿼리 에러:", error)
         throw error
       }
 
       if (!data || data.length === 0) {
-        console.log("[v0] 응답 데이터가 없습니다.")
         setQuestionStats([])
         return
       }
@@ -335,7 +330,6 @@ export default function AdminPage() {
         filteredData = data.filter((response: any) =>
           response.survey_participants?.hospital_name?.toLowerCase().includes(hospitalFilter.toLowerCase()),
         )
-        console.log("[v0] 병원 필터링 후 데이터:", filteredData.length)
       }
 
       // 문항별 통계 계산
@@ -357,7 +351,7 @@ export default function AdminPage() {
         const questionText = response.survey_questions?.question_text || ""
         const responseValue = response.answer_value || 0
 
-        console.log("[v0] 응답 처리:", { questionId, questionOrder, questionText, responseValue })
+        if (!questionId || !responseValue) return // 유효하지 않은 데이터 스킵
 
         if (!questionStatsMap[questionId]) {
           questionStatsMap[questionId] = {
@@ -375,8 +369,6 @@ export default function AdminPage() {
         questionStatsMap[questionId].totalScore += responseValue
       })
 
-      console.log("[v0] 문항별 통계 맵:", questionStatsMap)
-
       // QuestionStat 형태로 변환
       const processedStats: QuestionStat[] = Object.values(questionStatsMap)
         .map((stat) => ({
@@ -389,11 +381,11 @@ export default function AdminPage() {
         }))
         .sort((a, b) => a.questionNumber - b.questionNumber)
 
-      console.log("[v0] 최종 처리된 통계:", processedStats)
       setQuestionStats(processedStats)
     } catch (err) {
-      console.error("[v0] 질문 통계 조회 오류:", err)
+      console.error("질문 통계 조회 오류:", err)
       setQuestionStats([])
+      setError("문항별 통계를 불러오는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
     }
   }
 
@@ -440,7 +432,6 @@ export default function AdminPage() {
             answers: [
               { text: "매우 그렇다", score: 5 },
               { text: "그렇다", score: 4 },
-              { text: "보통이다", score: 3 },
               { text: "보통이다", score: 3 },
               { text: "그렇지 않다", score: 2 },
               { text: "전혀 그렇지 않다", score: 1 },
@@ -1901,54 +1892,52 @@ export default function AdminPage() {
 
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-lg font-semibold">문항별 통계</CardTitle>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg font-semibold">문항별 통계</CardTitle>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            placeholder="병원명 검색..."
+                            value={hospitalFilter}
+                            onChange={(e) => setHospitalFilter(e.target.value)}
+                            className="w-64"
+                          />
+                          {hospitalFilter && (
+                            <Button variant="outline" size="sm" onClick={() => setHospitalFilter("")}>
+                              초기화
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     </CardHeader>
                     <CardContent>
                       {questionStats.length === 0 ? (
                         <Alert>
-                          <AlertDescription>문항별 통계 데이터가 없습니다.</AlertDescription>
+                          <AlertDescription>
+                            {hospitalFilter
+                              ? `"${hospitalFilter}" 병원의 문항별 통계 데이터가 없습니다.`
+                              : "문항별 통계 데이터가 없습니다."}
+                          </AlertDescription>
                         </Alert>
                       ) : (
                         <div className="space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {questionStats.map((stat) => (
-                              <Card key={stat.id} className="p-4 border-l-4 border-indigo-500">
-                                <CardHeader className="pb-2">
-                                  <CardTitle className="text-base font-semibold text-indigo-800">
-                                    문항 {stat.questionNumber}
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                  <div className="text-sm text-gray-700 line-clamp-2">{stat.questionText}</div>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">응답 수</span>
-                                    <span className="font-semibold">{stat.totalResponses}명</span>
-                                  </div>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">평균 점수</span>
-                                    <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
-                                      {stat.averageScore}/{stat.maxScore}
-                                    </Badge>
-                                  </div>
-                                  <div className="w-full bg-gray-200 rounded-full h-2">
-                                    <div
-                                      className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-                                      style={{
-                                        width: `${(Number.parseFloat(stat.averageScore) / stat.maxScore) * 100}%`,
-                                      }}
-                                    ></div>
-                                  </div>
-                                  <div className="text-xs text-gray-500 text-center">
-                                    만족도: {((Number.parseFloat(stat.averageScore) / stat.maxScore) * 100).toFixed(0)}%
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
+                          {hospitalFilter && (
+                            <div className="bg-blue-50 p-3 rounded-lg">
+                              <p className="text-sm text-blue-800">
+                                <strong>"{hospitalFilter}"</strong> 병원의 문항별 통계를 표시하고 있습니다.
+                              </p>
+                            </div>
+                          )}
 
                           {/* 문항별 상세 테이블 */}
-                          <div className="mt-6">
-                            <h4 className="text-md font-semibold mb-3">문항별 상세 통계</h4>
+                          <div>
+                            <h4 className="text-md font-semibold mb-3">
+                              문항별 상세 통계
+                              {hospitalFilter && (
+                                <span className="text-sm font-normal text-blue-600 ml-2">
+                                  ("{hospitalFilter}" 병원)
+                                </span>
+                              )}
+                            </h4>
                             <div className="overflow-x-auto">
                               <table className="w-full border-collapse border border-gray-300">
                                 <thead>
