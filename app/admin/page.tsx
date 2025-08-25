@@ -188,13 +188,14 @@ export default function AdminPage() {
         .from("survey_responses")
         .select(`
           *,
-          survey_participants (
+          survey_participants!inner (
             participant_name,
             hospital_name,
-            phone_number
+            phone_number,
+            survey_id
           )
         `)
-        .eq("survey_id", surveyId)
+        .eq("survey_participants.survey_id", surveyId)
         .order("created_at", { ascending: false })
 
       if (error) throw error
@@ -220,10 +221,11 @@ export default function AdminPage() {
             question_order
           ),
           survey_participants!inner (
-            hospital_name
+            hospital_name,
+            survey_id
           )
         `)
-        .eq("survey_id", surveyId)
+        .eq("survey_participants.survey_id", surveyId)
 
       if (hospitalFilter) {
         query = query.ilike("survey_participants.hospital_name", `%${hospitalFilter}%`)
