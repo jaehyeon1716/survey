@@ -1,15 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/server"
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.json({ error: "Supabase 환경 변수가 설정되지 않았습니다." }, { status: 500 })
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseKey)
   const surveyId = params.id
 
   try {
@@ -18,6 +10,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (!title || !questions || questions.length === 0) {
       return NextResponse.json({ error: "제목과 문항은 필수입니다." }, { status: 400 })
     }
+
+    const supabase = await createClient()
 
     const { error: surveyError } = await supabase
       .from("surveys")
@@ -56,50 +50,21 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.json({ error: "Supabase 환경 변수가 설정되지 않았습니다." }, { status: 500 })
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseKey)
-  const surveyId = params.id
-
   try {
-    // 1. 먼저 해당 설문의 참여자 토큰들을 조회
-    const { data: participants, error: participantsSelectError } = await supabase
-      .from("survey_participants")
-      .select("token")
-      .eq("survey_id", Number.parseInt(surveyId))
+    const supabase = await createClient()
+    const surveyId = params.id
 
-    if (participantsSelectError) throw participantsSelectError
+    // 관련된 데이터들을 순서대로 삭제
+    // 1. 설문 응답 삭제
+    await supabase.from("survey_responses").delete().eq("survey_id", Number.parseInt(surveyId))
 
-    // 2. 참여자 토큰이 있으면 설문 응답 삭제
-    if (participants && participants.length > 0) {
-      const tokens = participants.map((p) => p.token)
-      const { error: responsesError } = await supabase.from("survey_responses").delete().in("participant_token", tokens)
+    // 2. 설문 참여자 삭제
+    await supabase.from("survey_participants").delete().eq("survey_id", Number.parseInt(surveyId))
 
-      if (responsesError) throw responsesError
-    }
+    // 3. 설문 문항 삭제
+    await supabase.from("survey_questions").delete().eq("survey_id", Number.parseInt(surveyId))
 
-    // 3. 참여자 삭제
-    const { error: participantsError } = await supabase
-      .from("survey_participants")
-      .delete()
-      .eq("survey_id", Number.parseInt(surveyId))
-
-    if (participantsError) throw participantsError
-
-    // 4. 설문 문항 삭제
-    const { error: questionsError } = await supabase
-      .from("survey_questions")
-      .delete()
-      .eq("survey_id", Number.parseInt(surveyId))
-
-    if (questionsError) throw questionsError
-
-    // 5. 설문지 삭제
+    // 4. 설문지 삭제
     const { error: surveyError } = await supabase.from("surveys").delete().eq("id", Number.parseInt(surveyId))
 
     if (surveyError) throw surveyError
