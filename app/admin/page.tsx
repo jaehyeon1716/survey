@@ -225,7 +225,19 @@ export default function AdminPage() {
       const data = await response.json()
 
       if (response.ok) {
-        setSurveys(data.surveys || [])
+        const surveysWithParticipants = await Promise.all(
+          (data.surveys || []).map(async (survey: any) => {
+            // 각 설문지의 참여자 수를 미리 계산
+            const participantsResponse = await fetch(`/api/admin/surveys/${survey.id}/participants`)
+            const participantsData = await participantsResponse.json()
+
+            return {
+              ...survey,
+              participantCount: participantsData.participants?.length || 0,
+            }
+          }),
+        )
+        setSurveys(surveysWithParticipants)
       } else {
         setError(data.error || "설문지 조회 중 오류가 발생했습니다.")
       }
@@ -761,37 +773,25 @@ export default function AdminPage() {
   const handleDeleteSurvey = async () => {
     if (!surveyToDelete) return
 
-    if (deletePassword !== ADMIN_PASSWORD) {
-      setError("비밀번호가 올바르지 않습니다.")
-      return
-    }
-
-    setDeleteLoading(true)
-    setError("")
-
     try {
-      const response = await fetch(`/api/admin/surveys/${surveyToDelete.id}`, {
+      const response = await fetch(`/api/admin/surveys?id=${surveyToDelete.id}`, {
         method: "DELETE",
       })
 
       const data = await response.json()
 
       if (response.ok) {
-        setUploadSuccess("설문지가 성공적으로 삭제되었습니다.")
-        setShowDeleteConfirm(false)
-        setSurveyToDelete(null)
-        setDeletePassword("")
-        fetchSurveys()
+        setSurveys(surveys.filter((s) => s.id !== surveyToDelete.id))
         if (selectedSurvey?.id === surveyToDelete.id) {
           setSelectedSurvey(null)
         }
+        setShowDeleteConfirm(false)
+        setSurveyToDelete(null)
       } else {
         setError(data.error || "설문지 삭제 중 오류가 발생했습니다.")
       }
     } catch (err) {
-      setError("설문지 삭제 중 오류가 발생했습니다.")
-    } finally {
-      setDeleteLoading(false)
+      setError("설문지 삭제에 실패했습니다.")
     }
   }
 
@@ -1261,9 +1261,7 @@ export default function AdminPage() {
                             <CardDescription>{survey.description}</CardDescription>
                           </CardHeader>
                           <CardContent className="flex flex-col gap-2">
-                            <Badge variant="secondary">
-                              참여자 수: {participants.filter((p) => p.survey_id === survey.id).length}
-                            </Badge>
+                            <Badge variant="secondary">참여자 수: {survey.participantCount || 0}</Badge>
                             <Badge variant="outline">상태: {survey.is_active ? "활성" : "비활성"}</Badge>
                             <div className="flex justify-end gap-2">
                               <Button
@@ -1742,7 +1740,7 @@ export default function AdminPage() {
                                       </Badge>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                      <span className="text-sm text-gray-600">평균 점수(전체문항)</span>
+                                      <span className="text-sm text-gray-600">평균 점수</span>
                                       <span className="font-semibold text-blue-600">
                                         {(() => {
                                           const totalScore = responses

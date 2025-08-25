@@ -72,3 +72,35 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "설문지 생성 중 오류가 발생했습니다." }, { status: 500 })
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const url = new URL(request.url)
+    const surveyId = url.searchParams.get("id")
+
+    if (!surveyId) {
+      return NextResponse.json({ error: "설문지 ID가 필요합니다." }, { status: 400 })
+    }
+
+    // 관련된 데이터들을 순서대로 삭제
+    // 1. 설문 응답 삭제
+    await supabase.from("survey_responses").delete().eq("survey_id", surveyId)
+
+    // 2. 설문 참여자 삭제
+    await supabase.from("survey_participants").delete().eq("survey_id", surveyId)
+
+    // 3. 설문 문항 삭제
+    await supabase.from("survey_questions").delete().eq("survey_id", surveyId)
+
+    // 4. 설문지 삭제
+    const { error: surveyError } = await supabase.from("surveys").delete().eq("id", surveyId)
+
+    if (surveyError) throw surveyError
+
+    return NextResponse.json({ message: "설문지가 성공적으로 삭제되었습니다." })
+  } catch (error) {
+    console.error("설문지 삭제 오류:", error)
+    return NextResponse.json({ error: "설문지 삭제 중 오류가 발생했습니다." }, { status: 500 })
+  }
+}
