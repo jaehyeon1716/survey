@@ -37,6 +37,7 @@ interface Survey {
     question_number: number
     answer_options?: AnswerOption[]
   }>
+  participantCount?: number // 미리 계산된 참여자 수를 저장하는 필드
 }
 
 interface Participant {
@@ -1321,12 +1322,7 @@ export default function AdminPage() {
                               <p className="text-gray-600 mb-3">{survey.description || "설명 없음"}</p>
                               <div className="flex items-center gap-4 text-sm text-gray-500">
                                 <span>문항: {survey.survey_questions?.length || 0}개</span>
-                                <span>
-                                  참여자: {(() => {
-                                    const surveyParticipants = participants.filter((p) => p.survey_id === survey.id)
-                                    return surveyParticipants.length
-                                  })()}명
-                                </span>
+                                <span>참여자: {survey.participantCount || 0}명</span>
                                 <span>생성일: {new Date(survey.created_at).toLocaleDateString()}</span>
                               </div>
                             </div>

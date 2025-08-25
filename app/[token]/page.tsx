@@ -114,12 +114,52 @@ export default function HospitalSurvey() {
         const processedQuestions = questionsData.map((question) => {
           let answerOptions = defaultScaleLabels
 
-          if (question.answer_options && Array.isArray(question.answer_options) && question.answer_options.length > 0) {
-            answerOptions = question.answer_options.map((option, index) => ({
-              value: option.value || 5 - index, // 기본값 설정
-              label: option.label || defaultScaleLabels[index]?.label || `옵션 ${index + 1}`,
-              color: option.color || defaultScaleLabels[index]?.color || "bg-gray-400",
-            }))
+          console.log("[v0] Question answer_options:", question.answer_options)
+
+          if (question.answer_options) {
+            try {
+              let options = question.answer_options
+
+              // JSON 문자열인 경우 파싱
+              if (typeof options === "string") {
+                options = JSON.parse(options)
+              }
+
+              // 배열이고 비어있지 않은 경우
+              if (Array.isArray(options) && options.length > 0) {
+                answerOptions = options.map((option, index) => {
+                  // 옵션이 객체인 경우
+                  if (typeof option === "object" && option !== null) {
+                    return {
+                      value: option.value || option.score || 5 - index,
+                      label: option.label || option.text || defaultScaleLabels[index]?.label || `옵션 ${index + 1}`,
+                      color: option.color || defaultScaleLabels[index]?.color || "bg-gray-400",
+                    }
+                  }
+                  // 옵션이 문자열인 경우
+                  else if (typeof option === "string") {
+                    return {
+                      value: 5 - index,
+                      label: option,
+                      color: defaultScaleLabels[index]?.color || "bg-gray-400",
+                    }
+                  }
+                  // 기본값 반환
+                  return (
+                    defaultScaleLabels[index] || {
+                      value: 5 - index,
+                      label: `옵션 ${index + 1}`,
+                      color: "bg-gray-400",
+                    }
+                  )
+                })
+
+                console.log("[v0] Processed answer options:", answerOptions)
+              }
+            } catch (error) {
+              console.error("[v0] Error processing answer options:", error)
+              answerOptions = defaultScaleLabels
+            }
           }
 
           return {
