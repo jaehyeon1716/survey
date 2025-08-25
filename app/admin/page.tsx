@@ -887,18 +887,15 @@ export default function AdminPage() {
     const completedParticipants = participants.filter((p) => p.is_completed).length
 
     const totalScore = responses.reduce((sum, r) => sum + (r.answer_value || 0), 0)
-    const averageScore = responses.length > 0 ? (totalScore / responses.length).toFixed(1) : "0"
+    const averageScore = responses.length > 0 ? totalScore / responses.length : 0
 
     const basicStats = [
       ["통계 항목", "값"],
       ["설문지 제목", selectedSurvey.title],
       ["총 참여자 수", participants.length.toString()],
-      ["완료된 설문 수", completedParticipants.toString()], // 완료된 참여자 수로 수정
-      ["완료율", `${participants.length > 0 ? Math.round((completedParticipants / participants.length) * 100) : 0}%`], // 올바른 완료율 계산
-      [
-        "전체 평균 점수",
-        responses.length > 0 ? `${averageScore}/5` : "0", // answer_value 기반 평균 점수
-      ],
+      ["완료된 설문 수", completedParticipants.toString()],
+      ["완료율", `${participants.length > 0 ? Math.round((completedParticipants / participants.length) * 100) : 0}%`],
+      ["전체 평균 점수", responses.length > 0 ? `${averageScore.toFixed(1)}/5` : "0"],
       [""],
     ]
 
@@ -930,7 +927,7 @@ export default function AdminPage() {
       ...Object.entries(hospitalStats).map(([hospital, stats]: [string, any]) => [
         hospital,
         stats.count.toString(),
-        `${(stats.totalScore / stats.count).toFixed(1)}/${stats.maxScore}`,
+        `${stats.count > 0 ? (stats.totalScore / stats.count).toFixed(1) : "0"}/${stats.maxScore}`,
       ]),
       [""],
     ]
@@ -967,7 +964,7 @@ export default function AdminPage() {
             "전체",
             "모든 문항 평균",
             hospitalTotalStats.count.toString(),
-            `${(hospitalTotalStats.totalScore / hospitalTotalStats.count).toFixed(1)}/${hospitalTotalStats.maxScore}`,
+            `${hospitalTotalStats.count > 0 ? (hospitalTotalStats.totalScore / hospitalTotalStats.count).toFixed(1) : "0"}/${hospitalTotalStats.maxScore}`,
           ])
         }
 
