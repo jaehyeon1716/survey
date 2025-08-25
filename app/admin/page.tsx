@@ -118,6 +118,9 @@ export default function AdminPage() {
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [uploadLoading, setUploadLoading] = useState(false)
 
+  const safeParticipants = Array.isArray(participants) ? participants : []
+  const safeResponses = Array.isArray(responses) ? responses : []
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
     if (password === "hospital2024") {
@@ -493,8 +496,8 @@ export default function AdminPage() {
   const downloadOverallStats = () => {
     if (!selectedSurvey) return
 
-    const completedParticipants = participants.filter((p) => p.is_completed)
-    const totalParticipants = participants.length
+    const completedParticipants = safeParticipants.filter((p) => p.is_completed)
+    const totalParticipants = safeParticipants.length
     const completionRate = totalParticipants > 0 ? (completedParticipants.length / totalParticipants) * 100 : 0
 
     // 전체 평균 점수 계산
@@ -558,7 +561,7 @@ export default function AdminPage() {
           acc[hospital].completed++
 
           // 해당 참여자의 응답 점수 합계
-          const participantResponses = responses.filter(
+          const participantResponses = safeResponses.filter(
             (r) =>
               r.survey_participants?.participant_name === participant.participant_name &&
               r.survey_participants?.hospital_name === hospital,
@@ -664,7 +667,7 @@ export default function AdminPage() {
   }
 
   // 필터링된 참여자 목록
-  const filteredParticipants = participants.filter((participant) => {
+  const filteredParticipants = safeParticipants.filter((participant) => {
     const matchesHospital =
       hospitalFilter === "" || participant.hospital_name.toLowerCase().includes(hospitalFilter.toLowerCase())
     const matchesStatus =
@@ -691,7 +694,7 @@ export default function AdminPage() {
         acc[hospital].completed++
 
         // 해당 참여자의 응답 점수 합계
-        const participantResponses = responses.filter(
+        const participantResponses = safeResponses.filter(
           (r) =>
             r.survey_participants?.participant_name === participant.participant_name &&
             r.survey_participants?.hospital_name === hospital,
@@ -706,9 +709,12 @@ export default function AdminPage() {
   )
 
   // 검색된 병원 목록
-  const filteredHospitals = Object.entries(hospitalStats).filter(([hospital]) =>
-    hospital.toLowerCase().includes(hospitalSearchFilter.toLowerCase()),
-  )
+  const filteredHospitals =
+    hospitalStats && typeof hospitalStats === "object"
+      ? Object.entries(hospitalStats).filter(([hospital]) =>
+          hospital.toLowerCase().includes(hospitalSearchFilter.toLowerCase()),
+        )
+      : []
 
   return (
     <div className="min-h-screen bg-white p-6">
@@ -1078,7 +1084,7 @@ export default function AdminPage() {
                           <Card className="bg-green-50 border-green-200 shadow-sm">
                             <CardContent className="p-4 text-center">
                               <div className="text-2xl font-bold text-green-600">
-                                {participants.filter((p) => p.is_completed).length}
+                                {safeParticipants.filter((p) => p.is_completed).length}
                               </div>
                               <div className="text-sm text-green-600">완료</div>
                             </CardContent>
@@ -1086,7 +1092,7 @@ export default function AdminPage() {
                           <Card className="bg-orange-50 border-orange-200 shadow-sm">
                             <CardContent className="p-4 text-center">
                               <div className="text-2xl font-bold text-orange-600">
-                                {participants.filter((p) => !p.is_completed).length}
+                                {safeParticipants.filter((p) => !p.is_completed).length}
                               </div>
                               <div className="text-sm text-orange-600">미완료</div>
                             </CardContent>
@@ -1094,9 +1100,10 @@ export default function AdminPage() {
                           <Card className="bg-purple-50 border-purple-200 shadow-sm">
                             <CardContent className="p-4 text-center">
                               <div className="text-2xl font-bold text-purple-600">
-                                {participants.length > 0
+                                {safeParticipants.length > 0
                                   ? (
-                                      (participants.filter((p) => p.is_completed).length / participants.length) *
+                                      (safeParticipants.filter((p) => p.is_completed).length /
+                                        safeParticipants.length) *
                                       100
                                     ).toFixed(1)
                                   : 0}
@@ -1344,11 +1351,11 @@ export default function AdminPage() {
                       </CardHeader>
                       <CardContent>
                         {(() => {
-                          const completedParticipants = participants.filter((p) => p.is_completed)
-                          const totalParticipants = participants.length
+                          const completedParticipants = safeParticipants.filter((p) => p.is_completed)
+                          const totalParticipants = safeParticipants.length
                           const completionRate =
                             totalParticipants > 0 ? (completedParticipants.length / totalParticipants) * 100 : 0
-                          const totalScore = responses.reduce((sum, r) => sum + (r.answer_value || 0), 0)
+                          const totalScore = safeResponses.reduce((sum, r) => sum + (r.answer_value || 0), 0)
                           const averageScore =
                             completedParticipants.length > 0 ? totalScore / completedParticipants.length : 0
 
@@ -1430,7 +1437,7 @@ export default function AdminPage() {
                                   acc[hospital].total++
                                   if (participant.is_completed) {
                                     acc[hospital].completed++
-                                    const participantResponses = responses.filter(
+                                    const participantResponses = safeResponses.filter(
                                       (r) =>
                                         r.survey_participants?.participant_name === participant.participant_name &&
                                         r.survey_participants?.hospital_name === hospital,
@@ -1447,9 +1454,12 @@ export default function AdminPage() {
                                 {} as Record<string, { total: number; completed: number; totalScore: number }>,
                               )
 
-                              const filteredHospitals = Object.entries(hospitalStats).filter(([hospital]) =>
-                                hospital.toLowerCase().includes(hospitalSearchFilter.toLowerCase()),
-                              )
+                              const filteredHospitals =
+                                hospitalStats && typeof hospitalStats === "object"
+                                  ? Object.entries(hospitalStats).filter(([hospital]) =>
+                                      hospital.toLowerCase().includes(hospitalSearchFilter.toLowerCase()),
+                                    )
+                                  : []
 
                               return (
                                 <>
