@@ -747,28 +747,28 @@ export default function AdminPage() {
   )
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-white p-6">
+      <div className="max-w-6xl mx-auto">
         {!isAuthenticated && (
-          <Card className="max-w-md mx-auto mt-20">
-            <CardHeader>
-              <CardTitle className="text-center">관리자 로그인</CardTitle>
+          <Card className="max-w-md mx-auto mt-20 shadow-lg border-0">
+            <CardHeader className="text-center pb-4">
+              <CardTitle className="text-2xl font-semibold text-gray-800">관리자 로그인</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-6 pb-6">
               <form onSubmit={handleLogin} className="space-y-4">
                 <Input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="관리자 비밀번호"
-                  className="w-full"
+                  className="w-full h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                 />
                 {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
+                  <Alert variant="destructive" className="border-red-200 bg-red-50">
+                    <AlertDescription className="text-red-700">{error}</AlertDescription>
                   </Alert>
                 )}
-                <Button type="submit" className="w-full">
+                <Button type="submit" className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium">
                   로그인
                 </Button>
               </form>
@@ -777,147 +777,179 @@ export default function AdminPage() {
         )}
 
         {isAuthenticated && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
+          <div className="space-y-8">
+            <div className="flex items-center justify-between border-b border-gray-200 pb-6">
               <h1 className="text-3xl font-bold text-gray-900">병원 만족도 조사 관리</h1>
-              <Button onClick={() => setIsAuthenticated(false)} variant="outline">
+              <Button
+                onClick={() => setIsAuthenticated(false)}
+                variant="outline"
+                className="border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
                 로그아웃
               </Button>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="create" className="flex items-center gap-2">
+              <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-lg">
+                <TabsTrigger
+                  value="create"
+                  className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                >
                   <FileText className="h-4 w-4" />
                   {isEditMode ? "설문지 수정" : "설문지 생성"}
                   {newSurveyQuestions.length > 0 && (
-                    <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-800">
+                    <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-700 text-xs">
                       {newSurveyQuestions.length}
                     </Badge>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="manage" className="flex items-center gap-2">
+                <TabsTrigger
+                  value="manage"
+                  className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                >
                   <Settings className="h-4 w-4" />
                   설문지 관리
                 </TabsTrigger>
-                <TabsTrigger value="participants" className="flex items-center gap-2">
+                <TabsTrigger
+                  value="participants"
+                  className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                >
                   <Users className="h-4 w-4" />
                   대상자 관리
                 </TabsTrigger>
-                <TabsTrigger value="statistics" className="flex items-center gap-2">
+                <TabsTrigger
+                  value="statistics"
+                  className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                >
                   <BarChart3 className="h-4 w-4" />
                   통계
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="create" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
+              <TabsContent value="create" className="space-y-6 mt-8">
+                <Card className="shadow-sm border-gray-200">
+                  <CardHeader className="border-b border-gray-100 bg-gray-50">
+                    <CardTitle className="flex items-center justify-between text-xl text-gray-800">
                       {isEditMode ? "설문지 수정" : "새 설문지 생성"}
                       {isEditMode && (
-                        <Button onClick={cancelEdit} variant="outline" size="sm">
+                        <Button
+                          onClick={cancelEdit}
+                          variant="outline"
+                          size="sm"
+                          className="border-gray-300 text-gray-600 hover:bg-gray-50 bg-transparent"
+                        >
                           수정 취소
                         </Button>
                       )}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-6">
                     <form onSubmit={handleCreateSurvey} className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                          <label className="block text-sm font-medium mb-2">설문지 제목</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">설문지 제목</label>
                           <Input
                             value={newSurveyTitle}
                             onChange={(e) => setNewSurveyTitle(e.target.value)}
                             placeholder="설문지 제목을 입력하세요"
-                            className="w-full"
+                            className="w-full h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium mb-2">설문지 설명</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">설문지 설명</label>
                           <Textarea
                             value={newSurveyDescription}
                             onChange={(e) => setNewSurveyDescription(e.target.value)}
                             placeholder="설문지 설명을 입력하세요"
-                            className="w-full"
+                            className="w-full border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                             rows={3}
                           />
                         </div>
                       </div>
 
                       <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">설문 문항</h3>
+                        <h3 className="text-lg font-semibold text-gray-800">설문 문항</h3>
                         {newSurveyQuestions.map((question, index) => (
-                          <Card key={index} className="p-4">
-                            <div className="space-y-4">
-                              <div className="flex items-center justify-between">
-                                <label className="block text-sm font-medium">문항 {index + 1}</label>
-                                {newSurveyQuestions.length > 1 && (
+                          <Card key={index} className="border-gray-200 shadow-sm">
+                            <CardContent className="p-5">
+                              <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                  <label className="block text-sm font-medium text-gray-700">문항 {index + 1}</label>
+                                  {newSurveyQuestions.length > 1 && (
+                                    <Button
+                                      onClick={() => removeQuestion(index)}
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                                <Input
+                                  value={question.question}
+                                  onChange={(e) => updateQuestion(index, e.target.value)}
+                                  placeholder={`문항 ${index + 1}을 입력하세요`}
+                                  className="w-full h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                                />
+
+                                <div className="space-y-3">
+                                  <label className="block text-sm font-medium text-gray-700">답변 옵션</label>
+                                  {question.answers.map((answer, answerIndex) => (
+                                    <div key={answerIndex} className="flex items-center gap-3">
+                                      <Input
+                                        value={answer.text}
+                                        onChange={(e) => updateAnswer(index, answerIndex, "text", e.target.value)}
+                                        placeholder={`답변 ${answerIndex + 1}`}
+                                        className="flex-1 h-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                                      />
+                                      <Input
+                                        type="number"
+                                        value={answer.score.toString()}
+                                        onChange={(e) => updateAnswer(index, answerIndex, "score", e.target.value)}
+                                        placeholder="점수"
+                                        className="w-20 h-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                                        min="1"
+                                        max="10"
+                                      />
+                                      {question.answers.length > 1 && (
+                                        <Button
+                                          onClick={() => removeAnswer(index, answerIndex)}
+                                          variant="outline"
+                                          size="sm"
+                                          className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ))}
                                   <Button
-                                    onClick={() => removeQuestion(index)}
+                                    onClick={() => addAnswer(index)}
                                     variant="outline"
                                     size="sm"
-                                    className="text-red-600 hover:text-red-700"
+                                    className="w-full border-gray-300 text-gray-600 hover:bg-gray-50"
                                   >
-                                    <Trash2 className="h-4 w-4" />
+                                    답변 옵션 추가
                                   </Button>
-                                )}
+                                </div>
                               </div>
-                              <Input
-                                value={question.question}
-                                onChange={(e) => updateQuestion(index, e.target.value)}
-                                placeholder={`문항 ${index + 1}을 입력하세요`}
-                                className="w-full"
-                              />
-
-                              <div className="space-y-2">
-                                <label className="block text-sm font-medium">답변 옵션</label>
-                                {question.answers.map((answer, answerIndex) => (
-                                  <div key={answerIndex} className="flex items-center gap-2">
-                                    <Input
-                                      value={answer.text}
-                                      onChange={(e) => updateAnswer(index, answerIndex, "text", e.target.value)}
-                                      placeholder={`답변 ${answerIndex + 1}`}
-                                      className="flex-1"
-                                    />
-                                    <Input
-                                      type="number"
-                                      value={answer.score.toString()}
-                                      onChange={(e) => updateAnswer(index, answerIndex, "score", e.target.value)}
-                                      placeholder="점수"
-                                      className="w-20"
-                                      min="1"
-                                      max="10"
-                                    />
-                                    {question.answers.length > 1 && (
-                                      <Button
-                                        onClick={() => removeAnswer(index, answerIndex)}
-                                        variant="outline"
-                                        size="sm"
-                                        className="text-red-600 hover:text-red-700"
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                ))}
-                                <Button onClick={() => addAnswer(index)} variant="outline" size="sm" className="w-full">
-                                  답변 옵션 추가
-                                </Button>
-                              </div>
-                            </div>
+                            </CardContent>
                           </Card>
                         ))}
 
-                        <Button onClick={addQuestion} variant="outline" className="w-full bg-transparent">
+                        <Button
+                          onClick={addQuestion}
+                          variant="outline"
+                          className="w-full h-12 border-gray-300 text-gray-600 hover:bg-gray-50 bg-transparent"
+                        >
                           문항 추가
                         </Button>
                       </div>
 
                       {error && (
-                        <Alert variant="destructive">
-                          <AlertDescription>{error}</AlertDescription>
+                        <Alert variant="destructive" className="border-red-200 bg-red-50">
+                          <AlertDescription className="text-red-700">{error}</AlertDescription>
                         </Alert>
                       )}
 
@@ -927,7 +959,11 @@ export default function AdminPage() {
                         </Alert>
                       )}
 
-                      <Button type="submit" className="w-full" disabled={createLoading}>
+                      <Button
+                        type="submit"
+                        className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                        disabled={createLoading}
+                      >
                         {createLoading ? "처리 중..." : isEditMode ? "설문지 수정" : "설문지 생성"}
                       </Button>
                     </form>
@@ -936,24 +972,24 @@ export default function AdminPage() {
               </TabsContent>
 
               <TabsContent value="manage" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>설문지 관리</CardTitle>
+                <Card className="shadow-sm border-gray-200">
+                  <CardHeader className="border-b border-gray-100 bg-gray-50">
+                    <CardTitle className="text-xl font-semibold text-gray-800">설문지 관리</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {surveys.map((survey) => (
                         <Card
                           key={survey.id}
-                          className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+                          className={`cursor-pointer transition-all duration-200 hover:shadow-md border-gray-200 ${
                             selectedSurvey?.id === survey.id ? "ring-2 ring-blue-500 bg-blue-50" : "hover:bg-gray-50"
                           }`}
                           onClick={() => setSelectedSurvey(survey)}
                         >
-                          <CardContent className="p-4">
+                          <CardContent className="p-5">
                             <div className="space-y-3">
                               <div>
-                                <h3 className="font-semibold text-lg truncate">{survey.title}</h3>
+                                <h3 className="font-semibold text-lg truncate text-gray-800">{survey.title}</h3>
                                 <p className="text-sm text-gray-600 line-clamp-2">{survey.description}</p>
                               </div>
 
@@ -976,7 +1012,7 @@ export default function AdminPage() {
                                   }}
                                   variant="outline"
                                   size="sm"
-                                  className="flex-1"
+                                  className="flex-1 border-gray-300 text-gray-600 hover:bg-gray-50"
                                 >
                                   <Edit className="h-4 w-4 mr-1" />
                                   수정
@@ -989,7 +1025,7 @@ export default function AdminPage() {
                                   }}
                                   variant="outline"
                                   size="sm"
-                                  className="text-red-600 hover:text-red-700"
+                                  className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -1011,18 +1047,19 @@ export default function AdminPage() {
                 {/* 삭제 확인 모달 */}
                 {showDeleteConfirm && (
                   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <Card className="w-full max-w-md mx-4">
-                      <CardHeader>
-                        <CardTitle className="text-red-600">설문지 삭제</CardTitle>
+                    <Card className="w-full max-w-md mx-4 shadow-lg border-0">
+                      <CardHeader className="text-center pb-4">
+                        <CardTitle className="text-2xl font-semibold text-red-600">설문지 삭제</CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-4">
-                        <p>정말로 "{surveyToDelete?.title}" 설문지를 삭제하시겠습니까?</p>
+                      <CardContent className="space-y-4 px-6 pb-6">
+                        <p className="text-gray-700">정말로 "{surveyToDelete?.title}" 설문지를 삭제하시겠습니까?</p>
                         <p className="text-sm text-red-600">이 작업은 되돌릴 수 없습니다.</p>
                         <Input
                           type="password"
                           value={deletePassword}
                           onChange={(e) => setDeletePassword(e.target.value)}
                           placeholder="관리자 비밀번호 확인"
+                          className="w-full h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                         />
                         <div className="flex gap-2">
                           <Button
@@ -1032,11 +1069,15 @@ export default function AdminPage() {
                               setDeletePassword("")
                             }}
                             variant="outline"
-                            className="flex-1"
+                            className="flex-1 border-gray-300 text-gray-600 hover:bg-gray-50"
                           >
                             취소
                           </Button>
-                          <Button onClick={deleteSurvey} variant="destructive" className="flex-1">
+                          <Button
+                            onClick={deleteSurvey}
+                            variant="destructive"
+                            className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium"
+                          >
                             삭제
                           </Button>
                         </div>
@@ -1048,20 +1089,27 @@ export default function AdminPage() {
 
               <TabsContent value="participants" className="space-y-6">
                 {!selectedSurvey ? (
-                  <Card>
+                  <Card className="shadow-sm border-gray-200">
                     <CardContent className="text-center py-12">
                       <Users className="h-12 w-12 mx-auto text-gray-400 mb-4" />
                       <h3 className="text-lg font-semibold text-gray-600 mb-2">설문지를 선택해주세요</h3>
                       <p className="text-gray-500 mb-4">대상자를 관리하려면 먼저 설문지를 선택해야 합니다.</p>
-                      <Button onClick={() => setActiveTab("manage")}>설문지 관리로 이동</Button>
+                      <Button
+                        onClick={() => setActiveTab("manage")}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-medium h-12"
+                      >
+                        설문지 관리로 이동
+                      </Button>
                     </CardContent>
                   </Card>
                 ) : (
                   <div className="space-y-6">
-                    <Card>
-                      <CardHeader>
+                    <Card className="shadow-sm border-gray-200">
+                      <CardHeader className="border-b border-gray-100 bg-gray-50">
                         <div className="flex items-center justify-between">
-                          <CardTitle>대상자 관리 - {selectedSurvey.title}</CardTitle>
+                          <CardTitle className="text-xl font-semibold text-gray-800">
+                            대상자 관리 - {selectedSurvey.title}
+                          </CardTitle>
                           <Button
                             onClick={() => {
                               setSelectedSurvey(null)
@@ -1069,21 +1117,22 @@ export default function AdminPage() {
                             }}
                             variant="outline"
                             size="sm"
+                            className="border-gray-300 text-gray-600 hover:bg-gray-50"
                           >
                             다른 설문지 선택
                           </Button>
                         </div>
                       </CardHeader>
-                      <CardContent className="space-y-6">
+                      <CardContent className="space-y-6 p-6">
                         {/* 통계 카드 */}
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                          <Card className="bg-blue-50 border-blue-200">
+                          <Card className="bg-blue-50 border-blue-200 shadow-sm">
                             <CardContent className="p-4 text-center">
                               <div className="text-2xl font-bold text-blue-600">{participants.length}</div>
                               <div className="text-sm text-blue-600">총 대상자</div>
                             </CardContent>
                           </Card>
-                          <Card className="bg-green-50 border-green-200">
+                          <Card className="bg-green-50 border-green-200 shadow-sm">
                             <CardContent className="p-4 text-center">
                               <div className="text-2xl font-bold text-green-600">
                                 {participants.filter((p) => p.is_completed).length}
@@ -1091,7 +1140,7 @@ export default function AdminPage() {
                               <div className="text-sm text-green-600">완료</div>
                             </CardContent>
                           </Card>
-                          <Card className="bg-orange-50 border-orange-200">
+                          <Card className="bg-orange-50 border-orange-200 shadow-sm">
                             <CardContent className="p-4 text-center">
                               <div className="text-2xl font-bold text-orange-600">
                                 {participants.filter((p) => !p.is_completed).length}
@@ -1099,7 +1148,7 @@ export default function AdminPage() {
                               <div className="text-sm text-orange-600">미완료</div>
                             </CardContent>
                           </Card>
-                          <Card className="bg-purple-50 border-purple-200">
+                          <Card className="bg-purple-50 border-purple-200 shadow-sm">
                             <CardContent className="p-4 text-center">
                               <div className="text-2xl font-bold text-purple-600">
                                 {participants.length > 0
@@ -1116,13 +1165,13 @@ export default function AdminPage() {
                         </div>
 
                         {/* CSV 업로드 */}
-                        <Card>
-                          <CardHeader>
-                            <CardTitle className="text-lg">참여자 일괄 업로드</CardTitle>
+                        <Card className="shadow-sm border-gray-200">
+                          <CardHeader className="border-b border-gray-100 bg-gray-50">
+                            <CardTitle className="text-lg font-semibold text-gray-800">참여자 일괄 업로드</CardTitle>
                           </CardHeader>
                           <CardContent className="space-y-4">
                             <div className="bg-gray-50 p-4 rounded-lg">
-                              <h4 className="font-medium mb-2">CSV 파일 형식</h4>
+                              <h4 className="font-medium mb-2 text-gray-700">CSV 파일 형식</h4>
                               <p className="text-sm text-gray-600 mb-2">각 줄에 다음 형식으로 입력해주세요:</p>
                               <code className="text-sm bg-white p-2 rounded border block">
                                 병원이름|참여자이름|휴대폰번호
@@ -1131,8 +1180,17 @@ export default function AdminPage() {
                             </div>
 
                             <div className="flex items-center gap-4">
-                              <Input type="file" accept=".csv" onChange={handleFileSelect} className="flex-1" />
-                              <Button onClick={handleUpload} disabled={!csvFile || uploadLoading}>
+                              <Input
+                                type="file"
+                                accept=".csv"
+                                onChange={handleFileSelect}
+                                className="flex-1 h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                              />
+                              <Button
+                                onClick={handleUpload}
+                                disabled={!csvFile || uploadLoading}
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-medium h-12"
+                              >
                                 {uploadLoading ? "업로드 중..." : "업로드"}
                               </Button>
                             </div>
@@ -1147,12 +1205,12 @@ export default function AdminPage() {
                             placeholder="병원명으로 검색"
                             value={hospitalFilter}
                             onChange={(e) => setHospitalFilter(e.target.value)}
-                            className="flex-1"
+                            className="flex-1 h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                           />
                           <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-3 py-2 border rounded-md"
+                            className="px-3 py-2 border rounded-md border-gray-200"
                           >
                             <option value="all">전체</option>
                             <option value="completed">완료</option>
@@ -1161,28 +1219,32 @@ export default function AdminPage() {
                         </div>
 
                         {/* 대상자 목록 */}
-                        <Card>
-                          <CardHeader>
-                            <CardTitle>대상자 목록 ({filteredParticipants.length}명)</CardTitle>
+                        <Card className="shadow-sm border-gray-200">
+                          <CardHeader className="border-b border-gray-100 bg-gray-50">
+                            <CardTitle className="text-xl font-semibold text-gray-800">
+                              대상자 목록 ({filteredParticipants.length}명)
+                            </CardTitle>
                           </CardHeader>
-                          <CardContent>
+                          <CardContent className="p-6">
                             <Table>
                               <TableHeader>
                                 <TableRow>
-                                  <TableHead>이름</TableHead>
-                                  <TableHead>휴대폰번호</TableHead>
-                                  <TableHead>병원이름</TableHead>
-                                  <TableHead>상태</TableHead>
-                                  <TableHead>생성일</TableHead>
-                                  <TableHead>작업</TableHead>
+                                  <TableHead className="text-gray-600">이름</TableHead>
+                                  <TableHead className="text-gray-600">휴대폰번호</TableHead>
+                                  <TableHead className="text-gray-600">병원이름</TableHead>
+                                  <TableHead className="text-gray-600">상태</TableHead>
+                                  <TableHead className="text-gray-600">생성일</TableHead>
+                                  <TableHead className="text-gray-600">작업</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
                                 {filteredParticipants.map((participant) => (
                                   <TableRow key={participant.id}>
-                                    <TableCell className="font-medium">{participant.participant_name}</TableCell>
-                                    <TableCell>{participant.phone_number}</TableCell>
-                                    <TableCell>{participant.hospital_name}</TableCell>
+                                    <TableCell className="font-medium text-gray-700">
+                                      {participant.participant_name}
+                                    </TableCell>
+                                    <TableCell className="text-gray-600">{participant.phone_number}</TableCell>
+                                    <TableCell className="text-gray-600">{participant.hospital_name}</TableCell>
                                     <TableCell>
                                       <Badge
                                         variant={participant.is_completed ? "default" : "secondary"}
@@ -1195,12 +1257,15 @@ export default function AdminPage() {
                                         {participant.is_completed ? "완료" : "미완료"}
                                       </Badge>
                                     </TableCell>
-                                    <TableCell>{new Date(participant.created_at).toLocaleDateString()}</TableCell>
+                                    <TableCell className="text-gray-600">
+                                      {new Date(participant.created_at).toLocaleDateString()}
+                                    </TableCell>
                                     <TableCell>
                                       <Button
                                         onClick={() => copyToClipboard(participant.token)}
                                         variant="outline"
                                         size="sm"
+                                        className="border-gray-300 text-gray-600 hover:bg-gray-50"
                                       >
                                         링크 복사
                                       </Button>
@@ -1222,19 +1287,19 @@ export default function AdminPage() {
 
                         {/* 응답 분석 */}
                         {responses.length > 0 && (
-                          <Card>
-                            <CardHeader>
-                              <CardTitle>응답 분석</CardTitle>
+                          <Card className="shadow-sm border-gray-200">
+                            <CardHeader className="border-b border-gray-100 bg-gray-50">
+                              <CardTitle className="text-xl font-semibold text-gray-800">응답 분석</CardTitle>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="p-6">
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                <Card className="bg-blue-50 border-blue-200">
+                                <Card className="bg-blue-50 border-blue-200 shadow-sm">
                                   <CardContent className="p-4 text-center">
                                     <div className="text-xl font-bold text-blue-600">{responses.length}</div>
                                     <div className="text-sm text-blue-600">총 응답 수</div>
                                   </CardContent>
                                 </Card>
-                                <Card className="bg-green-50 border-green-200">
+                                <Card className="bg-green-50 border-green-200 shadow-sm">
                                   <CardContent className="p-4 text-center">
                                     <div className="text-xl font-bold text-green-600">
                                       {responses.length > 0
@@ -1247,7 +1312,7 @@ export default function AdminPage() {
                                     <div className="text-sm text-green-600">평균 점수</div>
                                   </CardContent>
                                 </Card>
-                                <Card className="bg-purple-50 border-purple-200">
+                                <Card className="bg-purple-50 border-purple-200 shadow-sm">
                                   <CardContent className="p-4 text-center">
                                     <div className="text-xl font-bold text-purple-600">
                                       {new Set(responses.map((r) => r.survey_participants?.hospital_name)).size}
@@ -1260,11 +1325,11 @@ export default function AdminPage() {
                               <Table>
                                 <TableHeader>
                                   <TableRow>
-                                    <TableHead>참여자명</TableHead>
-                                    <TableHead>병원이름</TableHead>
-                                    <TableHead>응답 수</TableHead>
-                                    <TableHead>평균 점수</TableHead>
-                                    <TableHead>응답일시</TableHead>
+                                    <TableHead className="text-gray-600">참여자명</TableHead>
+                                    <TableHead className="text-gray-600">병원이름</TableHead>
+                                    <TableHead className="text-gray-600">응답 수</TableHead>
+                                    <TableHead className="text-gray-600">평균 점수</TableHead>
+                                    <TableHead className="text-gray-600">응답일시</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -1287,16 +1352,18 @@ export default function AdminPage() {
                                     ),
                                   ).map(([key, data]) => (
                                     <TableRow key={key}>
-                                      <TableCell className="font-medium">{data.name}</TableCell>
-                                      <TableCell>{data.hospital}</TableCell>
-                                      <TableCell>{data.responses.length}</TableCell>
-                                      <TableCell>
+                                      <TableCell className="font-medium text-gray-700">{data.name}</TableCell>
+                                      <TableCell className="text-gray-600">{data.hospital}</TableCell>
+                                      <TableCell className="text-gray-600">{data.responses.length}</TableCell>
+                                      <TableCell className="text-gray-600">
                                         {(
                                           data.responses.reduce((sum: number, val: number) => sum + val, 0) /
                                           data.responses.length
                                         ).toFixed(1)}
                                       </TableCell>
-                                      <TableCell>{new Date(data.date).toLocaleString()}</TableCell>
+                                      <TableCell className="text-gray-600">
+                                        {new Date(data.date).toLocaleString()}
+                                      </TableCell>
                                     </TableRow>
                                   ))}
                                 </TableBody>
@@ -1312,25 +1379,32 @@ export default function AdminPage() {
 
               <TabsContent value="statistics" className="space-y-6">
                 {!selectedSurvey ? (
-                  <Card>
+                  <Card className="shadow-sm border-gray-200">
                     <CardContent className="text-center py-12">
                       <BarChart3 className="h-12 w-12 mx-auto text-gray-400 mb-4" />
                       <h3 className="text-lg font-semibold text-gray-600 mb-2">설문지를 선택해주세요</h3>
                       <p className="text-gray-500 mb-4">통계를 확인하려면 먼저 설문지를 선택해야 합니다.</p>
-                      <Button onClick={() => setActiveTab("manage")}>설문지 관리로 이동</Button>
+                      <Button
+                        onClick={() => setActiveTab("manage")}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-medium h-12"
+                      >
+                        설문지 관리로 이동
+                      </Button>
                     </CardContent>
                   </Card>
                 ) : (
                   <div className="space-y-6">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>통계 - {selectedSurvey.title}</CardTitle>
+                    <Card className="shadow-sm border-gray-200">
+                      <CardHeader className="border-b border-gray-100 bg-gray-50">
+                        <CardTitle className="text-xl font-semibold text-gray-800">
+                          통계 - {selectedSurvey.title}
+                        </CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-6">
+                      <CardContent className="space-y-6 p-6">
                         {/* 전체 병원 합계 */}
-                        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+                        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 shadow-sm">
                           <CardHeader>
-                            <CardTitle className="text-blue-800">전체 병원 합계</CardTitle>
+                            <CardTitle className="text-blue-800 font-semibold">전체 병원 합계</CardTitle>
                           </CardHeader>
                           <CardContent>
                             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -1378,39 +1452,49 @@ export default function AdminPage() {
                         </Card>
 
                         {/* 병원별 통계 */}
-                        <Card>
-                          <CardHeader>
+                        <Card className="shadow-sm border-gray-200">
+                          <CardHeader className="border-b border-gray-100 bg-gray-50">
                             <div className="flex items-center justify-between">
-                              <CardTitle>병원별 통계</CardTitle>
+                              <CardTitle className="text-xl font-semibold text-gray-800">병원별 통계</CardTitle>
                               <div className="flex items-center gap-2">
                                 <Search className="h-4 w-4 text-gray-400" />
                                 <Input
                                   placeholder="병원명 검색"
                                   value={hospitalSearchFilter}
                                   onChange={(e) => setHospitalSearchFilter(e.target.value)}
-                                  className="w-64"
+                                  className="w-64 h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                                 />
                                 {hospitalSearchFilter && (
-                                  <Button onClick={() => setHospitalSearchFilter("")} variant="outline" size="sm">
+                                  <Button
+                                    onClick={() => setHospitalSearchFilter("")}
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-gray-300 text-gray-600 hover:bg-gray-50"
+                                  >
                                     <X className="h-4 w-4" />
                                   </Button>
                                 )}
                               </div>
                             </div>
                           </CardHeader>
-                          <CardContent>
+                          <CardContent className="p-6">
                             {hospitalSearchFilter ? (
                               <div className="space-y-4">
                                 <p className="text-sm text-gray-600">검색 결과: {filteredHospitals.length}개 병원</p>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                   {filteredHospitals.map(([hospital, stats]) => (
-                                    <Card key={hospital} className="border-l-4 border-l-blue-500">
+                                    <Card
+                                      key={hospital}
+                                      className="border-l-4 border-l-blue-500 shadow-sm border-gray-200"
+                                    >
                                       <CardContent className="p-4">
-                                        <h4 className="font-semibold text-lg mb-3 truncate">{hospital}</h4>
+                                        <h4 className="font-semibold text-lg mb-3 truncate text-gray-800">
+                                          {hospital}
+                                        </h4>
                                         <div className="space-y-2">
                                           <div className="flex justify-between">
                                             <span className="text-sm text-gray-600">총 대상자:</span>
-                                            <span className="font-medium">{stats.total}명</span>
+                                            <span className="font-medium text-gray-700">{stats.total}명</span>
                                           </div>
                                           <div className="flex justify-between">
                                             <span className="text-sm text-gray-600">응답 완료:</span>
@@ -1418,7 +1502,7 @@ export default function AdminPage() {
                                           </div>
                                           <div className="flex justify-between">
                                             <span className="text-sm text-gray-600">완료율:</span>
-                                            <span className="font-medium">
+                                            <span className="font-medium text-gray-700">
                                               {stats.total > 0 ? ((stats.completed / stats.total) * 100).toFixed(1) : 0}
                                               %
                                             </span>
@@ -1447,9 +1531,9 @@ export default function AdminPage() {
                         </Card>
 
                         {/* 문항별 통계 */}
-                        <Card>
-                          <CardHeader>
-                            <CardTitle>
+                        <Card className="shadow-sm border-gray-200">
+                          <CardHeader className="border-b border-gray-100 bg-gray-50">
+                            <CardTitle className="text-xl font-semibold text-gray-800">
                               문항별 통계
                               {hospitalSearchFilter && (
                                 <span className="text-sm font-normal text-gray-600 ml-2">
@@ -1458,23 +1542,25 @@ export default function AdminPage() {
                               )}
                             </CardTitle>
                           </CardHeader>
-                          <CardContent>
+                          <CardContent className="p-6">
                             {questionStats.length > 0 ? (
                               <Table>
                                 <TableHeader>
                                   <TableRow>
-                                    <TableHead>문항</TableHead>
-                                    <TableHead className="text-center">응답 수</TableHead>
-                                    <TableHead className="text-center">평균 점수</TableHead>
+                                    <TableHead className="text-gray-600">문항</TableHead>
+                                    <TableHead className="text-center text-gray-600">응답 수</TableHead>
+                                    <TableHead className="text-center text-gray-600">평균 점수</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                   {questionStats.map((stat) => (
                                     <TableRow key={stat.questionId}>
-                                      <TableCell className="font-medium max-w-md">
+                                      <TableCell className="font-medium max-w-md text-gray-700">
                                         {stat.questionText || `문항 ${stat.questionId}`}
                                       </TableCell>
-                                      <TableCell className="text-center">{stat.responseCount}명</TableCell>
+                                      <TableCell className="text-center text-gray-600">
+                                        {stat.responseCount}명
+                                      </TableCell>
                                       <TableCell className="text-center">
                                         <span
                                           className={`font-semibold ${
@@ -1500,16 +1586,16 @@ export default function AdminPage() {
                         </Card>
 
                         {/* 데이터 내보내기 */}
-                        <Card>
-                          <CardHeader>
-                            <CardTitle>데이터 내보내기</CardTitle>
+                        <Card className="shadow-sm border-gray-200">
+                          <CardHeader className="border-b border-gray-100 bg-gray-50">
+                            <CardTitle className="text-xl font-semibold text-gray-800">데이터 내보내기</CardTitle>
                           </CardHeader>
-                          <CardContent>
+                          <CardContent className="p-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                               <Button
                                 onClick={downloadOverallStats}
                                 variant="outline"
-                                className="h-auto p-4 bg-transparent"
+                                className="h-auto p-4 bg-transparent border-gray-300 text-gray-600 hover:bg-gray-50"
                               >
                                 <div className="text-center">
                                   <Download className="h-6 w-6 mx-auto mb-2" />
@@ -1520,7 +1606,7 @@ export default function AdminPage() {
                               <Button
                                 onClick={downloadQuestionStats}
                                 variant="outline"
-                                className="h-auto p-4 bg-transparent"
+                                className="h-auto p-4 bg-transparent border-gray-300 text-gray-600 hover:bg-gray-50"
                               >
                                 <div className="text-center">
                                   <Download className="h-6 w-6 mx-auto mb-2" />
@@ -1531,7 +1617,7 @@ export default function AdminPage() {
                               <Button
                                 onClick={downloadHospitalStats}
                                 variant="outline"
-                                className="h-auto p-4 bg-transparent"
+                                className="h-auto p-4 bg-transparent border-gray-300 text-gray-600 hover:bg-gray-50"
                               >
                                 <div className="text-center">
                                   <Download className="h-6 w-6 mx-auto mb-2" />
@@ -1542,7 +1628,7 @@ export default function AdminPage() {
                               <Button
                                 onClick={downloadHospitalDetailedStats}
                                 variant="outline"
-                                className="h-auto p-4 bg-transparent"
+                                className="h-auto p-4 bg-transparent border-gray-300 text-gray-600 hover:bg-gray-50"
                               >
                                 <div className="text-center">
                                   <Download className="h-6 w-6 mx-auto mb-2" />
@@ -1559,19 +1645,6 @@ export default function AdminPage() {
                 )}
               </TabsContent>
             </Tabs>
-
-            {/* 전역 성공/에러 메시지 */}
-            {error && (
-              <Alert variant="destructive" className="fixed bottom-4 right-4 w-auto max-w-md z-50">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            {uploadSuccess && (
-              <Alert className="fixed bottom-4 right-4 w-auto max-w-md z-50 border-green-200 bg-green-50">
-                <AlertDescription className="text-green-800">{uploadSuccess}</AlertDescription>
-              </Alert>
-            )}
           </div>
         )}
       </div>
