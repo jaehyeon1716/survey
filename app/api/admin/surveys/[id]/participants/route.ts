@@ -2,6 +2,33 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { randomBytes } from "crypto"
 
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseKey) {
+    return NextResponse.json({ error: "Supabase 환경 변수가 설정되지 않았습니다." }, { status: 500 })
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseKey)
+  const surveyId = params.id
+
+  try {
+    const { data: participants, error } = await supabase
+      .from("survey_participants")
+      .select("*")
+      .eq("survey_id", Number.parseInt(surveyId))
+      .order("created_at", { ascending: false })
+
+    if (error) throw error
+
+    return NextResponse.json({ participants: participants || [] })
+  } catch (error) {
+    console.error("참여자 조회 오류:", error)
+    return NextResponse.json({ error: "참여자 데이터를 불러오는데 실패했습니다." }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
