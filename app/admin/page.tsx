@@ -1,7 +1,5 @@
 "use client"
 
-import { CardDescription } from "@/components/ui/card"
-
 import type React from "react"
 
 import { useState, useEffect, useCallback } from "react"
@@ -13,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Trash2, FileText, Users, BarChart3, Filter, Download } from "lucide-react"
+import { Plus, Trash2, FileText, Users, BarChart3, Filter, Download, Edit } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
@@ -37,6 +35,7 @@ interface Survey {
     id: number
     question_text: string
     question_number: number
+    answer_options?: AnswerOption[]
   }>
 }
 
@@ -82,20 +81,16 @@ const ADMIN_PASSWORD = "hospital2024"
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState("")
-  const [surveys, setSurveys] = useState<any[]>([])
-  const [participants, setParticipants] = useState<any[]>([])
+  const [surveys, setSurveys] = useState<Survey[]>([])
+  const [participants, setParticipants] = useState<Participant[]>([])
   const [responses, setResponses] = useState<SurveyResponse[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [uploadSuccess, setUploadSuccess] = useState("")
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [selectedResponse, setSelectedResponse] = useState<SurveyResponse | null>(null)
-  const [showDetailModal, setShowDetailModal] = useState(false)
-  const [activeTab, setActiveTab] = useState("create")
-
+  const [questionStats, setQuestionStats] = useState<QuestionStat[]>([])
+  const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null)
   const [newSurveyTitle, setNewSurveyTitle] = useState("")
   const [newSurveyDescription, setNewSurveyDescription] = useState("")
-  const [newSurveyQuestions, setNewSurveyQuestions] = useState<QuestionData[]>([
+  const [newSurveyQuestions, setNewSurveyQuestions] = useState<
+    { question: string; answers: { text: string; score: number }[] }[]
+  >([
     {
       question: "",
       answers: [
@@ -107,25 +102,39 @@ export default function AdminPage() {
       ],
     },
   ])
+
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [editingSurvey, setEditingSurvey] = useState<Survey | null>(null)
+  const [editSurveyTitle, setEditSurveyTitle] = useState("")
+  const [editSurveyDescription, setEditSurveyDescription] = useState("")
+  const [editSurveyQuestions, setEditSurveyQuestions] = useState<
+    { question: string; answers: { text: string; score: number }[] }[]
+  >([])
+
+  const [activeTab, setActiveTab] = useState("create")
+  const [csvFile, setCsvFile] = useState<File | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [surveyToDelete, setSurveyToDelete] = useState<Survey | null>(null)
+  const [deletePassword, setDeletePassword] = useState("")
+  const [hospitalSearchFilter, setHospitalSearchFilter] = useState("")
+  const [participantFilter, setParticipantFilter] = useState("all")
+
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [uploadSuccess, setUploadSuccess] = useState("")
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [selectedResponse, setSelectedResponse] = useState<SurveyResponse | null>(null)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+
   const [createLoading, setCreateLoading] = useState(false)
 
-  const [questionStats, setQuestionStats] = useState<QuestionStat[]>([])
   const [hospitalFilter, setHospitalFilter] = useState<string>("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [filteredParticipants, setFilteredParticipants] = useState<Participant[]>([])
-  const [hospitalSearchFilter, setHospitalSearchFilter] = useState<string>("")
 
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [editingSurvey, setEditingSurvey] = useState<Survey | null>(null)
-  const [editTitle, setEditTitle] = useState("")
-  const [editDescription, setEditDescription] = useState("")
-  const [editQuestions, setEditQuestions] = useState<string[]>([])
   const [editLoading, setEditLoading] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [surveyToDelete, setSurveyToDelete] = useState<Survey | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
-  const [deletePassword, setDeletePassword] = useState("")
-  const [selectedSurvey, setSelectedSurvey] = useState<any>(null)
   const [showTokens, setShowTokens] = useState(false)
 
   const downloadParticipantsExcel = () => {
@@ -711,110 +720,156 @@ export default function AdminPage() {
 
   const handleEditSurvey = (survey: Survey) => {
     setEditingSurvey(survey)
-    setEditTitle(survey.title)
-    setEditDescription(survey.description || "")
-    setEditQuestions(survey.survey_questions?.map((q) => q.question_text) || [""])
-    setShowEditModal(true)
+    setEditSurveyTitle(survey.title)
+    setEditSurveyDescription(survey.description || "")
+
+    // 기존 문항들을 수정용 상태로 복사
+    if (survey.survey_questions && survey.survey_questions.length > 0) {
+      const questions = survey.survey_questions.map((q) => ({
+        question: q.question_text,
+        answers: Array.isArray(q.answer_options)
+          ? q.answer_options
+          : [
+              { text: "매우 그렇다", score: 5 },
+              { text: "그렇다", score: 4 },
+              { text: "보통이다", score: 3 },
+              { text: "그렇지 않다", score: 2 },
+              { text: "전혀 그렇지 않다", score: 1 },
+            ],
+      }))
+      setEditSurveyQuestions(questions)
+    } else {
+      setEditSurveyQuestions([
+        {
+          question: "",
+          answers: [
+            { text: "매우 그렇다", score: 5 },
+            { text: "그렇다", score: 4 },
+            { text: "보통이다", score: 3 },
+            { text: "그렇지 않다", score: 2 },
+            { text: "전혀 그렇지 않다", score: 1 },
+          ],
+        },
+      ])
+    }
+
+    setIsEditMode(true)
+    setActiveTab("create") // 생성 탭으로 이동하여 수정 UI 표시
   }
 
-  const handleSaveEdit = async () => {
-    if (!editTitle.trim()) {
-      setError("설문지 제목을 입력해주세요.")
+  const cancelEditSurvey = () => {
+    setIsEditMode(false)
+    setEditingSurvey(null)
+    setEditSurveyTitle("")
+    setEditSurveyDescription("")
+    setEditSurveyQuestions([])
+    setActiveTab("manage") // 관리 탭으로 돌아가기
+  }
+
+  const updateSurvey = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!editingSurvey || !editSurveyTitle.trim() || editSurveyQuestions.length === 0) {
+      alert("제목과 최소 1개의 문항이 필요합니다.")
       return
     }
 
-    const validQuestions = editQuestions.filter((q) => q.trim() !== "")
-    if (validQuestions.length === 0) {
-      setError("최소 1개의 문항을 입력해주세요.")
+    const hasEmptyQuestions = editSurveyQuestions.some((q) => !q.question.trim())
+    if (hasEmptyQuestions) {
+      alert("모든 문항에 질문 내용을 입력해주세요.")
       return
     }
-
-    setEditLoading(true)
-    setError("")
 
     try {
-      const response = await fetch(`/api/admin/surveys/${editingSurvey?.id}`, {
+      const response = await fetch("/api/admin/surveys", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          title: editTitle.trim(),
-          description: editDescription.trim(),
-          questions: validQuestions,
+          id: editingSurvey.id,
+          title: editSurveyTitle.trim(),
+          description: editSurveyDescription.trim(),
+          questions: editSurveyQuestions,
         }),
       })
 
-      const data = await response.json()
-
       if (response.ok) {
-        setUploadSuccess("설문지가 성공적으로 수정되었습니다.")
-        setShowEditModal(false)
-        setEditingSurvey(null)
-        fetchSurveys()
-        if (selectedSurvey?.id === editingSurvey?.id) {
-          setSelectedSurvey(null)
-        }
+        alert("설문지가 성공적으로 수정되었습니다!")
+        await fetchSurveys()
+        cancelEditSurvey()
       } else {
-        setError(data.error || "설문지 수정 중 오류가 발생했습니다.")
+        const errorData = await response.json()
+        alert(`설문지 수정 실패: ${errorData.error}`)
       }
-    } catch (err) {
-      setError("설문지 수정 중 오류가 발생했습니다.")
-    } finally {
-      setEditLoading(false)
-    }
-  }
-
-  const handleDeleteConfirm = (survey: Survey) => {
-    setSurveyToDelete(survey)
-    setShowDeleteConfirm(true)
-  }
-
-  const handleDeleteSurvey = async () => {
-    if (!surveyToDelete) return
-
-    try {
-      const response = await fetch(`/api/admin/surveys?id=${surveyToDelete.id}`, {
-        method: "DELETE",
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        setSurveys(surveys.filter((s) => s.id !== surveyToDelete.id))
-        if (selectedSurvey?.id === surveyToDelete.id) {
-          setSelectedSurvey(null)
-        }
-        setShowDeleteConfirm(false)
-        setSurveyToDelete(null)
-      } else {
-        setError(data.error || "설문지 삭제 중 오류가 발생했습니다.")
-      }
-    } catch (err) {
-      setError("설문지 삭제에 실패했습니다.")
+    } catch (error) {
+      console.error("설문지 수정 오류:", error)
+      alert("설문지 수정 중 오류가 발생했습니다.")
     }
   }
 
   const addEditQuestion = () => {
-    setEditQuestions([...editQuestions, ""])
+    setEditSurveyQuestions([
+      ...editSurveyQuestions,
+      {
+        question: "",
+        answers: [
+          { text: "매우 그렇다", score: 5 },
+          { text: "그렇다", score: 4 },
+          { text: "보통이다", score: 3 },
+          { text: "그렇지 않다", score: 2 },
+          { text: "전혀 그렇지 않다", score: 1 },
+        ],
+      },
+    ])
   }
 
   const removeEditQuestion = (index: number) => {
-    if (editQuestions.length > 1) {
-      setEditQuestions(editQuestions.filter((_, i) => i !== index))
+    if (editSurveyQuestions.length > 1) {
+      const updated = editSurveyQuestions.filter((_, i) => i !== index)
+      setEditSurveyQuestions(updated)
     }
   }
 
   const updateEditQuestion = (index: number, value: string) => {
-    const updated = [...editQuestions]
-    updated[index] = value
-    setEditQuestions(updated)
+    const updated = [...editSurveyQuestions]
+    updated[index].question = value
+    setEditSurveyQuestions(updated)
+  }
+
+  const addEditAnswer = (questionIndex: number) => {
+    const updated = [...editSurveyQuestions]
+    updated[questionIndex].answers.push({ text: "", score: 1 })
+    setEditSurveyQuestions(updated)
+  }
+
+  const removeEditAnswer = (questionIndex: number, answerIndex: number) => {
+    const updated = [...editSurveyQuestions]
+    if (updated[questionIndex].answers.length > 1) {
+      updated[questionIndex].answers.splice(answerIndex, 1)
+      setEditSurveyQuestions(updated)
+    }
+  }
+
+  const updateEditAnswer = (
+    questionIndex: number,
+    answerIndex: number,
+    field: "text" | "score",
+    value: string | number,
+  ) => {
+    const updated = [...editSurveyQuestions]
+    if (field === "text") {
+      updated[questionIndex].answers[answerIndex].text = value as string
+    } else {
+      updated[questionIndex].answers[answerIndex].score = Number(value)
+    }
+    setEditSurveyQuestions(updated)
   }
 
   const filterParticipants = useCallback(() => {
-    let filtered = participants
+    let filtered = [...participants]
 
-    if (hospitalFilter.trim()) {
+    if (hospitalFilter) {
       filtered = filtered.filter((p) => p.hospital_name.toLowerCase().includes(hospitalFilter.toLowerCase()))
     }
 
@@ -826,160 +881,133 @@ export default function AdminPage() {
     setFilteredParticipants(filtered)
   }, [participants, hospitalFilter, statusFilter])
 
-  const downloadStatsExcel = async () => {
-    if (!selectedSurvey || responses.length === 0) {
-      alert("다운로드할 통계 데이터가 없습니다.")
+  const startEditSurvey = (survey: Survey) => {
+    setEditingSurvey(survey)
+    setEditSurveyTitle(survey.title)
+    setEditSurveyDescription(survey.description || "")
+
+    if (survey.survey_questions && survey.survey_questions.length > 0) {
+      const questions = survey.survey_questions.map((q) => ({
+        question: q.question_text,
+        answers: Array.isArray(q.answer_options)
+          ? q.answer_options
+          : [
+              { text: "매우 그렇다", score: 5 },
+              { text: "그렇다", score: 4 },
+              { text: "보통이다", score: 3 },
+              { text: "그렇지 않다", score: 2 },
+              { text: "전혀 그렇지 않다", score: 1 },
+            ],
+      }))
+      setEditSurveyQuestions(questions)
+    } else {
+      setEditSurveyQuestions([
+        {
+          question: "",
+          answers: [
+            { text: "매우 그렇다", score: 5 },
+            { text: "그렇다", score: 4 },
+            { text: "보통이다", score: 3 },
+            { text: "그렇지 않다", score: 2 },
+            { text: "전혀 그렇지 않다", score: 1 },
+          ],
+        },
+      ])
+    }
+
+    setIsEditMode(true)
+    setActiveTab("create")
+  }
+
+  const handleDeleteConfirm = (survey: Survey) => {
+    setShowDeleteConfirm(true)
+    setSurveyToDelete(survey)
+  }
+
+  const handleDeleteSurvey = async () => {
+    if (!surveyToDelete) return
+    if (deletePassword !== ADMIN_PASSWORD) {
+      alert("비밀번호가 올바르지 않습니다.")
       return
     }
 
-    const hospitalQuestionStats: Record<string, Record<number, any>> = {}
-
+    setDeleteLoading(true)
     try {
-      const supabase = createClient()
-      const { data: detailedResponses, error } = await supabase
-        .from("survey_responses")
-        .select(`
-          question_id,
-          answer_value,
-          survey_questions (
-            question_text,
-            question_order
-          ),
-          survey_participants!inner (
-            hospital_name
-          )
-        `)
-        .in(
-          "question_id",
-          questionStats.map((q) => q.id),
-        )
+      const response = await fetch("/api/admin/surveys", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: surveyToDelete.id }),
+      })
 
-      if (!error && detailedResponses) {
-        detailedResponses.forEach((response: any) => {
-          const hospital = response.survey_participants?.hospital_name || "알 수 없음"
-          const questionId = response.question_id
-          const questionNumber = response.survey_questions?.question_order || 0
-          const questionText = response.survey_questions?.question_text || ""
-
-          if (!hospitalQuestionStats[hospital]) {
-            hospitalQuestionStats[hospital] = {}
-          }
-
-          if (!hospitalQuestionStats[hospital][questionId]) {
-            hospitalQuestionStats[hospital][questionId] = {
-              questionNumber,
-              questionText,
-              responses: [],
-              total: 0,
-              count: 0,
-            }
-          }
-
-          hospitalQuestionStats[hospital][questionId].responses.push(response.answer_value)
-          hospitalQuestionStats[hospital][questionId].total += response.answer_value
-          hospitalQuestionStats[hospital][questionId].count += 1
-        })
+      if (response.ok) {
+        alert("설문지가 성공적으로 삭제되었습니다.")
+        fetchSurveys()
+      } else {
+        const errorData = await response.json()
+        alert(`설문지 삭제 실패: ${errorData.error}`)
       }
-    } catch (err) {
-      console.error("병원별 문항별 통계 조회 오류:", err)
+    } catch (error) {
+      console.error("설문지 삭제 오류:", error)
+      alert("설문지 삭제 중 오류가 발생했습니다.")
+    } finally {
+      setDeleteLoading(false)
+      setShowDeleteConfirm(false)
+      setSurveyToDelete(null)
+      setDeletePassword("")
+    }
+  }
+
+  const downloadStatsExcel = () => {
+    if (!selectedSurvey) {
+      alert("설문지를 선택해주세요.")
+      return
     }
 
-    const completedParticipants = participants.filter((p) => p.is_completed).length
+    const surveyParticipants = participants.filter((p) => p.survey_id === selectedSurvey.id)
 
-    const totalScore = responses.reduce((sum, r) => sum + (r.answer_value || 0), 0)
-    const averageScore = responses.length > 0 ? totalScore / responses.length : 0
+    if (surveyParticipants.length === 0) {
+      alert("다운로드할 참여자 데이터가 없습니다.")
+      return
+    }
 
-    const basicStats = [
-      ["통계 항목", "값"],
-      ["설문지 제목", selectedSurvey.title],
-      ["총 참여자 수", participants.length.toString()],
-      ["완료된 설문 수", completedParticipants.toString()],
-      ["완료율", `${participants.length > 0 ? Math.round((completedParticipants / participants.length) * 100) : 0}%`],
-      ["전체 평균 점수", responses.length > 0 ? `${averageScore.toFixed(1)}/5` : "0"],
-      [""],
-    ]
+    const headers = ["병원명", "총 대상자", "응답 완료", "완료율", "평균 점수"]
 
-    const questionStatsData = [
-      ["문항별 통계"],
-      ["문항 번호", "문항 내용", "응답 수", "평균 점수"],
-      ...questionStats.map((stat) => [
-        stat.questionNumber.toString(),
-        stat.questionText,
-        stat.totalResponses.toString(),
-        `${stat.averageScore}/${stat.maxScore}`,
-      ]),
-      [""],
-    ]
-
-    const hospitalStats = responses.reduce((acc: Record<string, any>, response) => {
-      const hospital = response.survey_participants?.hospital_name || "알 수 없음"
+    const hospitalStats = participants.reduce((acc: Record<string, any>, participant) => {
+      const hospital = participant.hospital_name
       if (!acc[hospital]) {
-        acc[hospital] = { count: 0, totalScore: 0, maxScore: 5 }
+        acc[hospital] = {
+          total: 0,
+          completed: 0,
+          totalScore: 0,
+        }
       }
-      acc[hospital].count += 1
-      acc[hospital].totalScore += response.answer_value || 0 // answer_value 사용
+      acc[hospital].total += 1
+      if (participant.is_completed) {
+        acc[hospital].completed += 1
+
+        const participantResponses = responses.filter((r) => r.survey_participants?.token === participant.token)
+        const participantTotalScore = participantResponses.reduce((sum, r) => sum + (r.answer_value || 0), 0)
+        acc[hospital].totalScore += participantTotalScore
+      }
       return acc
     }, {})
 
-    const hospitalStatsData = [
-      ["병원별 통계"],
-      ["병원명", "응답 수", "평균 점수"],
-      ...Object.entries(hospitalStats).map(([hospital, stats]: [string, any]) => [
-        hospital,
-        stats.count.toString(),
-        `${stats.count > 0 ? (stats.totalScore / stats.count).toFixed(1) : "0"}/${stats.maxScore}`,
-      ]),
-      [""],
-    ]
+    const csvData = Object.entries(hospitalStats).map(([hospital, stats]: [string, any]) => {
+      const completionRate = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0
+      const averageScore = stats.completed > 0 ? (stats.totalScore / stats.completed).toFixed(1) : "-"
 
-    const hospitalQuestionStatsData = [
-      ["병원별 문항별 상세 통계"],
-      ["병원명", "문항 번호", "문항 내용", "응답 수", "평균 점수"],
-    ]
+      return [hospital, stats.total, stats.completed, `${completionRate}%`, averageScore]
+    })
 
-    Object.keys(hospitalQuestionStats)
-      .sort()
-      .forEach((hospital) => {
-        const hospitalData = hospitalQuestionStats[hospital]
-
-        const sortedQuestions = Object.values(hospitalData).sort(
-          (a: any, b: any) => a.questionNumber - b.questionNumber,
-        )
-
-        sortedQuestions.forEach((questionData: any) => {
-          const average = questionData.count > 0 ? (questionData.total / questionData.count).toFixed(1) : "0"
-          hospitalQuestionStatsData.push([
-            hospital,
-            questionData.questionNumber.toString(),
-            questionData.questionText,
-            questionData.count.toString(),
-            `${average}/5`,
-          ])
-        })
-
-        const hospitalTotalStats = hospitalStats[hospital]
-        if (hospitalTotalStats) {
-          hospitalQuestionStatsData.push([
-            hospital,
-            "전체",
-            "모든 문항 평균",
-            hospitalTotalStats.count.toString(),
-            `${hospitalTotalStats.count > 0 ? (hospitalTotalStats.totalScore / hospitalTotalStats.count).toFixed(1) : "0"}/${hospitalTotalStats.maxScore}`,
-          ])
-        }
-
-        hospitalQuestionStatsData.push(["", "", "", "", ""])
-      })
-
-    const allData = [...basicStats, ...questionStatsData, ...hospitalStatsData, ...hospitalQuestionStatsData]
-
-    const csvContent = allData.map((row) => row.map((field) => `"${field}"`).join(",")).join("\n")
+    const csvContent = [headers, ...csvData].map((row) => row.map((field) => `"${field}"`).join(",")).join("\n")
 
     const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" })
     const link = document.createElement("a")
     const url = URL.createObjectURL(blob)
     link.setAttribute("href", url)
-    link.setAttribute("download", `${selectedSurvey.title}_통계_${new Date().toISOString().split("T")[0]}.csv`)
+    link.setAttribute("download", `설문통계_${selectedSurvey.title}_${new Date().toISOString().split("T")[0]}.csv`)
     link.style.visibility = "hidden"
     document.body.appendChild(link)
     link.click()
@@ -1091,14 +1119,19 @@ export default function AdminPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-xl font-semibold flex items-center justify-between">
-                  새 설문지 생성
+                  {isEditMode ? "설문지 수정" : "새 설문지 생성"}
                   <span className="text-sm font-normal bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
-                    문항 {newSurveyQuestions.length}개
+                    문항 {isEditMode ? editSurveyQuestions.length : newSurveyQuestions.length}개
                   </span>
                 </CardTitle>
+                {isEditMode && (
+                  <Button type="button" onClick={cancelEditSurvey} variant="outline" className="mt-2 bg-transparent">
+                    수정 취소
+                  </Button>
+                )}
               </CardHeader>
               <CardContent>
-                <form onSubmit={createSurvey} className="space-y-6">
+                <form onSubmit={isEditMode ? updateSurvey : createSurvey} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <Label htmlFor="title" className="text-lg font-medium">
@@ -1106,8 +1139,10 @@ export default function AdminPage() {
                       </Label>
                       <Input
                         id="title"
-                        value={newSurveyTitle}
-                        onChange={(e) => setNewSurveyTitle(e.target.value)}
+                        value={isEditMode ? editSurveyTitle : newSurveyTitle}
+                        onChange={(e) =>
+                          isEditMode ? setEditSurveyTitle(e.target.value) : setNewSurveyTitle(e.target.value)
+                        }
                         placeholder="예: 2024년 병원 만족도 조사"
                         className="mt-2 h-12 text-lg"
                         required
@@ -1119,8 +1154,12 @@ export default function AdminPage() {
                       </Label>
                       <Textarea
                         id="description"
-                        value={newSurveyDescription}
-                        onChange={(e) => setNewSurveyDescription(e.target.value)}
+                        value={isEditMode ? editSurveyDescription : newSurveyDescription}
+                        onChange={(e) =>
+                          isEditMode
+                            ? setEditSurveyDescription(e.target.value)
+                            : setNewSurveyDescription(e.target.value)
+                        }
                         placeholder="설문지에 대한 간단한 설명을 입력하세요"
                         className="mt-2 min-h-[48px] text-lg"
                         rows={2}
@@ -1131,21 +1170,28 @@ export default function AdminPage() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <Label className="text-lg font-semibold">설문 문항 및 답변 옵션</Label>
-                      <Button type="button" onClick={addQuestion} size="sm" className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        onClick={isEditMode ? addEditQuestion : addQuestion}
+                        size="sm"
+                        className="flex items-center gap-2"
+                      >
                         <Plus className="w-4 h-4" />
                         문항 추가
                       </Button>
                     </div>
 
-                    {newSurveyQuestions.map((questionData, questionIndex) => (
+                    {(isEditMode ? editSurveyQuestions : newSurveyQuestions).map((questionData, questionIndex) => (
                       <Card key={questionIndex} className="p-4 border-l-4 border-blue-500">
                         <div className="space-y-4">
                           <div className="flex items-center justify-between">
                             <Label className="font-medium">문항 {questionIndex + 1}</Label>
-                            {newSurveyQuestions.length > 1 && (
+                            {(isEditMode ? editSurveyQuestions.length : newSurveyQuestions.length) > 1 && (
                               <Button
                                 type="button"
-                                onClick={() => removeQuestion(questionIndex)}
+                                onClick={() =>
+                                  isEditMode ? removeEditQuestion(questionIndex) : removeQuestion(questionIndex)
+                                }
                                 size="sm"
                                 variant="destructive"
                                 className="flex items-center gap-1"
@@ -1161,7 +1207,11 @@ export default function AdminPage() {
                             <Textarea
                               id={`question-${questionIndex}`}
                               value={questionData.question}
-                              onChange={(e) => updateQuestion(questionIndex, e.target.value)}
+                              onChange={(e) =>
+                                isEditMode
+                                  ? updateEditQuestion(questionIndex, e.target.value)
+                                  : updateQuestion(questionIndex, e.target.value)
+                              }
                               placeholder="예: 의료진의 친절도에 만족하십니까?"
                               rows={2}
                             />
@@ -1172,7 +1222,7 @@ export default function AdminPage() {
                               <Label className="font-medium">답변 옵션</Label>
                               <Button
                                 type="button"
-                                onClick={() => addAnswer(questionIndex)}
+                                onClick={() => (isEditMode ? addEditAnswer(questionIndex) : addAnswer(questionIndex))}
                                 size="sm"
                                 variant="outline"
                                 className="flex items-center gap-1"
@@ -1187,7 +1237,11 @@ export default function AdminPage() {
                                 <span className="text-sm font-medium w-8">{answerIndex + 1}.</span>
                                 <Input
                                   value={answer.text}
-                                  onChange={(e) => updateAnswer(questionIndex, answerIndex, "text", e.target.value)}
+                                  onChange={(e) =>
+                                    isEditMode
+                                      ? updateEditAnswer(questionIndex, answerIndex, "text", e.target.value)
+                                      : updateAnswer(questionIndex, answerIndex, "text", e.target.value)
+                                  }
                                   placeholder={`답변 옵션 ${answerIndex + 1}`}
                                   className="flex-1"
                                 />
@@ -1196,7 +1250,11 @@ export default function AdminPage() {
                                   <Input
                                     type="number"
                                     value={answer.score}
-                                    onChange={(e) => updateAnswer(questionIndex, answerIndex, "score", e.target.value)}
+                                    onChange={(e) =>
+                                      isEditMode
+                                        ? updateEditAnswer(questionIndex, answerIndex, "score", e.target.value)
+                                        : updateAnswer(questionIndex, answerIndex, "score", e.target.value)
+                                    }
                                     className="w-16"
                                     min="1"
                                     max="10"
@@ -1205,7 +1263,11 @@ export default function AdminPage() {
                                 {questionData.answers.length > 1 && (
                                   <Button
                                     type="button"
-                                    onClick={() => removeAnswer(questionIndex, answerIndex)}
+                                    onClick={() =>
+                                      isEditMode
+                                        ? removeEditAnswer(questionIndex, answerIndex)
+                                        : removeAnswer(questionIndex, answerIndex)
+                                    }
                                     size="sm"
                                     variant="ghost"
                                     className="p-1 h-8 w-8"
@@ -1221,157 +1283,167 @@ export default function AdminPage() {
                     ))}
                   </div>
 
-                  <Button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full h-12 text-lg font-semibold bg-blue-600 hover:bg-blue-700"
-                  >
-                    {loading ? "생성 중..." : "설문지 생성"}
-                  </Button>
+                  <div className="flex justify-end">
+                    <Button type="submit" size="lg" className="px-8">
+                      {isEditMode ? "설문지 수정" : "설문지 생성"}
+                    </Button>
+                  </div>
                 </form>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="manage">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-xl font-semibold">설문지 관리</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {surveys.length === 0 ? (
-                    <Alert>
-                      <AlertDescription>생성된 설문지가 없습니다.</AlertDescription>
-                    </Alert>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {surveys.map((survey) => (
-                        <Card
-                          key={survey.id}
-                          className={`p-4 cursor-pointer transition-all duration-200 hover:shadow-lg ${
-                            selectedSurvey?.id === survey.id
-                              ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200"
-                              : "hover:border-gray-300"
-                          }`}
-                          onClick={() => setSelectedSurvey(survey)}
-                        >
-                          <CardHeader>
-                            <CardTitle className="text-lg font-semibold">{survey.title}</CardTitle>
-                            <CardDescription>{survey.description}</CardDescription>
-                          </CardHeader>
-                          <CardContent className="flex flex-col gap-2">
-                            <Badge variant="secondary">참여자 수: {survey.participantCount || 0}</Badge>
-                            <Badge variant="outline">상태: {survey.is_active ? "활성" : "비활성"}</Badge>
-                            <div className="flex justify-end gap-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold">설문지 관리</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {surveys.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-gray-500 text-lg">등록된 설문지가 없습니다.</p>
+                    <p className="text-gray-400 mt-2">새 설문지를 생성해보세요.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {surveys.map((survey) => (
+                      <Card
+                        key={survey.id}
+                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+                          selectedSurvey?.id === survey.id ? "ring-2 ring-blue-500 bg-blue-50" : "hover:bg-gray-50"
+                        }`}
+                        onClick={() => setSelectedSurvey(survey)}
+                      >
+                        <CardContent className="p-6">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <h3 className="text-lg font-semibold text-gray-800 mb-2">{survey.title}</h3>
+                              <p className="text-gray-600 mb-3">{survey.description || "설명 없음"}</p>
+                              <div className="flex items-center gap-4 text-sm text-gray-500">
+                                <span>문항: {survey.survey_questions?.length || 0}개</span>
+                                <span>
+                                  참여자: {(() => {
+                                    const surveyParticipants = participants.filter((p) => p.survey_id === survey.id)
+                                    return surveyParticipants.length
+                                  })()}명
+                                </span>
+                                <span>생성일: {new Date(survey.created_at).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 ml-4">
                               <Button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  startEditSurvey(survey)
+                                }}
                                 size="sm"
-                                variant="destructive"
+                                variant="outline"
+                                className="flex items-center gap-1"
+                              >
+                                <Edit className="w-3 h-3" />
+                                수정
+                              </Button>
+                              <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleDeleteConfirm(survey)
                                 }}
+                                size="sm"
+                                variant="destructive"
+                                className="flex items-center gap-1"
                               >
-                                <Trash2 className="w-4 h-4 mr-2" />
+                                <Trash2 className="w-3 h-3" />
                                 삭제
                               </Button>
                             </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {selectedSurvey && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-xl font-semibold">선택된 설문지: {selectedSurvey.title}</CardTitle>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedSurvey(null)
+                        setActiveTab("manage")
+                      }}
+                    >
+                      다른 설문지 선택
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label className="font-medium">설명:</Label>
+                    <p className="text-gray-600 mt-1">{selectedSurvey.description || "설명이 없습니다."}</p>
+                  </div>
+
+                  <div>
+                    <Label className="font-medium">생성일:</Label>
+                    <p className="text-gray-600 mt-1">{new Date(selectedSurvey.created_at).toLocaleString("ko-KR")}</p>
+                  </div>
+
+                  <div>
+                    <Label className="font-medium">참여자 현황:</Label>
+                    <div className="mt-2 grid grid-cols-2 gap-4">
+                      <div className="bg-blue-50 p-3 rounded-lg">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {participants.filter((p) => p.survey_id === selectedSurvey.id).length}
+                        </div>
+                        <div className="text-sm text-blue-600">총 참여자</div>
+                      </div>
+                      <div className="bg-green-50 p-3 rounded-lg">
+                        <div className="text-2xl font-bold text-green-600">
+                          {participants.filter((p) => p.survey_id === selectedSurvey.id && p.is_completed).length}
+                        </div>
+                        <div className="text-sm text-green-600">완료된 응답</div>
+                      </div>
                     </div>
-                  )}
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <Label className="font-medium text-lg">참여자 CSV 업로드</Label>
+                    <div className="mt-3 space-y-3">
+                      <div className="bg-yellow-50 p-3 rounded-lg">
+                        <p className="text-sm text-yellow-800">
+                          <strong>CSV 파일 형식:</strong> 병원이름|사람이름|휴대폰번호
+                        </p>
+                        <p className="text-sm text-yellow-800 mt-1">예시: 서울대병원|홍길동|010-1234-5678</p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <Input id="csvFile" type="file" accept=".csv" onChange={handleFileSelect} className="flex-1" />
+                        <Button
+                          onClick={handleUpload}
+                          disabled={!selectedFile || loading}
+                          className="whitespace-nowrap"
+                        >
+                          {loading ? "업로드 중..." : "업로드"}
+                        </Button>
+                      </div>
+
+                      {selectedFile && <p className="text-sm text-gray-600">선택된 파일: {selectedFile.name}</p>}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button onClick={() => downloadParticipantsExcel()} className="flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      참여자 목록 다운로드
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
-
-              {selectedSurvey && (
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-xl font-semibold">선택된 설문지: {selectedSurvey.title}</CardTitle>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedSurvey(null)
-                          setActiveTab("manage")
-                        }}
-                      >
-                        다른 설문지 선택
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <Label className="font-medium">설명:</Label>
-                      <p className="text-gray-600 mt-1">{selectedSurvey.description || "설명이 없습니다."}</p>
-                    </div>
-
-                    <div>
-                      <Label className="font-medium">생성일:</Label>
-                      <p className="text-gray-600 mt-1">
-                        {new Date(selectedSurvey.created_at).toLocaleString("ko-KR")}
-                      </p>
-                    </div>
-
-                    <div>
-                      <Label className="font-medium">참여자 현황:</Label>
-                      <div className="mt-2 grid grid-cols-2 gap-4">
-                        <div className="bg-blue-50 p-3 rounded-lg">
-                          <div className="text-2xl font-bold text-blue-600">
-                            {participants.filter((p) => p.survey_id === selectedSurvey.id).length}
-                          </div>
-                          <div className="text-sm text-blue-600">총 참여자</div>
-                        </div>
-                        <div className="bg-green-50 p-3 rounded-lg">
-                          <div className="text-2xl font-bold text-green-600">
-                            {participants.filter((p) => p.survey_id === selectedSurvey.id && p.is_completed).length}
-                          </div>
-                          <div className="text-sm text-green-600">완료된 응답</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="border-t pt-4">
-                      <Label className="font-medium text-lg">참여자 CSV 업로드</Label>
-                      <div className="mt-3 space-y-3">
-                        <div className="bg-yellow-50 p-3 rounded-lg">
-                          <p className="text-sm text-yellow-800">
-                            <strong>CSV 파일 형식:</strong> 병원이름|사람이름|휴대폰번호
-                          </p>
-                          <p className="text-sm text-yellow-800 mt-1">예시: 서울대병원|홍길동|010-1234-5678</p>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <Input
-                            id="csvFile"
-                            type="file"
-                            accept=".csv"
-                            onChange={handleFileSelect}
-                            className="flex-1"
-                          />
-                          <Button
-                            onClick={handleUpload}
-                            disabled={!selectedFile || loading}
-                            className="whitespace-nowrap"
-                          >
-                            {loading ? "업로드 중..." : "업로드"}
-                          </Button>
-                        </div>
-
-                        {selectedFile && <p className="text-sm text-gray-600">선택된 파일: {selectedFile.name}</p>}
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button onClick={() => downloadParticipantsExcel()} className="flex items-center gap-2">
-                        <FileText className="w-4 h-4" />
-                        참여자 목록 다운로드
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+            )}
           </TabsContent>
 
           <TabsContent value="participants">
@@ -1740,7 +1812,7 @@ export default function AdminPage() {
                                       </Badge>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                      <span className="text-sm text-gray-600">평균 점수(전 항목 합)</span>
+                                      <span className="text-sm text-gray-600">평균 점수</span>
                                       <span className="font-semibold text-blue-600">
                                         {(() => {
                                           const totalScore = responses

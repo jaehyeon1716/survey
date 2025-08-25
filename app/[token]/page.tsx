@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/client"
 import { CheckCircle, Heart, AlertCircle } from "lucide-react"
 
-const scaleLabels = [
+const defaultScaleLabels = [
   { value: 5, label: "매우 그렇다", color: "bg-green-500" },
   { value: 4, label: "그렇다", color: "bg-green-400" },
   { value: 3, label: "보통이다", color: "bg-yellow-400" },
@@ -36,6 +36,7 @@ type Question = {
   id: number
   question_number: number
   question_text: string
+  answer_options: Array<{ value: number; label: string; color?: string }> // 답변 옵션 타입 추가
 }
 
 export default function HospitalSurvey() {
@@ -100,7 +101,7 @@ export default function HospitalSurvey() {
 
         const { data: questionsData, error: questionsError } = await supabase
           .from("survey_questions")
-          .select("*")
+          .select("id, question_text, question_order, answer_options")
           .eq("survey_id", participantData.survey_id)
           .order("question_order", { ascending: true })
 
@@ -110,7 +111,26 @@ export default function HospitalSurvey() {
           return
         }
 
-        setQuestions(questionsData)
+        const processedQuestions = questionsData.map((question) => {
+          let answerOptions = question.answer_options || defaultScaleLabels
+
+          // 답변 옵션에 색상이 없으면 기본 색상 추가
+          if (Array.isArray(answerOptions)) {
+            answerOptions = answerOptions.map((option, index) => ({
+              ...option,
+              color: option.color || defaultScaleLabels[index]?.color || "bg-gray-400",
+            }))
+          } else {
+            answerOptions = defaultScaleLabels
+          }
+
+          return {
+            ...question,
+            answer_options: answerOptions,
+          }
+        })
+
+        setQuestions(processedQuestions)
 
         const { data: existingResponses, error: responsesError } = await supabase
           .from("survey_responses")
@@ -134,35 +154,6 @@ export default function HospitalSurvey() {
 
     validateTokenAndLoadSurvey()
   }, [token])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-2xl">
-          <CardContent className="text-center py-16">
-            <div className="animate-spin rounded-full h-24 w-24 border-b-2 border-blue-500 mx-auto mb-8"></div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-4">설문 정보 확인 중...</h1>
-            <p className="text-xl text-gray-600">잠시만 기다려 주세요.</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-2xl">
-          <CardContent className="text-center py-16">
-            <AlertCircle className="w-24 h-24 text-red-500 mx-auto mb-8" />
-            <h1 className="text-4xl font-bold text-gray-800 mb-4">접근 오류</h1>
-            <p className="text-2xl text-gray-600 mb-8">{error}</p>
-            <p className="text-xl text-gray-500">문의사항이 있으시면 관리자에게 연락해 주세요.</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
 
   const handleAnswer = (questionId: number, value: number) => {
     setAnswers((prev) => ({
@@ -200,12 +191,17 @@ export default function HospitalSurvey() {
         throw new Error("설문 제출에 필요한 정보가 없습니다.")
       }
 
-      const responses = questions.map((question) => ({
-        participant_id: participant.id,
-        question_id: question.id,
-        answer_text: scaleLabels.find((scale) => scale.value === answers[question.id])?.label || "",
-        answer_value: answers[question.id],
-      }))
+      const responses = questions.map((question) => {
+        const selectedValue = answers[question.id]
+        const selectedOption = question.answer_options.find((option) => option.value === selectedValue)
+
+        return {
+          participant_id: participant.id,
+          question_id: question.id,
+          answer_text: selectedOption?.label || "",
+          answer_value: selectedValue,
+        }
+      })
 
       await supabase.from("survey_responses").delete().eq("participant_id", participant.id)
 
@@ -230,15 +226,29 @@ export default function HospitalSurvey() {
     }
   }
 
-  if (!questions.length) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-2xl">
           <CardContent className="text-center py-16">
-            <AlertCircle className="w-24 h-24 text-yellow-500 mx-auto mb-8" />
-            <h1 className="text-4xl font-bold text-gray-800 mb-4">설문 문항 없음</h1>
-            <p className="text-2xl text-gray-600 mb-8">이 설문에는 아직 문항이 등록되지 않았습니다.</p>
-            <p className="text-xl text-gray-500">관리자에게 문의해 주세요.</p>
+            <div className="animate-spin rounded-full h-24 w-24 border-b-2 border-blue-500 mx-auto mb-8"></div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-4">설문 정보 확인 중...</h1>
+            <p className="text-xl text-gray-600">잠시만 기다려 주세요.</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-2xl">
+          <CardContent className="text-center py-16">
+            <AlertCircle className="w-24 h-24 text-red-500 mx-auto mb-8" />
+            <h1 className="text-4xl font-bold text-gray-800 mb-4">접근 오류</h1>
+            <p className="text-2xl text-gray-600 mb-8">{error}</p>
+            <p className="text-xl text-gray-500">문의사항이 있으시면 관리자에게 연락해 주세요.</p>
           </CardContent>
         </Card>
       </div>
@@ -268,6 +278,8 @@ export default function HospitalSurvey() {
       </div>
     )
   }
+
+  const currentAnswerOptions = currentQuestionData?.answer_options || defaultScaleLabels
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-2 sm:p-4">
@@ -320,6 +332,25 @@ export default function HospitalSurvey() {
               {currentQuestionData?.question_text}
             </h2>
 
+            <div className="space-y-2">
+              {currentAnswerOptions.map((scale) => (
+                <button
+                  key={scale.value}
+                  onClick={() => handleAnswer(currentQuestionData.id, scale.value)}
+                  className={`w-full p-2 sm:p-3 rounded-lg border-2 transition-all duration-200 text-sm sm:text-base font-medium ${
+                    currentAnswer === scale.value
+                      ? `${scale.color} text-white border-gray-400 shadow-md scale-[1.02]`
+                      : "bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="flex-1 text-left">{scale.label}</span>
+                    <span className="text-base sm:text-lg font-bold ml-2">{scale.value}점</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+
             <div className="flex justify-between items-center pt-2">
               <Button
                 onClick={handlePrevious}
@@ -348,26 +379,6 @@ export default function HospitalSurvey() {
                 )}
               </div>
             </div>
-            
-            <div className="space-y-2">
-              {scaleLabels.map((scale) => (
-                <button
-                  key={scale.value}
-                  onClick={() => handleAnswer(currentQuestionData.id, scale.value)}
-                  className={`w-full p-2 sm:p-3 rounded-lg border-2 transition-all duration-200 text-sm sm:text-base font-medium ${
-                    currentAnswer === scale.value
-                      ? `${scale.color} text-white border-gray-400 shadow-md scale-[1.02]`
-                      : "bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:shadow-sm"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="flex-1 text-left">{scale.label}</span>
-                    <span className="text-base sm:text-lg font-bold ml-2">{scale.value}점</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-
           </CardContent>
         </Card>
 

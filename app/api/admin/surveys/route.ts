@@ -73,6 +73,55 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function PUT(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const { id, title, description, questions } = await request.json()
+
+    if (!id || !title || !questions || questions.length === 0) {
+      return NextResponse.json({ error: "설문지 ID, 제목, 문항은 필수입니다." }, { status: 400 })
+    }
+
+    // 설문지 기본 정보 업데이트
+    const { error: surveyError } = await supabase
+      .from("surveys")
+      .update({
+        title,
+        description: description || "",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+
+    if (surveyError) throw surveyError
+
+    // 기존 문항들 삭제
+    const { error: deleteError } = await supabase.from("survey_questions").delete().eq("survey_id", id)
+
+    if (deleteError) throw deleteError
+
+    // 새로운 문항들 추가
+    const questionsData = questions.map(
+      (q: { question: string; answers: { text: string; score: number }[] }, index: number) => ({
+        survey_id: id,
+        question_order: index + 1,
+        question_text: q.question,
+        answer_options: q.answers,
+      }),
+    )
+
+    const { error: questionsError } = await supabase.from("survey_questions").insert(questionsData)
+
+    if (questionsError) throw questionsError
+
+    return NextResponse.json({
+      message: "설문지가 성공적으로 수정되었습니다.",
+    })
+  } catch (error) {
+    console.error("설문지 수정 오류:", error)
+    return NextResponse.json({ error: "설문지 수정 중 오류가 발생했습니다." }, { status: 500 })
+  }
+}
+
 export async function DELETE(request: NextRequest) {
   try {
     const supabase = await createClient()
