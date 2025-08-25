@@ -1742,7 +1742,7 @@ export default function AdminPage() {
                                       </Badge>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                      <span className="text-sm text-gray-600">평균 점수</span>
+                                      <span className="text-sm text-gray-600">평균 점수(전체문항)</span>
                                       <span className="font-semibold text-blue-600">
                                         {(() => {
                                           const totalScore = responses
