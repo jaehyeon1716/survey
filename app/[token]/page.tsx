@@ -112,20 +112,20 @@ export default function HospitalSurvey() {
         }
 
         const processedQuestions = questionsData.map((question) => {
-          let answerOptions = question.answer_options || defaultScaleLabels
+          let answerOptions = defaultScaleLabels
 
-          // 답변 옵션에 색상이 없으면 기본 색상 추가
-          if (Array.isArray(answerOptions)) {
-            answerOptions = answerOptions.map((option, index) => ({
-              ...option,
+          if (question.answer_options && Array.isArray(question.answer_options) && question.answer_options.length > 0) {
+            answerOptions = question.answer_options.map((option, index) => ({
+              value: option.value || 5 - index, // 기본값 설정
+              label: option.label || defaultScaleLabels[index]?.label || `옵션 ${index + 1}`,
               color: option.color || defaultScaleLabels[index]?.color || "bg-gray-400",
             }))
-          } else {
-            answerOptions = defaultScaleLabels
           }
 
           return {
-            ...question,
+            id: question.id,
+            question_number: question.question_order || 1,
+            question_text: question.question_text,
             answer_options: answerOptions,
           }
         })
@@ -279,7 +279,22 @@ export default function HospitalSurvey() {
     )
   }
 
-  const currentAnswerOptions = currentQuestionData?.answer_options || defaultScaleLabels
+  if (!currentQuestionData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-2xl">
+          <CardContent className="text-center py-16">
+            <AlertCircle className="w-24 h-24 text-red-500 mx-auto mb-8" />
+            <h1 className="text-4xl font-bold text-gray-800 mb-4">문항 로딩 오류</h1>
+            <p className="text-2xl text-gray-600 mb-8">설문 문항을 불러올 수 없습니다.</p>
+            <p className="text-xl text-gray-500">관리자에게 문의해 주세요.</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const currentAnswerOptions = currentQuestionData.answer_options || defaultScaleLabels
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-2 sm:p-4">
@@ -333,22 +348,28 @@ export default function HospitalSurvey() {
             </h2>
 
             <div className="space-y-2">
-              {currentAnswerOptions.map((scale) => (
-                <button
-                  key={scale.value}
-                  onClick={() => handleAnswer(currentQuestionData.id, scale.value)}
-                  className={`w-full p-2 sm:p-3 rounded-lg border-2 transition-all duration-200 text-sm sm:text-base font-medium ${
-                    currentAnswer === scale.value
-                      ? `${scale.color} text-white border-gray-400 shadow-md scale-[1.02]`
-                      : "bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:shadow-sm"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="flex-1 text-left">{scale.label}</span>
-                    <span className="text-base sm:text-lg font-bold ml-2">{scale.value}점</span>
-                  </div>
-                </button>
-              ))}
+              {currentAnswerOptions && currentAnswerOptions.length > 0 ? (
+                currentAnswerOptions.map((scale) => (
+                  <button
+                    key={scale.value}
+                    onClick={() => handleAnswer(currentQuestionData.id, scale.value)}
+                    className={`w-full p-2 sm:p-3 rounded-lg border-2 transition-all duration-200 text-sm sm:text-base font-medium ${
+                      currentAnswer === scale.value
+                        ? `${scale.color} text-white border-gray-400 shadow-md scale-[1.02]`
+                        : "bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="flex-1 text-left">{scale.label}</span>
+                      <span className="text-base sm:text-lg font-bold ml-2">{scale.value}점</span>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">답변 옵션을 불러올 수 없습니다.</p>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-between items-center pt-2">
