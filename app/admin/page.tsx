@@ -73,7 +73,7 @@ interface QuestionStat {
   questionNumber: number
   questionText: string
   totalResponses: number
-  averageScore: string
+  averageScore: number
   maxScore: number
 }
 
@@ -377,7 +377,7 @@ export default function AdminPage() {
           questionNumber: stat.questionNumber,
           questionText: stat.questionText,
           totalResponses: stat.totalResponses,
-          averageScore: stat.totalResponses > 0 ? (stat.totalScore / stat.totalResponses).toFixed(1) : "0",
+          averageScore: stat.totalResponses > 0 ? stat.totalScore / stat.totalResponses : 0,
           maxScore: 5,
         }))
         .sort((a, b) => a.questionNumber - b.questionNumber)
@@ -1852,7 +1852,7 @@ export default function AdminPage() {
                                             {stat.question}
                                           </div>
                                         </TableCell>
-                                        <TableCell className="text-center">{stat.responseCount}명</TableCell>
+                                        <TableCell className="text-center">{stat.totalResponses}명</TableCell>
                                         <TableCell className="text-center">
                                           <span
                                             className={`font-semibold ${
@@ -1863,7 +1863,10 @@ export default function AdminPage() {
                                                   : "text-red-600"
                                             }`}
                                           >
-                                            {stat.averageScore.toFixed(1)}점
+                                            {typeof stat.averageScore === "number"
+                                              ? stat.averageScore.toFixed(1)
+                                              : "0.0"}
+                                            점
                                           </span>
                                         </TableCell>
                                         <TableCell className="text-center">
