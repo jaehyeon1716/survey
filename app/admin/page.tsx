@@ -1838,15 +1838,14 @@ export default function AdminPage() {
                                       <TableHead>문항</TableHead>
                                       <TableHead className="text-center">응답 수</TableHead>
                                       <TableHead className="text-center">평균 점수</TableHead>
-                                      <TableHead className="text-center">만족도</TableHead>
                                     </TableRow>
                                   </TableHeader>
                                   <TableBody>
                                     {questionStats.map((stat, index) => (
                                       <TableRow key={index}>
                                         <TableCell className="font-medium max-w-md">
-                                          <div className="truncate" title={stat.question}>
-                                            {stat.question}
+                                          <div className="truncate" title={stat.questionText}>
+                                            {stat.questionText || `문항 ${stat.questionNumber || index + 1}`}
                                           </div>
                                         </TableCell>
                                         <TableCell className="text-center">{stat.totalResponses}명</TableCell>
@@ -1865,19 +1864,6 @@ export default function AdminPage() {
                                               : "0.0"}
                                             점
                                           </span>
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                          <Badge
-                                            variant={
-                                              stat.averageScore >= 4
-                                                ? "default"
-                                                : stat.averageScore >= 3
-                                                  ? "secondary"
-                                                  : "destructive"
-                                            }
-                                          >
-                                            {stat.averageScore >= 4 ? "높음" : stat.averageScore >= 3 ? "보통" : "낮음"}
-                                          </Badge>
                                         </TableCell>
                                       </TableRow>
                                     ))}
