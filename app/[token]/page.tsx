@@ -387,6 +387,31 @@ export default function HospitalSurvey() {
               {currentQuestionData?.question_text}
             </h2>
 
+            <div className="space-y-2">
+              {currentAnswerOptions && currentAnswerOptions.length > 0 ? (
+                currentAnswerOptions.map((scale) => (
+                  <button
+                    key={scale.value}
+                    onClick={() => handleAnswer(currentQuestionData.id, scale.value)}
+                    className={`w-full p-2 sm:p-3 rounded-lg border-2 transition-all duration-200 text-sm sm:text-base font-medium ${
+                      currentAnswer === scale.value
+                        ? `${scale.color} text-white border-gray-400 shadow-md scale-[1.02]`
+                        : "bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="flex-1 text-left">{scale.label}</span>
+                      <span className="text-base sm:text-lg font-bold ml-2">{scale.value}점</span>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">답변 옵션을 불러올 수 없습니다.</p>
+                </div>
+              )}
+            </div>
+
             <div className="flex justify-between items-center pt-2">
               <Button
                 onClick={handlePrevious}
@@ -415,32 +440,6 @@ export default function HospitalSurvey() {
                 )}
               </div>
             </div>
-            
-            <div className="space-y-2">
-              {currentAnswerOptions && currentAnswerOptions.length > 0 ? (
-                currentAnswerOptions.map((scale) => (
-                  <button
-                    key={scale.value}
-                    onClick={() => handleAnswer(currentQuestionData.id, scale.value)}
-                    className={`w-full p-2 sm:p-3 rounded-lg border-2 transition-all duration-200 text-sm sm:text-base font-medium ${
-                      currentAnswer === scale.value
-                        ? `${scale.color} text-white border-gray-400 shadow-md scale-[1.02]`
-                        : "bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:shadow-sm"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="flex-1 text-left">{scale.label}</span>
-                      <span className="text-base sm:text-lg font-bold ml-2">{scale.value}점</span>
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">답변 옵션을 불러올 수 없습니다.</p>
-                </div>
-              )}
-            </div>
-            
           </CardContent>
         </Card>
 
