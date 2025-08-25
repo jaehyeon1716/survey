@@ -13,8 +13,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Trash2, FileText, Users, BarChart3, Filter } from "lucide-react"
+import { Plus, Trash2, FileText, Users, BarChart3, Filter, Download } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 interface AnswerOption {
   text: string
@@ -1606,486 +1607,342 @@ export default function AdminPage() {
                 </Card>
               ) : (
                 <>
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-xl font-semibold flex items-center gap-2">
-                          <BarChart3 className="w-6 h-6" />
-                          {selectedSurvey.title} - 통계
-                        </CardTitle>
-                        <Button variant="outline" onClick={() => setActiveTab("manage")}>
-                          다른 설문지 선택
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                        <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 rounded-lg text-white">
-                          <div className="text-3xl font-bold">
-                            {participants.filter((p) => p.survey_id === selectedSurvey.id).length}
-                          </div>
-                          <div className="text-blue-100">총 대상자 수</div>
-                        </div>
-                        <div className="bg-gradient-to-r from-green-500 to-green-600 p-6 rounded-lg text-white">
-                          <div className="text-3xl font-bold">
-                            {participants.filter((p) => p.survey_id === selectedSurvey.id && p.is_completed).length}
-                          </div>
-                          <div className="text-green-100">응답 완료</div>
-                        </div>
-                        <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 rounded-lg text-white">
-                          <div className="text-3xl font-bold">
-                            {participants.filter((p) => p.survey_id === selectedSurvey.id && !p.is_completed).length}
-                          </div>
-                          <div className="text-purple-100">응답 미완료</div>
-                        </div>
-                        <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 rounded-lg text-white">
-                          <div className="text-3xl font-bold">
-                            {participants.filter((p) => p.survey_id === selectedSurvey.id).length > 0
-                              ? Math.round(
-                                  (participants.filter((p) => p.survey_id === selectedSurvey.id && p.is_completed)
-                                    .length /
-                                    participants.filter((p) => p.survey_id === selectedSurvey.id).length) *
-                                    100,
-                                )
-                              : 0}
-                            %
-                          </div>
-                          <div className="text-orange-100">완료율</div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  {(() => {
+                    const selectedParticipants = participants.filter((p) => p.survey_id === selectedSurvey.id)
+                    const completedParticipants = selectedParticipants.filter((p) => p.is_completed)
 
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg font-semibold">병원별 통계</CardTitle>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            placeholder="병원명 검색..."
-                            value={hospitalSearchFilter}
-                            onChange={(e) => setHospitalSearchFilter(e.target.value)}
-                            className="w-64"
-                          />
-                          {hospitalSearchFilter && (
-                            <Button variant="outline" size="sm" onClick={() => setHospitalSearchFilter("")}>
-                              초기화
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      {participants.filter((p) => p.survey_id === selectedSurvey.id).length === 0 ? (
-                        <Alert>
-                          <AlertDescription>이 설문지에 참여자 데이터가 없습니다.</AlertDescription>
-                        </Alert>
-                      ) : (
-                        <div className="space-y-4">
-                          {/* 전체 병원 합계 */}
-                          <Card className="bg-gray-50">
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-lg font-semibold text-gray-800">전체 병원 합계</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-600">참여 병원 수</span>
-                                <span className="font-semibold">
-                                  {
-                                    new Set(
-                                      participants
-                                        .filter((p) => p.survey_id === selectedSurvey.id)
-                                        .map((p) => p.hospital_name),
-                                    ).size
-                                  }
-                                  개
-                                </span>
+                    const hospitalStats = selectedParticipants.reduce((acc: Record<string, any>, participant) => {
+                      const hospital = participant.hospital_name
+                      if (!acc[hospital]) {
+                        acc[hospital] = {
+                          total: 0,
+                          completed: 0,
+                          totalScore: 0,
+                        }
+                      }
+                      acc[hospital].total += 1
+                      if (participant.is_completed) {
+                        acc[hospital].completed += 1
+
+                        const participantResponses = responses.filter(
+                          (r) => r.survey_participants?.token === participant.token,
+                        )
+                        const participantTotalScore = participantResponses.reduce(
+                          (sum, r) => sum + (r.answer_value || 0),
+                          0,
+                        )
+                        acc[hospital].totalScore += participantTotalScore
+                      }
+                      return acc
+                    }, {})
+
+                    const filteredHospitals = Object.entries(hospitalStats).filter(([hospital]) =>
+                      hospital.toLowerCase().includes(hospitalSearchFilter.toLowerCase()),
+                    )
+
+                    return (
+                      <>
+                        <Card>
+                          <CardHeader>
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-xl font-semibold flex items-center gap-2">
+                                <BarChart3 className="w-6 h-6" />
+                                {selectedSurvey.title} - 통계
+                              </CardTitle>
+                              <Button variant="outline" onClick={() => setActiveTab("manage")}>
+                                다른 설문지 선택
+                              </Button>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                              <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 rounded-lg text-white">
+                                <div className="text-3xl font-bold">{selectedParticipants.length}</div>
+                                <div className="text-blue-100">총 대상자 수</div>
                               </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-600">총 대상자</span>
-                                <span className="font-semibold">
-                                  {participants.filter((p) => p.survey_id === selectedSurvey.id).length}명
-                                </span>
+                              <div className="bg-gradient-to-r from-green-500 to-green-600 p-6 rounded-lg text-white">
+                                <div className="text-3xl font-bold">{completedParticipants.length}</div>
+                                <div className="text-green-100">응답 완료</div>
                               </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-600">응답 완료</span>
-                                <span className="font-semibold text-green-600">
-                                  {
-                                    participants.filter((p) => p.survey_id === selectedSurvey.id && p.is_completed)
-                                      .length
-                                  }
-                                  명
-                                </span>
+                              <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 rounded-lg text-white">
+                                <div className="text-3xl font-bold">
+                                  {selectedParticipants.length - completedParticipants.length}
+                                </div>
+                                <div className="text-purple-100">응답 미완료</div>
                               </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-600">완료율</span>
-                                <Badge variant="default">
-                                  {participants.filter((p) => p.survey_id === selectedSurvey.id).length > 0
-                                    ? Math.round(
-                                        (participants.filter((p) => p.survey_id === selectedSurvey.id && p.is_completed)
-                                          .length /
-                                          participants.filter((p) => p.survey_id === selectedSurvey.id).length) *
-                                          100,
-                                      )
+                              <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 rounded-lg text-white">
+                                <div className="text-3xl font-bold">
+                                  {selectedParticipants.length > 0
+                                    ? Math.round((completedParticipants.length / selectedParticipants.length) * 100)
                                     : 0}
                                   %
-                                </Badge>
+                                </div>
+                                <div className="text-orange-100">완료율</div>
                               </div>
-                              {(() => {
-                                const totalParticipants = participants.filter(
-                                  (p) => p.survey_id === selectedSurvey.id,
-                                ).length
-                                const completedParticipants = participants.filter(
-                                  (p) => p.survey_id === selectedSurvey.id && p.is_completed,
-                                ).length
+                            </div>
+                          </CardContent>
+                        </Card>
 
-                                const totalScore = responses.reduce((sum, r) => sum + (r.answer_value || 0), 0)
-                                const averageScore =
-                                  responses.length > 0 ? (totalScore / responses.length).toFixed(1) : "0"
-
-                                return {
-                                  total: totalParticipants,
-                                  completed: completedParticipants,
-                                  totalScore: totalScore,
-                                  averageScore: averageScore,
-                                }
-                              })()}
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-600">평균 점수</span>
-                                <span className="font-semibold text-blue-600">
-                                  {(() => {
-                                    const totalParticipants = participants.filter(
-                                      (p) => p.survey_id === selectedSurvey.id,
-                                    ).length
-                                    const completedParticipants = participants.filter(
-                                      (p) => p.survey_id === selectedSurvey.id && p.is_completed,
-                                    ).length
-                                    const totalScore = responses.reduce((sum, r) => sum + (r.answer_value || 0), 0)
-
-                                    return completedParticipants > 0
-                                      ? (totalScore / completedParticipants).toFixed(1)
-                                      : "-"
-                                  })()}
-                                </span>
+                        <Card>
+                          <CardHeader>
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-lg font-semibold">병원별 통계</CardTitle>
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  placeholder="병원명 검색..."
+                                  value={hospitalSearchFilter}
+                                  onChange={(e) => setHospitalSearchFilter(e.target.value)}
+                                  className="w-64"
+                                />
+                                {hospitalSearchFilter && (
+                                  <Button variant="outline" size="sm" onClick={() => setHospitalSearchFilter("")}>
+                                    초기화
+                                  </Button>
+                                )}
                               </div>
-                            </CardContent>
-                          </Card>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            {selectedParticipants.length === 0 ? (
+                              <Alert>
+                                <AlertDescription>이 설문지에 참여자 데이터가 없습니다.</AlertDescription>
+                              </Alert>
+                            ) : (
+                              <div className="space-y-4">
+                                {/* 전체 병원 합계 */}
+                                <Card className="bg-gray-50">
+                                  <CardHeader className="pb-2">
+                                    <CardTitle className="text-lg font-semibold text-gray-800">
+                                      전체 병원 합계
+                                    </CardTitle>
+                                  </CardHeader>
+                                  <CardContent className="space-y-3">
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-sm text-gray-600">참여 병원 수</span>
+                                      <span className="font-semibold">
+                                        {new Set(selectedParticipants.map((p) => p.hospital_name)).size}개
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-sm text-gray-600">총 대상자</span>
+                                      <span className="font-semibold">{selectedParticipants.length}명</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-sm text-gray-600">응답 완료</span>
+                                      <span className="font-semibold text-green-600">
+                                        {completedParticipants.length}명
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-sm text-gray-600">완료율</span>
+                                      <Badge variant="default">
+                                        {selectedParticipants.length > 0
+                                          ? Math.round(
+                                              (completedParticipants.length / selectedParticipants.length) * 100,
+                                            )
+                                          : 0}
+                                        %
+                                      </Badge>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-sm text-gray-600">평균 점수</span>
+                                      <span className="font-semibold text-blue-600">
+                                        {(() => {
+                                          const totalScore = responses
+                                            .filter(
+                                              (r) =>
+                                                r.survey_participants &&
+                                                completedParticipants.some(
+                                                  (p) => p.token === r.survey_participants?.token,
+                                                ),
+                                            )
+                                            .reduce((sum, r) => sum + (r.answer_value || 0), 0)
+                                          return completedParticipants.length > 0
+                                            ? (totalScore / completedParticipants.length).toFixed(1)
+                                            : "-"
+                                        })()}
+                                      </span>
+                                    </div>
+                                  </CardContent>
+                                </Card>
 
-                          {hospitalSearchFilter ? (
-                            <div className="space-y-4">
-                              <div className="text-sm text-gray-600">
-                                검색 결과: "{hospitalSearchFilter}"에 대한{" "}
-                                {
-                                  Object.entries(
-                                    participants
-                                      .filter((p) => p.survey_id === selectedSurvey.id)
-                                      .reduce((acc: Record<string, any>, participant) => {
-                                        const hospital = participant.hospital_name
-                                        if (!acc[hospital]) {
-                                          acc[hospital] = {
-                                            total: 0,
-                                            completed: 0,
-                                            totalScore: 0,
-                                            responseCount: 0,
-                                          }
-                                        }
-                                        acc[hospital].total += 1
-                                        if (participant.is_completed) {
-                                          acc[hospital].completed += 1
-                                        }
-
-                                        const participantResponses = responses.filter(
-                                          (r) => r.survey_participants?.token === participant.token,
-                                        )
-                                        if (participantResponses.length > 0) {
-                                          acc[hospital].totalScore += participantResponses.reduce(
-                                            (sum, r) => sum + (r.answer_value || 0),
-                                            0,
-                                          )
-                                          acc[hospital].responseCount += participantResponses.length
-                                        }
-
-                                        return acc
-                                      }, {}),
-                                  ).filter(([hospital]) =>
-                                    hospital.toLowerCase().includes(hospitalSearchFilter.toLowerCase()),
-                                  ).length
-                                }
-                                개 병원
+                                {hospitalSearchFilter ? (
+                                  <div className="space-y-4">
+                                    <div className="text-sm text-gray-600">
+                                      검색 결과: "{hospitalSearchFilter}"에 대한 {filteredHospitals.length}개 병원
+                                    </div>
+                                    {filteredHospitals.map(([hospital, stats]: [string, any]) => (
+                                      <Card key={hospital} className="p-4">
+                                        <CardHeader className="pb-2">
+                                          <CardTitle className="text-lg font-semibold">{hospital}</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-3">
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-sm text-gray-600">총 대상자</span>
+                                            <span className="font-semibold">{stats.total}명</span>
+                                          </div>
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-sm text-gray-600">응답 완료</span>
+                                            <span className="font-semibold text-green-600">{stats.completed}명</span>
+                                          </div>
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-sm text-gray-600">완료율</span>
+                                            <Badge
+                                              variant={
+                                                stats.total > 0 && stats.completed / stats.total >= 0.7
+                                                  ? "default"
+                                                  : "secondary"
+                                              }
+                                            >
+                                              {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
+                                            </Badge>
+                                          </div>
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-sm text-gray-600">평균 점수</span>
+                                            <span className="font-semibold text-blue-600">
+                                              {stats.completed > 0
+                                                ? (stats.totalScore / stats.completed).toFixed(1)
+                                                : "-"}
+                                            </span>
+                                          </div>
+                                        </CardContent>
+                                      </Card>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <Alert>
+                                    <AlertDescription>
+                                      병원별 통계를 보려면 위의 검색창에서 병원명을 검색해 주세요.
+                                    </AlertDescription>
+                                  </Alert>
+                                )}
                               </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {Object.entries(
-                                  participants
-                                    .filter((p) => p.survey_id === selectedSurvey.id)
-                                    .reduce((acc: Record<string, any>, participant) => {
-                                      const hospital = participant.hospital_name
-                                      if (!acc[hospital]) {
-                                        acc[hospital] = { total: 0, completed: 0, totalScore: 0, responseCount: 0 }
-                                      }
-                                      acc[hospital].total += 1
-                                      if (participant.is_completed) {
-                                        acc[hospital].completed += 1
-                                      }
+                            )}
+                          </CardContent>
+                        </Card>
 
-                                      const participantResponses = responses.filter(
-                                        (r) => r.survey_participants?.token === participant.token,
-                                      )
-                                      if (participantResponses.length > 0) {
-                                        acc[hospital].totalScore += participantResponses.reduce(
-                                          (sum, r) => sum + (r.answer_value || 0),
-                                          0,
-                                        )
-                                        acc[hospital].responseCount += participantResponses.length
-                                      }
-
-                                      return acc
-                                    }, {}),
-                                )
-                                  .filter(([hospital]) =>
-                                    hospital.toLowerCase().includes(hospitalSearchFilter.toLowerCase()),
-                                  )
-                                  .map(([hospital, stats]: [string, any]) => (
-                                    <Card key={hospital} className="p-4">
-                                      <CardHeader className="pb-2">
-                                        <CardTitle className="text-lg font-semibold">{hospital}</CardTitle>
-                                      </CardHeader>
-                                      <CardContent className="space-y-3">
-                                        <div className="flex justify-between items-center">
-                                          <span className="text-sm text-gray-600">총 대상자</span>
-                                          <span className="font-semibold">{stats.total}명</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                          <span className="text-sm text-gray-600">응답 완료</span>
-                                          <span className="font-semibold text-green-600">{stats.completed}명</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                          <span className="text-sm text-gray-600">완료율</span>
+                        {/* 문항별 통계 */}
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-lg font-semibold">
+                              문항별 통계 {hospitalSearchFilter && `- ${hospitalSearchFilter}`}
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {questionStats.length === 0 ? (
+                              <Alert>
+                                <AlertDescription>문항별 통계 데이터를 불러오는 중입니다...</AlertDescription>
+                              </Alert>
+                            ) : (
+                              <div className="overflow-x-auto">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>문항</TableHead>
+                                      <TableHead className="text-center">응답 수</TableHead>
+                                      <TableHead className="text-center">평균 점수</TableHead>
+                                      <TableHead className="text-center">만족도</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {questionStats.map((stat, index) => (
+                                      <TableRow key={index}>
+                                        <TableCell className="font-medium max-w-md">
+                                          <div className="truncate" title={stat.question}>
+                                            {stat.question}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell className="text-center">{stat.responseCount}명</TableCell>
+                                        <TableCell className="text-center">
+                                          <span
+                                            className={`font-semibold ${
+                                              stat.averageScore >= 4
+                                                ? "text-green-600"
+                                                : stat.averageScore >= 3
+                                                  ? "text-yellow-600"
+                                                  : "text-red-600"
+                                            }`}
+                                          >
+                                            {stat.averageScore.toFixed(1)}점
+                                          </span>
+                                        </TableCell>
+                                        <TableCell className="text-center">
                                           <Badge
                                             variant={
-                                              stats.total > 0 && stats.completed / stats.total >= 0.7
+                                              stat.averageScore >= 4
                                                 ? "default"
-                                                : "secondary"
+                                                : stat.averageScore >= 3
+                                                  ? "secondary"
+                                                  : "destructive"
                                             }
                                           >
-                                            {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
+                                            {stat.averageScore >= 4 ? "높음" : stat.averageScore >= 3 ? "보통" : "낮음"}
                                           </Badge>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                          <span className="text-sm text-gray-600">평균 점수</span>
-                                          <span className="font-semibold text-blue-600">
-                                            {stats.responseCount > 0
-                                              ? (stats.totalScore / stats.responseCount).toFixed(1)
-                                              : "-"}
-                                          </span>
-                                        </div>
-                                      </CardContent>
-                                    </Card>
-                                  ))}
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
                               </div>
-                              {Object.entries(
-                                participants
-                                  .filter((p) => p.survey_id === selectedSurvey.id)
-                                  .reduce((acc: Record<string, any>, participant) => {
-                                    const hospital = participant.hospital_name
-                                    if (!acc[hospital]) {
-                                      acc[hospital] = { total: 0, completed: 0, totalScore: 0, responseCount: 0 }
-                                    }
-                                    acc[hospital].total += 1
-                                    if (participant.is_completed) {
-                                      acc[hospital].completed += 1
-                                    }
+                            )}
+                          </CardContent>
+                        </Card>
 
-                                    const participantResponses = responses.filter(
-                                      (r) => r.survey_participants?.token === participant.token,
-                                    )
-                                    if (participantResponses.length > 0) {
-                                      acc[hospital].totalScore += participantResponses.reduce(
-                                        (sum, r) => sum + (r.answer_value || 0),
-                                        0,
-                                      )
-                                      acc[hospital].responseCount += participantResponses.length
-                                    }
-
-                                    return acc
-                                  }, {}),
-                              ).filter(([hospital]) =>
-                                hospital.toLowerCase().includes(hospitalSearchFilter.toLowerCase()),
-                              ).length === 0 && (
-                                <Alert>
-                                  <AlertDescription>
-                                    "{hospitalSearchFilter}"와 일치하는 병원이 없습니다.
-                                  </AlertDescription>
-                                </Alert>
-                              )}
+                        {/* 데이터 내보내기 */}
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-lg font-semibold">데이터 내보내기</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex gap-4">
+                              <Button onClick={downloadStatsExcel} className="flex items-center gap-2">
+                                <Download className="w-4 h-4" />
+                                통계 데이터 CSV 다운로드
+                              </Button>
                             </div>
-                          ) : (
-                            <Alert>
-                              <AlertDescription>
-                                병원별 통계를 보려면 위의 검색창에서 병원명을 검색해 주세요.
-                              </AlertDescription>
-                            </Alert>
-                          )}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg font-semibold">문항별 통계</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {questionStats.length === 0 ? (
-                        <Alert>
-                          <AlertDescription>
-                            {hospitalSearchFilter
-                              ? `"${hospitalSearchFilter}" 병원의 문항별 통계 데이터가 없습니다.`
-                              : "문항별 통계 데이터가 없습니다."}
-                          </AlertDescription>
-                        </Alert>
-                      ) : (
-                        <div className="space-y-4">
-                          {hospitalSearchFilter && (
-                            <div className="bg-blue-50 p-3 rounded-lg">
-                              <p className="text-sm text-blue-800">
-                                <strong>"{hospitalSearchFilter}"</strong> 병원의 문항별 통계를 표시하고 있습니다.
-                              </p>
-                            </div>
-                          )}
-
-                          {/* 문항별 상세 테이블 */}
-                          <div>
-                            <h4 className="text-md font-semibold mb-3">
-                              문항별 상세 통계
-                              {hospitalSearchFilter && (
-                                <span className="text-sm font-normal text-blue-600 ml-2">
-                                  ("{hospitalSearchFilter}" 병원)
-                                </span>
-                              )}
-                            </h4>
-                            <div className="overflow-x-auto">
-                              <table className="w-full border-collapse border border-gray-300">
-                                <thead>
-                                  <tr className="bg-indigo-50">
-                                    <th className="border border-gray-300 px-4 py-2 text-left">문항 번호</th>
-                                    <th className="border border-gray-300 px-4 py-2 text-left">문항 내용</th>
-                                    <th className="border border-gray-300 px-4 py-2 text-center">응답 수</th>
-                                    <th className="border border-gray-300 px-4 py-2 text-center">평균 점수</th>
-                                    <th className="border border-gray-300 px-4 py-2 text-center">만족도</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {questionStats.map((stat) => (
-                                    <tr key={stat.id} className="hover:bg-gray-50">
-                                      <td className="border border-gray-300 px-4 py-2 font-medium">
-                                        문항 {stat.questionNumber}
-                                      </td>
-                                      <td className="border border-gray-300 px-4 py-2">{stat.questionText}</td>
-                                      <td className="border border-gray-300 px-4 py-2 text-center">
-                                        {stat.totalResponses}명
-                                      </td>
-                                      <td className="border border-gray-300 px-4 py-2 text-center">
-                                        <Badge variant="outline" className="bg-indigo-50 text-indigo-700">
-                                          {stat.averageScore}/{stat.maxScore}
-                                        </Badge>
-                                      </td>
-                                      <td className="border border-gray-300 px-4 py-2 text-center">
-                                        <span
-                                          className={`font-semibold ${
-                                            Number.parseFloat(stat.averageScore) >= 4
-                                              ? "text-green-600"
-                                              : Number.parseFloat(stat.averageScore) >= 3
-                                                ? "text-yellow-600"
-                                                : "text-red-600"
-                                          }`}
-                                        >
-                                          {((Number.parseFloat(stat.averageScore) / stat.maxScore) * 100).toFixed(0)}%
-                                        </span>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* 통계 다운로드 */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg font-semibold">데이터 내보내기</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-wrap gap-4">
-                        <Button
-                          onClick={downloadStatsExcel}
-                          variant="outline"
-                          className="flex items-center gap-2 bg-transparent"
-                        >
-                          <BarChart3 className="w-4 h-4" />
-                          선택된 설문지 통계 다운로드
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                          </CardContent>
+                        </Card>
+                      </>
+                    )
+                  })()}
                 </>
               )}
             </div>
           </TabsContent>
         </Tabs>
 
-        {showDeleteConfirm && (
+        {/* 삭제 확인 모달 */}
+        {showDeleteConfirm && surveyToDelete && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <Card className="w-full max-w-md mx-4">
+            <Card className="w-full max-w-md">
               <CardHeader>
-                <CardTitle className="text-xl font-semibold text-red-600">설문지 삭제 확인</CardTitle>
+                <CardTitle>설문지 삭제 확인</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <p className="text-gray-700">
-                    <strong>"{surveyToDelete?.title}"</strong> 설문지를 삭제하시겠습니까?
-                  </p>
-                  <p className="text-sm text-red-600 mt-2">
-                    ⚠️ 이 작업은 되돌릴 수 없으며, 모든 참여자 데이터와 응답이 함께 삭제됩니다.
-                  </p>
-                </div>
-
-                <div>
-                  <Label htmlFor="deletePassword" className="font-medium">
-                    관리자 비밀번호 확인
-                  </Label>
+                <p>정말로 "{surveyToDelete.title}" 설문지를 삭제하시겠습니까?</p>
+                <p className="text-sm text-red-600">이 작업은 되돌릴 수 없습니다.</p>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">삭제하려면 비밀번호를 입력하세요:</label>
                   <Input
-                    id="deletePassword"
                     type="password"
                     value={deletePassword}
                     onChange={(e) => setDeletePassword(e.target.value)}
-                    placeholder="비밀번호를 입력하세요"
-                    className="mt-2"
+                    placeholder="비밀번호 입력"
                   />
                 </div>
-
-                <div className="flex justify-end gap-2">
+                <div className="flex gap-2 justify-end">
                   <Button
                     variant="outline"
                     onClick={() => {
                       setShowDeleteConfirm(false)
                       setSurveyToDelete(null)
                       setDeletePassword("")
-                      setError("")
                     }}
-                    disabled={deleteLoading}
                   >
                     취소
                   </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={handleDeleteSurvey}
-                    disabled={deleteLoading || !deletePassword}
-                  >
-                    {deleteLoading ? "삭제 중..." : "삭제"}
+                  <Button variant="destructive" onClick={handleDeleteSurvey}>
+                    삭제
                   </Button>
                 </div>
               </CardContent>
