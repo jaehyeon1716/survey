@@ -9,19 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Trash2,
-  Download,
-  Edit,
-  Search,
-  X,
-  Users,
-  BarChart3,
-  FileText,
-  Settings,
-  Building,
-  Building2,
-} from "lucide-react"
+import { Trash2, Download, Search, X, Users, BarChart3, FileText, Settings, Building, Building2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
@@ -120,10 +108,6 @@ export default function AdminPage() {
   ])
   const [createLoading, setCreateLoading] = useState(false)
   const [uploadSuccess, setUploadSuccess] = useState("")
-
-  // 설문지 수정 관련 상태
-  const [isEditMode, setIsEditMode] = useState(false)
-  const [editingSurvey, setEditingSurvey] = useState<Survey | null>(null)
 
   // 삭제 관련 상태
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -298,16 +282,33 @@ export default function AdminPage() {
   // 설문지 선택 시 관련 데이터 로드
   useEffect(() => {
     if (selectedSurvey) {
-      fetchParticipants(selectedSurvey.id)
-      fetchResponses(selectedSurvey.id)
-      fetchQuestionStats(selectedSurvey.id, hospitalSearchFilter)
+      const loadSurveyData = async () => {
+        try {
+          await Promise.all([
+            fetchParticipants(selectedSurvey.id),
+            fetchResponses(selectedSurvey.id),
+            fetchQuestionStats(selectedSurvey.id, hospitalSearchFilter),
+          ])
+        } catch (error) {
+          console.error("[v0] 설문지 데이터 로딩 에러:", error)
+          setError("설문지 데이터를 불러오는데 실패했습니다.")
+        }
+      }
+      loadSurveyData()
     }
   }, [selectedSurvey])
 
   // 병원 검색 필터 변경 시 문항별 통계 다시 로드
   useEffect(() => {
     if (selectedSurvey && hospitalSearchFilter !== undefined) {
-      fetchQuestionStats(selectedSurvey.id, hospitalSearchFilter)
+      const loadQuestionStats = async () => {
+        try {
+          await fetchQuestionStats(selectedSurvey.id, hospitalSearchFilter)
+        } catch (error) {
+          console.error("[v0] 문항별 통계 로딩 에러:", error)
+        }
+      }
+      loadQuestionStats()
     }
   }, [hospitalSearchFilter, selectedSurvey])
 
@@ -375,10 +376,9 @@ export default function AdminPage() {
 
     try {
       const response = await fetch("/api/admin/surveys", {
-        method: isEditMode ? "PUT" : "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: isEditMode ? editingSurvey?.id : undefined,
           title: newSurveyTitle,
           description: newSurveyDescription,
           questions: newSurveyQuestions,
@@ -387,7 +387,7 @@ export default function AdminPage() {
 
       if (!response.ok) throw new Error("설문지 저장 실패")
 
-      setUploadSuccess(isEditMode ? "설문지가 성공적으로 수정되었습니다!" : "설문지가 성공적으로 생성되었습니다!")
+      setUploadSuccess("설문지가 성공적으로 생성되었습니다!")
 
       // 폼 초기화
       setNewSurveyTitle("")
@@ -405,65 +405,16 @@ export default function AdminPage() {
         },
       ])
 
-      // 수정 모드 해제
-      setIsEditMode(false)
-      setEditingSurvey(null)
-
       // 설문지 목록 새로고침
       fetchSurveys()
 
       setTimeout(() => setUploadSuccess(""), 3000)
     } catch (error) {
-      console.error("설문지 생성/수정 오류:", error)
-      setError(isEditMode ? "설문지 수정에 실패했습니다." : "설문지 생성에 실패했습니다.")
+      console.error("설문지 생성 오류:", error)
+      setError("설문지 생성에 실패했습니다.")
     } finally {
       setCreateLoading(false)
     }
-  }
-
-  const startEditSurvey = (survey: Survey) => {
-    setEditingSurvey(survey)
-    setIsEditMode(true)
-    setNewSurveyTitle(survey.title)
-    setNewSurveyDescription(survey.description)
-
-    // 기존 문항들을 로드
-    if (survey.survey_questions) {
-      const questions = survey.survey_questions
-        .sort((a, b) => a.question_order - b.question_order)
-        .map((q) => ({
-          question: q.question_text,
-          answers: q.answer_options || [
-            { text: "매우 그렇다", score: 5 },
-            { text: "그렇다", score: 4 },
-            { text: "보통이다", score: 3 },
-            { text: "그렇지 않다", score: 2 },
-            { text: "전혀 그렇지 않다", score: 1 },
-          ],
-        }))
-      setNewSurveyQuestions(questions)
-    }
-
-    setActiveTab("create")
-  }
-
-  const cancelEdit = () => {
-    setIsEditMode(false)
-    setEditingSurvey(null)
-    setNewSurveyTitle("")
-    setNewSurveyDescription("")
-    setNewSurveyQuestions([
-      {
-        question: "",
-        answers: [
-          { text: "매우 그렇다", score: 5 },
-          { text: "그렇다", score: 4 },
-          { text: "보통이다", score: 3 },
-          { text: "그렇지 않다", score: 2 },
-          { text: "전혀 그렇지 않다", score: 1 },
-        ],
-      },
-    ])
   }
 
   const deleteSurvey = async () => {
@@ -807,7 +758,7 @@ export default function AdminPage() {
                   className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm"
                 >
                   <FileText className="h-4 w-4" />
-                  {isEditMode ? "설문지 수정" : "설문지 생성"}
+                  설문지 생성
                   {newSurveyQuestions.length > 0 && (
                     <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-700 text-xs">
                       {newSurveyQuestions.length}
@@ -841,17 +792,7 @@ export default function AdminPage() {
                 <Card className="shadow-sm border-gray-200">
                   <CardHeader className="border-b border-gray-100 bg-gray-50">
                     <CardTitle className="flex items-center justify-between text-xl text-gray-800">
-                      {isEditMode ? "설문지 수정" : "새 설문지 생성"}
-                      {isEditMode && (
-                        <Button
-                          onClick={cancelEdit}
-                          variant="outline"
-                          size="sm"
-                          className="border-gray-300 text-gray-600 hover:bg-gray-50 bg-transparent"
-                        >
-                          수정 취소
-                        </Button>
-                      )}
+                      새 설문지 생성
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6">
@@ -975,7 +916,7 @@ export default function AdminPage() {
                         className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-medium"
                         disabled={createLoading}
                       >
-                        {createLoading ? "처리 중..." : isEditMode ? "설문지 수정" : "설문지 생성"}
+                        {createLoading ? "처리 중..." : "설문지 생성"}
                       </Button>
                     </form>
                   </CardContent>
@@ -1019,18 +960,6 @@ export default function AdminPage() {
                                 <Button
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    startEditSurvey(survey)
-                                  }}
-                                  variant="outline"
-                                  size="sm"
-                                  className="flex-1 border-gray-300 text-gray-600 hover:bg-gray-50"
-                                >
-                                  <Edit className="h-4 w-4 mr-1" />
-                                  수정
-                                </Button>
-                                <Button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
                                     setSurveyToDelete(survey)
                                     setShowDeleteConfirm(true)
                                   }}
@@ -1038,7 +967,8 @@ export default function AdminPage() {
                                   size="sm"
                                   className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
                                 >
-                                  <Trash2 className="h-4 w-4" />
+                                  <Trash2 className="h-4 w-4 mr-1" />
+                                  삭제
                                 </Button>
                               </div>
                             </div>
