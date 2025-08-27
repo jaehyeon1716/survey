@@ -1,16 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createServerClient } from "@supabase/ssr"
 import { randomBytes } from "crypto"
+import { cookies } from "next/headers"
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const cookieStore = cookies()
 
-  if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.json({ error: "Supabase 환경 변수가 설정되지 않았습니다." }, { status: 500 })
-  }
+  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    cookies: {
+      get(name: string) {
+        return cookieStore.get(name)?.value
+      },
+    },
+  })
 
-  const supabase = createClient(supabaseUrl, supabaseKey)
   const surveyId = params.id
 
   try {
@@ -22,7 +25,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     if (error) throw error
 
-    return NextResponse.json({ participants: participants || [] })
+    return NextResponse.json(participants || [])
   } catch (error) {
     console.error("참여자 조회 오류:", error)
     return NextResponse.json({ error: "참여자 데이터를 불러오는데 실패했습니다." }, { status: 500 })
@@ -30,19 +33,21 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const cookieStore = cookies()
 
-  if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.json({ error: "Supabase 환경 변수가 설정되지 않았습니다." }, { status: 500 })
-  }
+  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    cookies: {
+      get(name: string) {
+        return cookieStore.get(name)?.value
+      },
+    },
+  })
 
-  const supabase = createClient(supabaseUrl, supabaseKey)
   const surveyId = params.id
 
   try {
     const formData = await request.formData()
-    const csvFile = formData.get("csvFile") as File
+    const csvFile = formData.get("file") as File
 
     if (!csvFile) {
       return NextResponse.json({ error: "CSV 파일이 필요합니다." }, { status: 400 })
@@ -55,14 +60,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "CSV 파일이 비어있습니다." }, { status: 400 })
     }
 
-    await supabase
-      .from("survey_responses")
+    const { error: deleteError } = await supabase
+      .from("survey_participants")
       .delete()
-      .eq(
-        "participant_token",
-        supabase.from("survey_participants").select("token").eq("survey_id", Number.parseInt(surveyId)),
-      )
-    await supabase.from("survey_participants").delete().eq("survey_id", Number.parseInt(surveyId))
+      .eq("survey_id", Number.parseInt(surveyId))
+
+    if (deleteError) {
+      console.error("기존 참여자 삭제 오류:", deleteError)
+    }
 
     const participants = []
     const uniqueParticipants = new Set() // 중복 방지를 위한 Set
@@ -87,6 +92,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         hospital_name: hospitalName,
         participant_name: participantName,
         phone_number: phoneNumber,
+        is_completed: false,
       })
     }
 

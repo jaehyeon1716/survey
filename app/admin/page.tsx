@@ -174,12 +174,27 @@ export default function AdminPage() {
 
   const fetchParticipants = async (surveyId: number) => {
     try {
+      console.log("[v0] 참여자 데이터 로딩 시작:", surveyId)
       const response = await fetch(`/api/admin/surveys/${surveyId}/participants`)
-      if (!response.ok) throw new Error("Failed to fetch participants")
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("[v0] API 응답 에러:", response.status, errorText)
+        throw new Error(`Failed to fetch participants: ${response.status}`)
+      }
       const data = await response.json()
-      setParticipants(data)
+      console.log("[v0] 참여자 데이터 응답:", data)
+
+      if (Array.isArray(data)) {
+        setParticipants(data)
+        console.log("[v0] 참여자 데이터 설정 완료:", data.length, "명")
+      } else {
+        console.error("[v0] 예상치 못한 응답 구조:", data)
+        setParticipants([])
+        setError("참여자 데이터 형식이 올바르지 않습니다.")
+      }
     } catch (error) {
       console.error("참여자 조회 오류:", error)
+      setParticipants([]) // 에러 시 빈 배열로 초기화
       setError("참여자 데이터를 불러오는데 실패했습니다.")
     }
   }
@@ -1075,7 +1090,7 @@ export default function AdminPage() {
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                           <Card className="bg-blue-50 border-blue-200 shadow-sm">
                             <CardContent className="p-4 text-center">
-                              <div className="text-2xl font-bold text-blue-600">{participants.length}</div>
+                              <div className="text-2xl font-bold text-blue-600">{safeParticipants.length}</div>
                               <div className="text-sm text-blue-600">총 대상자</div>
                             </CardContent>
                           </Card>
