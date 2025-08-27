@@ -500,8 +500,7 @@ export default function AdminPage() {
     const totalParticipants = safeParticipants.length
     const completionRate = totalParticipants > 0 ? (completedParticipants.length / totalParticipants) * 100 : 0
 
-    // 전체 평균 점수 계산
-    const totalScore = responses.reduce((sum, r) => sum + (r.answer_value || 0), 0)
+    const totalScore = safeResponses.reduce((sum, r) => sum + (r.answer_value || 0), 0)
     const averageScore = completedParticipants.length > 0 ? totalScore / completedParticipants.length : 0
 
     const csvContent = [
@@ -544,8 +543,7 @@ export default function AdminPage() {
   const downloadHospitalStats = () => {
     if (!selectedSurvey || participants.length === 0) return
 
-    // 병원별 통계 계산
-    const hospitalStats = participants.reduce(
+    const hospitalStats = safeParticipants.reduce(
       (acc, participant) => {
         const hospital = participant.hospital_name
         if (!acc[hospital]) {
@@ -678,7 +676,7 @@ export default function AdminPage() {
   })
 
   // 병원별 통계 계산 (검색 필터 적용)
-  const hospitalStats = participants.reduce(
+  const hospitalStats = safeParticipants.reduce(
     (acc, participant) => {
       const hospital = participant.hospital_name
       if (!acc[hospital]) {
@@ -1252,10 +1250,10 @@ export default function AdminPage() {
                                 <Card className="bg-green-50 border-green-200 shadow-sm">
                                   <CardContent className="p-4 text-center">
                                     <div className="text-xl font-bold text-green-600">
-                                      {responses.length > 0
+                                      {safeResponses.length > 0
                                         ? (
-                                            responses.reduce((sum, r) => sum + (r.answer_value || 0), 0) /
-                                            responses.length
+                                            safeResponses.reduce((sum, r) => sum + (r.answer_value || 0), 0) /
+                                            safeResponses.length
                                           ).toFixed(1)
                                         : 0}
                                     </div>
@@ -1265,7 +1263,7 @@ export default function AdminPage() {
                                 <Card className="bg-purple-50 border-purple-200 shadow-sm">
                                   <CardContent className="p-4 text-center">
                                     <div className="text-xl font-bold text-purple-600">
-                                      {new Set(responses.map((r) => r.survey_participants?.hospital_name)).size}
+                                      {new Set(safeResponses.map((r) => r.survey_participants?.hospital_name)).size}
                                     </div>
                                     <div className="text-sm text-purple-600">참여 병원 수</div>
                                   </CardContent>
@@ -1284,7 +1282,7 @@ export default function AdminPage() {
                                 </TableHeader>
                                 <TableBody>
                                   {Object.entries(
-                                    responses.reduce(
+                                    safeResponses.reduce(
                                       (acc, response) => {
                                         const key = `${response.survey_participants?.participant_name}-${response.survey_participants?.hospital_name}`
                                         if (!acc[key]) {
@@ -1365,7 +1363,7 @@ export default function AdminPage() {
                                 <div className="text-2xl font-bold text-blue-600">
                                   {
                                     Object.keys(
-                                      participants.reduce((acc, p) => ({ ...acc, [p.hospital_name]: true }), {}),
+                                      safeParticipants.reduce((acc, p) => ({ ...acc, [p.hospital_name]: true }), {}),
                                     ).length
                                   }
                                 </div>
@@ -1423,7 +1421,7 @@ export default function AdminPage() {
                         {hospitalSearchFilter ? (
                           <div className="space-y-4">
                             {(() => {
-                              const hospitalStats = participants.reduce(
+                              const hospitalStats = safeParticipants.reduce(
                                 (acc, participant) => {
                                   const hospital = participant.hospital_name
                                   if (!acc[hospital]) {
