@@ -1290,7 +1290,7 @@ export default function AdminPage() {
                                   <TableRow>
                                     <TableHead className="text-gray-600">참여자명</TableHead>
                                     <TableHead className="text-gray-600">병원이름</TableHead>
-                                    <TableHead className="text-gray-600">응답 수</TableHead>
+                                    <TableHead className="text-gray-600">문항 수</TableHead>
                                     <TableHead className="text-gray-600">평균 점수</TableHead>
                                     <TableHead className="text-gray-600">응답일시</TableHead>
                                   </TableRow>
