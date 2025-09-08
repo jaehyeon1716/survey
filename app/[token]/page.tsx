@@ -348,7 +348,7 @@ export default function HospitalSurvey() {
                 disabled={currentQuestion === 0}
                 variant="outline"
                 size="lg"
-                className="text-lg px-6 py-3 h-auto bg-transparent"
+                className="text-base px-4 py-2 h-auto bg-transparent"
               >
                 이전
               </Button>
@@ -359,12 +359,12 @@ export default function HospitalSurvey() {
                     onClick={handleSubmit}
                     disabled={!currentAnswer || isSubmitting}
                     size="lg"
-                    className="text-lg px-8 py-3 h-auto bg-green-600 hover:bg-green-700"
+                    className="text-base px-4 py-2 h-auto bg-green-600 hover:bg-green-700"
                   >
                     {isSubmitting ? "제출 중..." : "설문 완료"}
                   </Button>
                 ) : (
-                  <Button onClick={handleNext} disabled={!currentAnswer} size="lg" className="text-lg px-6 py-3 h-auto">
+                  <Button onClick={handleNext} disabled={!currentAnswer} size="lg" className="text-lg px-4 py-2 h-auto">
                     다음
                   </Button>
                 )}
@@ -376,7 +376,7 @@ export default function HospitalSurvey() {
                 <button
                   key={scale.value}
                   onClick={() => handleAnswer(currentQuestionData.id, scale.value)}
-                  className={`w-full p-4 rounded-xl border-2 transition-all duration-200 text-lg font-medium ${
+                  className={`w-full px-3 py-2 rounded-xl border-2 transition-all duration-200 text-base font-medium ${
                     currentAnswer === scale.value
                       ? `${scale.color} text-white border-gray-400 shadow-lg scale-105`
                       : "bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:shadow-md"
@@ -384,7 +384,7 @@ export default function HospitalSurvey() {
                 >
                   <div className="flex items-center justify-between">
                     <span>{scale.label}</span>
-                    <span className="text-xl font-bold">{scale.value}점</span>
+                    <span className="text-lg font-bold">{scale.value}점</span>
                   </div>
                 </button>
               ))}
