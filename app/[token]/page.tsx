@@ -7,12 +7,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { supabase } from "@/lib/supabase/client"
 import { CheckCircle, Heart, AlertCircle } from "lucide-react"
 
-const scaleLabels = [
+const scaleLabels_default = [
   { value: 5, label: "매우 그렇다", color: "bg-green-500" },
   { value: 4, label: "그렇다", color: "bg-green-400" },
   { value: 3, label: "보통이다", color: "bg-yellow-400" },
   { value: 2, label: "그렇지 않다", color: "bg-orange-400" },
   { value: 1, label: "전혀 그렇지 않다", color: "bg-red-400" },
+]
+
+const scaleLabels_9 = [
+  { value: 5, label: "매우 만족한다", color: "bg-green-500" },
+  { value: 4, label: "만족한다", color: "bg-green-400" },
+  { value: 3, label: "보통이다", color: "bg-yellow-400" },
+  { value: 2, label: "불만족한다", color: "bg-orange-400" },
+  { value: 1, label: "매우 불만족한다", color: "bg-red-400" },
 ]
 
 type Participant = {
@@ -263,6 +271,8 @@ export default function HospitalSurvey() {
   const currentQuestionData = questions[currentQuestion]
   const currentAnswer = answers[currentQuestionData?.id]
   const progress = ((currentQuestion + 1) / questions.length) * 100
+
+  const scaleLabels = currentQuestionData.id === 9 ? scaleLabels_9 : scaleLabels_default;
 
   if (isSubmitted) {
     return (
