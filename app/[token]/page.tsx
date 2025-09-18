@@ -272,7 +272,7 @@ export default function HospitalSurvey() {
   const currentAnswer = answers[currentQuestionData?.id]
   const progress = ((currentQuestion + 1) / questions.length) * 100
 
-  const scaleLabels = currentQuestionData.id === 24 ? scaleLabels_9 : scaleLabels_default;
+  const scaleLabels = currentQuestionData.id === 33 ? scaleLabels_9 : scaleLabels_default;
 
   if (isSubmitted) {
     return (
