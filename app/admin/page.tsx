@@ -87,6 +87,7 @@ interface QuestionStat {
   questionNumber: number
   questionText: string
   questionType: string
+  responseScaleType: string // responseScaleType 필드 추가
   totalResponses: number
   averageScore: string
   maxScore: number
@@ -565,65 +566,85 @@ export default function AdminPage() {
     if (!supabase) return
 
     try {
+      console.log("[v0] Fetching question stats for survey:", surveyId)
+
       const { data: questionsData, error: questionsError } = await supabase
         .from("survey_questions")
         .select("*")
         .eq("survey_id", surveyId)
         .order("question_number", { ascending: true })
 
-      if (questionsError || !questionsData) return
+      console.log("[v0] Questions data:", questionsData)
+      if (questionsError) {
+        console.error("[v0] Questions error:", questionsError)
+        return
+      }
+      if (!questionsData) return
 
-      let responsesQuery = supabase
+      const { data: responsesData, error: responsesError } = await supabase
         .from("survey_responses")
-        .select(`
-          question_id,
-          response_value,
-          response_text,
-          participant_token,
-          survey_questions (
-            question_text,
-            question_number,
-            question_type,
-            response_scale_type // response_scale_type 조회
-          ),
-          survey_participants!inner (
-            hospital_name
-          )
-        `)
+        .select("question_id, response_value, response_text, participant_token")
         .in(
           "question_id",
           questionsData.map((q) => q.id),
         )
 
+      console.log("[v0] Responses data:", responsesData)
+      if (responsesError) {
+        console.error("[v0] Responses error:", responsesError)
+        return
+      }
+      if (!responsesData) return
+
+      const participantTokens = [...new Set(responsesData.map((r) => r.participant_token))]
+      let participantsQuery = supabase
+        .from("survey_participants")
+        .select("token, hospital_name")
+        .in("token", participantTokens)
+
       if (hospitalName && hospitalName.trim() !== "") {
-        responsesQuery = responsesQuery.ilike("survey_participants.hospital_name", `%${hospitalName.trim()}%`)
+        participantsQuery = participantsQuery.ilike("hospital_name", `%${hospitalName.trim()}%`)
       }
 
-      const { data: responsesData, error: responsesError } = await responsesQuery
+      const { data: participantsData, error: participantsError } = await participantsQuery
 
-      if (responsesError || !responsesData) return
+      console.log("[v0] Participants data:", participantsData)
+      if (participantsError) {
+        console.error("[v0] Participants error:", participantsError)
+        return
+      }
+
+      const participantMap = new Map(participantsData?.map((p) => [p.token, p.hospital_name]) || [])
+
+      const filteredResponses =
+        hospitalName && hospitalName.trim() !== ""
+          ? responsesData.filter((r) => participantMap.has(r.participant_token))
+          : responsesData
+
+      console.log("[v0] Filtered responses:", filteredResponses.length)
 
       const questionStatsMap = questionsData.map((question) => {
-        const questionResponses = responsesData.filter((r: any) => r.question_id === question.id)
+        const questionResponses = filteredResponses.filter((r) => r.question_id === question.id)
         const totalResponses = questionResponses.length
 
         // For objective questions, calculate average score
-        const objectiveResponses = questionResponses.filter((r: any) => r.response_value !== null)
+        const objectiveResponses = questionResponses.filter((r) => r.response_value !== null)
         const averageScore =
           objectiveResponses.length > 0
-            ? objectiveResponses.reduce((sum, r: any) => sum + r.response_value, 0) / objectiveResponses.length
+            ? objectiveResponses.reduce((sum, r) => sum + r.response_value, 0) / objectiveResponses.length
             : 0
 
         // For subjective questions, collect text responses
         const textResponses = questionResponses
-          .filter((r: any) => r.response_text !== null && r.response_text.trim() !== "")
-          .map((r: any) => r.response_text)
+          .filter((r) => r.response_text !== null && r.response_text.trim() !== "")
+          .map((r) => r.response_text)
 
         return {
           id: question.id,
           questionNumber: question.question_number,
           questionText: question.question_text,
           questionType: question.question_type || "objective",
+          responseScaleType: question.response_scale_type || "agreement",
           totalResponses,
           averageScore: averageScore.toFixed(1),
           maxScore: 5,
@@ -631,8 +652,10 @@ export default function AdminPage() {
         }
       })
 
+      console.log("[v0] Question stats map:", questionStatsMap)
       setQuestionStats(questionStatsMap)
     } catch (err) {
+      console.error("[v0] Error in fetchQuestionStats:", err)
       setError("문항별 통계 조회 중 오류가 발생했습니다.")
     }
   }
