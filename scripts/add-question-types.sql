@@ -4,9 +4,10 @@
 ALTER TABLE survey_questions 
 ADD COLUMN IF NOT EXISTS question_type VARCHAR(20) DEFAULT 'objective' CHECK (question_type IN ('objective', 'subjective'));
 
--- 2. survey_responses 테이블에 text_response 컬럼 추가 (주관식 응답용)
+-- 2. survey_responses 테이블에 response_text 컬럼 추가 (주관식 응답용)
+-- text_response를 response_text로 변경
 ALTER TABLE survey_responses 
-ADD COLUMN IF NOT EXISTS text_response TEXT;
+ADD COLUMN IF NOT EXISTS response_text TEXT;
 
 -- 3. response_value를 nullable로 변경 (주관식은 점수가 없음)
 ALTER TABLE survey_responses 
@@ -16,10 +17,11 @@ ALTER COLUMN response_value DROP NOT NULL;
 ALTER TABLE survey_responses 
 DROP CONSTRAINT IF EXISTS survey_responses_response_value_check;
 
+-- text_response를 response_text로 변경
 ALTER TABLE survey_responses 
 ADD CONSTRAINT survey_responses_response_value_check 
 CHECK (
-  (response_value IS NULL AND text_response IS NOT NULL) OR 
+  (response_value IS NULL AND response_text IS NOT NULL) OR 
   (response_value IS NOT NULL AND response_value >= 1 AND response_value <= 5)
 );
 
