@@ -39,12 +39,12 @@ interface Survey {
   description: string
   is_active: boolean
   created_at: string
-  response_scale_type?: "agreement" | "satisfaction" // Added response scale type
   survey_questions?: Array<{
     id: number
     question_text: string
     question_number: number
     question_type: string
+    response_scale_type?: string // 문항별 응답 척도 타입 추가
   }>
 }
 
@@ -111,10 +111,11 @@ export default function AdminPage() {
 
   const [newSurveyTitle, setNewSurveyTitle] = useState("")
   const [newSurveyDescription, setNewSurveyDescription] = useState("")
-  const [newSurveyQuestions, setNewSurveyQuestions] = useState<Array<{ text: string; type: string }>>([
-    { text: "", type: "objective" },
+  const [newSurveyQuestions, setNewSurveyQuestions] = useState<
+    Array<{ text: string; type: string; scaleType: string }>
+  >([
+    { text: "", type: "objective", scaleType: "agreement" }, // scaleType 추가
   ])
-  const [responseScaleType, setResponseScaleType] = useState<"agreement" | "satisfaction">("agreement")
   const [createLoading, setCreateLoading] = useState(false)
 
   const [questionStats, setQuestionStats] = useState<QuestionStat[]>([])
@@ -126,8 +127,8 @@ export default function AdminPage() {
   const [editingSurvey, setEditingSurvey] = useState<Survey | null>(null)
   const [editTitle, setEditTitle] = useState("")
   const [editDescription, setEditDescription] = useState("")
-  const [editQuestions, setEditQuestions] = useState<Array<{ text: string; type: string }>>([
-    { text: "", type: "objective" },
+  const [editQuestions, setEditQuestions] = useState<Array<{ text: string; type: string; scaleType: string }>>([
+    { text: "", type: "objective", scaleType: "agreement" }, // scaleType 추가
   ])
   const [editLoading, setEditLoading] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -217,7 +218,7 @@ export default function AdminPage() {
                 <li>설문지 제목과 설명을 입력합니다</li>
                 <li>문항을 하나씩 추가합니다 (예: "의료진의 친절도에 만족하십니까?")</li>
                 <li>문항 유형을 선택하세요 (객관식 - 5점 척도 / 주관식 - 텍스트)</li>
-                <li><span class="highlight">응답 척도 유형을 선택하세요.</span></li>
+                <li><span class="highlight">각 문항별 응답 척도 유형을 선택하세요.</span></li>
               </ul>
               <div class="info">
                 💡 <strong>팁:</strong> 문항은 명확하고 이해하기 쉽게 작성하세요. 고령자가 주 대상이므로 간단한 표현을 사용하는 것이 좋습니다.
@@ -582,7 +583,8 @@ export default function AdminPage() {
           survey_questions (
             question_text,
             question_number,
-            question_type
+            question_type,
+            response_scale_type // response_scale_type 조회
           ),
           survey_participants!inner (
             hospital_name
@@ -659,8 +661,7 @@ export default function AdminPage() {
         body: JSON.stringify({
           title: newSurveyTitle.trim(),
           description: newSurveyDescription.trim(),
-          questions: validQuestions.map((q) => ({ text: q.text, type: q.type })),
-          responseScaleType: responseScaleType,
+          questions: validQuestions.map((q) => ({ text: q.text, type: q.type, responseScaleType: q.scaleType })), // responseScaleType 추가
         }),
       })
 
@@ -670,8 +671,7 @@ export default function AdminPage() {
         setUploadSuccess("설문지가 성공적으로 생성되었습니다.")
         setNewSurveyTitle("")
         setNewSurveyDescription("")
-        setNewSurveyQuestions([{ text: "", type: "objective" }])
-        setResponseScaleType("agreement")
+        setNewSurveyQuestions([{ text: "", type: "objective", scaleType: "agreement" }]) // scaleType 초기화
         fetchSurveys()
       } else {
         setError(data.error || "설문지 생성 중 오류가 발생했습니다.")
@@ -684,7 +684,7 @@ export default function AdminPage() {
   }
 
   const addQuestion = () => {
-    setNewSurveyQuestions([...newSurveyQuestions, { text: "", type: "objective" }])
+    setNewSurveyQuestions([...newSurveyQuestions, { text: "", type: "objective", scaleType: "agreement" }]) // scaleType 추가
   }
 
   const removeQuestion = (index: number) => {
@@ -693,7 +693,8 @@ export default function AdminPage() {
     }
   }
 
-  const updateQuestion = (index: number, field: "text" | "type", value: string) => {
+  const updateQuestion = (index: number, field: "text" | "type" | "scaleType", value: string) => {
+    // scaleType 필드 추가
     const updated = [...newSurveyQuestions]
     updated[index][field] = value
     setNewSurveyQuestions(updated)
@@ -848,7 +849,8 @@ export default function AdminPage() {
       survey.survey_questions?.map((q) => ({
         text: q.question_text,
         type: q.question_type || "objective",
-      })) || [{ text: "", type: "objective" }],
+        scaleType: q.response_scale_type || "agreement", // scaleType 설정
+      })) || [{ text: "", type: "objective", scaleType: "agreement" }], // scaleType 초기화
     )
     setShowEditModal(true)
   }
@@ -877,8 +879,8 @@ export default function AdminPage() {
         body: JSON.stringify({
           title: editTitle.trim(),
           description: editDescription.trim(),
-          // Pass questions with text and type
-          questions: validQuestions.map((q) => ({ text: q.text, type: q.type })),
+          // Pass questions with text, type, and responseScaleType
+          questions: validQuestions.map((q) => ({ text: q.text, type: q.type, responseScaleType: q.scaleType })), // responseScaleType 추가
         }),
       })
 
@@ -945,7 +947,7 @@ export default function AdminPage() {
   }
 
   const addEditQuestion = () => {
-    setEditQuestions([...editQuestions, { text: "", type: "objective" }])
+    setEditQuestions([...editQuestions, { text: "", type: "objective", scaleType: "agreement" }]) // scaleType 추가
   }
 
   const removeEditQuestion = (index: number) => {
@@ -954,7 +956,8 @@ export default function AdminPage() {
     }
   }
 
-  const updateEditQuestion = (index: number, field: "text" | "type", value: string) => {
+  const updateEditQuestion = (index: number, field: "text" | "type" | "scaleType", value: string) => {
+    // scaleType 필드 추가
     const updated = [...editQuestions]
     updated[index][field] = value
     setEditQuestions(updated)
@@ -995,7 +998,8 @@ export default function AdminPage() {
             survey_questions (
               question_text,
               question_number,
-              question_type
+              question_type,
+              response_scale_type // response_scale_type 조회
             )
           `)
           .in(
@@ -1032,6 +1036,7 @@ export default function AdminPage() {
             const questionNumber = response.survey_questions?.question_number || 0
             const questionText = response.survey_questions?.question_text || ""
             const questionType = response.survey_questions?.question_type || "objective"
+            const responseScaleType = response.survey_questions?.response_scale_type || "agreement" // responseScaleType 사용
 
             if (!hospitalQuestionStats[hospital]) {
               hospitalQuestionStats[hospital] = {}
@@ -1042,6 +1047,7 @@ export default function AdminPage() {
                 questionNumber,
                 questionText,
                 questionType,
+                responseScaleType, // responseScaleType 저장
                 responses: [],
                 textResponses: [],
                 total: 0,
@@ -1131,7 +1137,7 @@ export default function AdminPage() {
 
     const hospitalQuestionStatsData = [
       ["병원별 문항별 상세 통계"],
-      ["병원명", "문항 번호", "문항 내용", "문항 유형", "응답 수", "평균 점수", "응답 내용 (주관식)"],
+      ["병원명", "문항 번호", "문항 내용", "문항 유형", "응답 척도", "응답 수", "평균 점수", "응답 내용 (주관식)"], // 응답 척도 열 추가
     ]
 
     Object.keys(hospitalQuestionStats)
@@ -1151,6 +1157,7 @@ export default function AdminPage() {
               questionData.questionNumber.toString(),
               questionData.questionText,
               "객관식",
+              questionData.responseScaleType === "agreement" ? "동의 척도" : "만족도 척도", // 척도 이름 표시
               questionData.count.toString(),
               `${average}/5`,
               "", // No subjective responses for objective questions
@@ -1162,6 +1169,7 @@ export default function AdminPage() {
               questionData.questionNumber.toString(),
               questionData.questionText,
               "주관식",
+              "", // No response scale for subjective questions
               questionData.count.toString(),
               "", // No average score for subjective questions
               questionData.textResponses ? questionData.textResponses.join("; ") : "", // Join multiple responses
@@ -1176,13 +1184,14 @@ export default function AdminPage() {
             "전체",
             "모든 문항 평균",
             "",
+            "",
             hospitalTotalStats.count.toString(),
             `${(hospitalTotalStats.totalScore / hospitalTotalStats.count).toFixed(1)}/${hospitalTotalStats.maxScore}`,
             "",
           ])
         }
 
-        hospitalQuestionStatsData.push(["", "", "", "", "", "", ""])
+        hospitalQuestionStatsData.push(["", "", "", "", "", "", "", ""]) // 열 개수 조정
       })
 
     const allData = [
@@ -1356,28 +1365,6 @@ export default function AdminPage() {
                     />
                   </div>
 
-                  <div className="p-4 border rounded-lg bg-blue-50">
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        id="satisfactionScale"
-                        checked={responseScaleType === "satisfaction"}
-                        onChange={(e) => setResponseScaleType(e.target.checked ? "satisfaction" : "agreement")}
-                        className="mt-1 w-5 h-5 cursor-pointer"
-                      />
-                      <div className="flex-1">
-                        <Label htmlFor="satisfactionScale" className="text-base font-medium cursor-pointer">
-                          만족도 척도 사용
-                        </Label>
-                        <p className="text-sm text-gray-600 mt-1">
-                          체크 시: 매우 만족한다 ~ 매우 만족하지 않는다
-                          <br />
-                          미체크 시: 매우 그렇다 ~ 전혀 그렇지 않다
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
                   <div>
                     <div className="flex justify-between items-center mb-4">
                       <Label className="text-lg font-medium">설문 문항 *</Label>
@@ -1410,20 +1397,39 @@ export default function AdminPage() {
                               </Button>
                             )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Label className="text-sm">문항 유형:</Label>
-                            <Select
-                              value={question.type}
-                              onValueChange={(value) => updateQuestion(index, "type", value)}
-                            >
-                              <SelectTrigger className="w-[180px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="objective">객관식 (5점 척도)</SelectItem>
-                                <SelectItem value="subjective">주관식 (텍스트)</SelectItem>
-                              </SelectContent>
-                            </Select>
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <Label className="text-sm">문항 유형:</Label>
+                              <Select
+                                value={question.type}
+                                onValueChange={(value) => updateQuestion(index, "type", value)}
+                              >
+                                <SelectTrigger className="w-[180px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="objective">객관식 (5점 척도)</SelectItem>
+                                  <SelectItem value="subjective">주관식 (텍스트)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            {question.type === "objective" && (
+                              <div className="flex items-center gap-2">
+                                <Label className="text-sm">응답 척도:</Label>
+                                <Select
+                                  value={question.scaleType}
+                                  onValueChange={(value) => updateQuestion(index, "scaleType", value)}
+                                >
+                                  <SelectTrigger className="w-[200px]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="agreement">동의 척도 (그렇다)</SelectItem>
+                                    <SelectItem value="satisfaction">만족도 척도 (만족한다)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -2042,20 +2048,39 @@ export default function AdminPage() {
                           </Button>
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Label className="text-sm">문항 유형:</Label>
-                        <Select
-                          value={question.type}
-                          onValueChange={(value) => updateEditQuestion(index, "type", value)}
-                        >
-                          <SelectTrigger className="w-[180px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="objective">객관식 (5점 척도)</SelectItem>
-                            <SelectItem value="subjective">주관식 (텍스트)</SelectItem>
-                          </SelectContent>
-                        </Select>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm">문항 유형:</Label>
+                          <Select
+                            value={question.type}
+                            onValueChange={(value) => updateEditQuestion(index, "type", value)}
+                          >
+                            <SelectTrigger className="w-[180px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="objective">객관식 (5점 척도)</SelectItem>
+                              <SelectItem value="subjective">주관식 (텍스트)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {question.type === "objective" && (
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm">응답 척도:</Label>
+                            <Select
+                              value={question.scaleType}
+                              onValueChange={(value) => updateEditQuestion(index, "scaleType", value)}
+                            >
+                              <SelectTrigger className="w-[200px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="agreement">동의 척도 (그렇다)</SelectItem>
+                                <SelectItem value="satisfaction">만족도 척도 (만족한다)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

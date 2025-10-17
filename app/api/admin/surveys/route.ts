@@ -20,7 +20,8 @@ export async function GET() {
           id,
           question_number,
           question_text,
-          question_type
+          question_type,
+          response_scale_type
         )
       `)
       .order("created_at", { ascending: false })
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
   const supabase = createClient(supabaseUrl, supabaseKey)
 
   try {
-    const { title, description, questions, responseScaleType } = await request.json()
+    const { title, description, questions } = await request.json()
 
     if (!title || !questions || questions.length === 0) {
       return NextResponse.json({ error: "제목과 문항은 필수입니다." }, { status: 400 })
@@ -57,19 +58,21 @@ export async function POST(request: NextRequest) {
         title,
         description: description || "",
         is_active: true,
-        response_scale_type: responseScaleType || "agreement",
       })
       .select()
       .single()
 
     if (surveyError) throw surveyError
 
-    const questionsData = questions.map((question: { text: string; type: string }, index: number) => ({
-      survey_id: survey.id,
-      question_number: index + 1,
-      question_text: question.text,
-      question_type: question.type || "objective",
-    }))
+    const questionsData = questions.map(
+      (question: { text: string; type: string; responseScaleType?: string }, index: number) => ({
+        survey_id: survey.id,
+        question_number: index + 1,
+        question_text: question.text,
+        question_type: question.type || "objective",
+        response_scale_type: question.responseScaleType || "agreement",
+      }),
+    )
 
     const { error: questionsError } = await supabase.from("survey_questions").insert(questionsData)
 

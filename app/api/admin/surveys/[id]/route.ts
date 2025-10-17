@@ -36,12 +36,15 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     if (deleteError) throw deleteError
 
-    const questionsData = questions.map((question: { text: string; type: string }, index: number) => ({
-      survey_id: Number.parseInt(surveyId),
-      question_number: index + 1,
-      question_text: question.text,
-      question_type: question.type || "objective",
-    }))
+    const questionsData = questions.map(
+      (question: { text: string; type: string; responseScaleType?: string }, index: number) => ({
+        survey_id: Number.parseInt(surveyId),
+        question_number: index + 1,
+        question_text: question.text,
+        question_type: question.type || "objective",
+        response_scale_type: question.responseScaleType || "agreement",
+      }),
+    )
 
     const { error: questionsError } = await supabase.from("survey_questions").insert(questionsData)
 

@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { supabase } from "@/lib/supabase/client"
 import { CheckCircle, Heart, AlertCircle } from "lucide-react"
 
-const scaleLabels_default = [
+const scaleLabels_agreement = [
   { value: 5, label: "매우 그렇다", color: "bg-green-500" },
   { value: 4, label: "그렇다", color: "bg-green-400" },
   { value: 3, label: "보통이다", color: "bg-yellow-400" },
@@ -16,12 +16,12 @@ const scaleLabels_default = [
   { value: 1, label: "전혀 그렇지 않다", color: "bg-red-400" },
 ]
 
-const scaleLabels_9 = [
+const scaleLabels_satisfaction = [
   { value: 5, label: "매우 만족한다", color: "bg-green-500" },
   { value: 4, label: "만족한다", color: "bg-green-400" },
   { value: 3, label: "보통이다", color: "bg-yellow-400" },
-  { value: 2, label: "불만족한다", color: "bg-orange-400" },
-  { value: 1, label: "매우 불만족한다", color: "bg-red-400" },
+  { value: 2, label: "만족하지 않는다", color: "bg-orange-400" },
+  { value: 1, label: "매우 만족하지 않는다", color: "bg-red-400" },
 ]
 
 type Participant = {
@@ -39,7 +39,6 @@ type Survey = {
   title: string
   description: string
   is_active: boolean
-  response_scale_type?: string
 }
 
 type Question = {
@@ -47,6 +46,7 @@ type Question = {
   question_number: number
   question_text: string
   question_type: "objective" | "subjective"
+  response_scale_type?: string // 문항별 응답 척도 타입 추가
 }
 
 export default function HospitalSurvey() {
@@ -87,8 +87,7 @@ export default function HospitalSurvey() {
               id,
               title,
               description,
-              is_active,
-              response_scale_type
+              is_active
             )
           `)
           .eq("token", token)
@@ -117,7 +116,7 @@ export default function HospitalSurvey() {
 
         const { data: questionsData, error: questionsError } = await supabase
           .from("survey_questions")
-          .select("*")
+          .select("id, question_number, question_text, question_type, response_scale_type")
           .eq("survey_id", participantData.survey_id)
           .order("question_number", { ascending: true })
 
@@ -298,7 +297,8 @@ export default function HospitalSurvey() {
       : subjectiveAnswers[currentQuestionData?.id]
   const progress = ((currentQuestion + 1) / questions.length) * 100
 
-  const scaleLabels = survey?.response_scale_type === "satisfaction" ? scaleLabels_9 : scaleLabels_default
+  const scaleLabels =
+    currentQuestionData?.response_scale_type === "satisfaction" ? scaleLabels_satisfaction : scaleLabels_agreement
 
   if (!questions.length) {
     return (
