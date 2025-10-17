@@ -19,7 +19,8 @@ export async function GET() {
         survey_questions (
           id,
           question_number,
-          question_text
+          question_text,
+          question_type
         )
       `)
       .order("created_at", { ascending: false })
@@ -63,11 +64,11 @@ export async function POST(request: NextRequest) {
 
     if (surveyError) throw surveyError
 
-    // 문항들 생성
-    const questionsData = questions.map((questionText: string, index: number) => ({
+    const questionsData = questions.map((question: { text: string; type: string }, index: number) => ({
       survey_id: survey.id,
       question_number: index + 1,
-      question_text: questionText,
+      question_text: question.text,
+      question_type: question.type || "objective",
     }))
 
     const { error: questionsError } = await supabase.from("survey_questions").insert(questionsData)

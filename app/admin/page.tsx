@@ -27,6 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from "@/lib/supabase/client"
 import { Copy, Download, ExternalLink, Eye, Plus, Trash2, Edit, FileText } from "lucide-react"
 
@@ -42,6 +43,7 @@ interface Survey {
     id: number
     question_text: string
     question_number: number
+    question_type: string
   }>
 }
 
@@ -96,7 +98,9 @@ export default function AdminPage() {
 
   const [newSurveyTitle, setNewSurveyTitle] = useState("")
   const [newSurveyDescription, setNewSurveyDescription] = useState("")
-  const [newSurveyQuestions, setNewSurveyQuestions] = useState([""])
+  const [newSurveyQuestions, setNewSurveyQuestions] = useState<Array<{ text: string; type: string }>>([
+    { text: "", type: "objective" },
+  ])
   const [createLoading, setCreateLoading] = useState(false)
 
   const [questionStats, setQuestionStats] = useState<QuestionStat[]>([])
@@ -108,7 +112,9 @@ export default function AdminPage() {
   const [editingSurvey, setEditingSurvey] = useState<Survey | null>(null)
   const [editTitle, setEditTitle] = useState("")
   const [editDescription, setEditDescription] = useState("")
-  const [editQuestions, setEditQuestions] = useState<string[]>([])
+  const [editQuestions, setEditQuestions] = useState<Array<{ text: string; type: string }>>([
+    { text: "", type: "objective" },
+  ])
   const [editLoading, setEditLoading] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [surveyToDelete, setSurveyToDelete] = useState<Survey | null>(null)
@@ -196,7 +202,7 @@ export default function AdminPage() {
                 <li><span class="highlight">'설문지 생성'</span> 탭을 클릭합니다</li>
                 <li>설문지 제목과 설명을 입력합니다</li>
                 <li>문항을 하나씩 추가합니다 (예: "의료진의 친절도에 만족하십니까?")</li>
-                <li>모든 문항은 5점 척도로 평가됩니다</li>
+                <li>문항 유형을 선택하세요 (객관식 - 5점 척도 / 주관식 - 텍스트)</li>
               </ul>
               <div class="info">
                 💡 <strong>팁:</strong> 문항은 명확하고 이해하기 쉽게 작성하세요. 고령자가 주 대상이므로 간단한 표현을 사용하는 것이 좋습니다.
@@ -606,7 +612,7 @@ export default function AdminPage() {
       return
     }
 
-    const validQuestions = newSurveyQuestions.filter((q) => q.trim() !== "")
+    const validQuestions = newSurveyQuestions.filter((q) => q.text.trim() !== "")
     if (validQuestions.length === 0) {
       setError("최소 1개의 문항을 입력해주세요.")
       return
@@ -624,7 +630,8 @@ export default function AdminPage() {
         body: JSON.stringify({
           title: newSurveyTitle.trim(),
           description: newSurveyDescription.trim(),
-          questions: validQuestions,
+          // Pass questions with text and type
+          questions: validQuestions.map((q) => ({ text: q.text, type: q.type })),
         }),
       })
 
@@ -634,7 +641,7 @@ export default function AdminPage() {
         setUploadSuccess("설문지가 성공적으로 생성되었습니다.")
         setNewSurveyTitle("")
         setNewSurveyDescription("")
-        setNewSurveyQuestions([""])
+        setNewSurveyQuestions([{ text: "", type: "objective" }])
         fetchSurveys()
       } else {
         setError(data.error || "설문지 생성 중 오류가 발생했습니다.")
@@ -647,7 +654,7 @@ export default function AdminPage() {
   }
 
   const addQuestion = () => {
-    setNewSurveyQuestions([...newSurveyQuestions, ""])
+    setNewSurveyQuestions([...newSurveyQuestions, { text: "", type: "objective" }])
   }
 
   const removeQuestion = (index: number) => {
@@ -656,9 +663,9 @@ export default function AdminPage() {
     }
   }
 
-  const updateQuestion = (index: number, value: string) => {
+  const updateQuestion = (index: number, field: "text" | "type", value: string) => {
     const updated = [...newSurveyQuestions]
-    updated[index] = value
+    updated[index][field] = value
     setNewSurveyQuestions(updated)
   }
 
@@ -764,7 +771,12 @@ export default function AdminPage() {
     setEditingSurvey(survey)
     setEditTitle(survey.title)
     setEditDescription(survey.description || "")
-    setEditQuestions(survey.survey_questions?.map((q) => q.question_text) || [""])
+    setEditQuestions(
+      survey.survey_questions?.map((q) => ({
+        text: q.question_text,
+        type: q.question_type || "objective",
+      })) || [{ text: "", type: "objective" }],
+    )
     setShowEditModal(true)
   }
 
@@ -774,7 +786,7 @@ export default function AdminPage() {
       return
     }
 
-    const validQuestions = editQuestions.filter((q) => q.trim() !== "")
+    const validQuestions = editQuestions.filter((q) => q.text.trim() !== "")
     if (validQuestions.length === 0) {
       setError("최소 1개의 문항을 입력해주세요.")
       return
@@ -792,7 +804,8 @@ export default function AdminPage() {
         body: JSON.stringify({
           title: editTitle.trim(),
           description: editDescription.trim(),
-          questions: validQuestions,
+          // Pass questions with text and type
+          questions: validQuestions.map((q) => ({ text: q.text, type: q.type })),
         }),
       })
 
@@ -859,7 +872,7 @@ export default function AdminPage() {
   }
 
   const addEditQuestion = () => {
-    setEditQuestions([...editQuestions, ""])
+    setEditQuestions([...editQuestions, { text: "", type: "objective" }])
   }
 
   const removeEditQuestion = (index: number) => {
@@ -868,9 +881,9 @@ export default function AdminPage() {
     }
   }
 
-  const updateEditQuestion = (index: number, value: string) => {
+  const updateEditQuestion = (index: number, field: "text" | "type", value: string) => {
     const updated = [...editQuestions]
-    updated[index] = value
+    updated[index][field] = value
     setEditQuestions(updated)
   }
 
@@ -1208,20 +1221,43 @@ export default function AdminPage() {
                     </div>
                     <div className="space-y-3">
                       {newSurveyQuestions.map((question, index) => (
-                        <div key={index} className="flex gap-2">
-                          <div className="flex-1">
-                            <Input
-                              value={question}
-                              onChange={(e) => updateQuestion(index, e.target.value)}
-                              placeholder={`문항 ${index + 1}을 입력하세요`}
-                              className="h-12 text-lg"
-                            />
+                        <div key={index} className="space-y-2 p-3 border rounded-lg bg-gray-50">
+                          <div className="flex gap-2 items-start">
+                            <div className="flex-1">
+                              <Label className="text-sm mb-1">문항 {index + 1}</Label>
+                              <Input
+                                value={question.text}
+                                onChange={(e) => updateQuestion(index, "text", e.target.value)}
+                                placeholder={`문항 ${index + 1}을 입력하세요`}
+                                className="h-12 text-lg"
+                              />
+                            </div>
+                            {newSurveyQuestions.length > 1 && (
+                              <Button
+                                onClick={() => removeQuestion(index)}
+                                size="sm"
+                                variant="outline"
+                                className="mt-6"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
-                          {newSurveyQuestions.length > 1 && (
-                            <Button onClick={() => removeQuestion(index)} size="sm" variant="outline">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm">문항 유형:</Label>
+                            <Select
+                              value={question.type}
+                              onValueChange={(value) => updateQuestion(index, "type", value)}
+                            >
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="objective">객관식 (5점 척도)</SelectItem>
+                                <SelectItem value="subjective">주관식 (텍스트)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1782,7 +1818,7 @@ export default function AdminPage() {
         </Tabs>
 
         <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>설문지 수정</DialogTitle>
               <DialogDescription>설문지 정보를 수정하세요</DialogDescription>
@@ -1817,18 +1853,42 @@ export default function AdminPage() {
                 </div>
                 <div className="space-y-2">
                   {editQuestions.map((question, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
-                        value={question}
-                        onChange={(e) => updateEditQuestion(index, e.target.value)}
-                        placeholder={`문항 ${index + 1}`}
-                        className="flex-1"
-                      />
-                      {editQuestions.length > 1 && (
-                        <Button onClick={() => removeEditQuestion(index)} size="sm" variant="outline">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
+                    <div key={index} className="space-y-2 p-3 border rounded-lg bg-gray-50">
+                      <div className="flex gap-2 items-start">
+                        <div className="flex-1">
+                          <Label className="text-sm mb-1">문항 {index + 1}</Label>
+                          <Input
+                            value={question.text}
+                            onChange={(e) => updateEditQuestion(index, "text", e.target.value)}
+                            placeholder={`문항 ${index + 1}`}
+                          />
+                        </div>
+                        {editQuestions.length > 1 && (
+                          <Button
+                            onClick={() => removeEditQuestion(index)}
+                            size="sm"
+                            variant="outline"
+                            className="mt-6"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm">문항 유형:</Label>
+                        <Select
+                          value={question.type}
+                          onValueChange={(value) => updateEditQuestion(index, "type", value)}
+                        >
+                          <SelectTrigger className="w-[180px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="objective">객관식 (5점 척도)</SelectItem>
+                            <SelectItem value="subjective">주관식 (텍스트)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   ))}
                 </div>
