@@ -73,6 +73,14 @@ interface SurveyResponse {
   max_possible_score: number
 }
 
+interface DetailedQuestionResponse {
+  question_number: number
+  question_text: string
+  question_type: string
+  response_value: number | null
+  response_text: string | null
+}
+
 interface QuestionStat {
   id: number
   questionNumber: number
@@ -95,6 +103,8 @@ export default function AdminPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [selectedResponse, setSelectedResponse] = useState<SurveyResponse | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
+  const [detailedResponses, setDetailedResponses] = useState<DetailedQuestionResponse[]>([])
+  const [loadingDetails, setLoadingDetails] = useState(false)
 
   const [newSurveyTitle, setNewSurveyTitle] = useState("")
   const [newSurveyDescription, setNewSurveyDescription] = useState("")
@@ -762,9 +772,52 @@ export default function AdminPage() {
     document.body.removeChild(link)
   }
 
-  const openDetailModal = (response: SurveyResponse) => {
+  const openDetailModal = async (response: SurveyResponse) => {
     setSelectedResponse(response)
     setShowDetailModal(true)
+    setLoadingDetails(true)
+
+    try {
+      if (!supabase) return
+
+      // Fetch detailed responses with question information
+      const { data, error } = await supabase
+        .from("survey_responses")
+        .select(`
+          response_value,
+          response_text,
+          survey_questions (
+            question_number,
+            question_text,
+            question_type
+          )
+        `)
+        .eq("participant_token", response.participant_token)
+        .order("survey_questions(question_number)", { ascending: true })
+
+      if (error) {
+        console.error("[v0] Error fetching detailed responses:", error)
+        return
+      }
+
+      // Transform the data
+      const details: DetailedQuestionResponse[] = (data || []).map((item: any) => ({
+        question_number: item.survey_questions?.question_number || 0,
+        question_text: item.survey_questions?.question_text || "",
+        question_type: item.survey_questions?.question_type || "objective",
+        response_value: item.response_value,
+        response_text: item.response_text,
+      }))
+
+      // Sort by question number
+      details.sort((a, b) => a.question_number - b.question_number)
+
+      setDetailedResponses(details)
+    } catch (err) {
+      console.error("[v0] Error loading detailed responses:", err)
+    } finally {
+      setLoadingDetails(false)
+    }
   }
 
   const handleEditSurvey = (survey: Survey) => {
@@ -1945,40 +1998,102 @@ export default function AdminPage() {
         </AlertDialog>
 
         <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>설문 응답 상세</DialogTitle>
+              <DialogTitle className="text-2xl">설문 응답 상세</DialogTitle>
             </DialogHeader>
             {selectedResponse && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
                   <div>
-                    <Label>병원명</Label>
-                    <p className="text-lg">{selectedResponse.survey_participants?.hospital_name || ""}</p>
+                    <Label className="text-sm text-gray-600">병원명</Label>
+                    <p className="text-lg font-medium">{selectedResponse.survey_participants?.hospital_name || ""}</p>
                   </div>
                   <div>
-                    <Label>참여자명</Label>
-                    <p className="text-lg">{selectedResponse.survey_participants?.participant_name || ""}</p>
+                    <Label className="text-sm text-gray-600">참여자명</Label>
+                    <p className="text-lg font-medium">
+                      {selectedResponse.survey_participants?.participant_name || ""}
+                    </p>
                   </div>
                   <div>
-                    <Label>휴대폰번호</Label>
-                    <p className="text-lg">{selectedResponse.survey_participants?.phone_number || ""}</p>
+                    <Label className="text-sm text-gray-600">휴대폰번호</Label>
+                    <p className="text-lg font-medium">{selectedResponse.survey_participants?.phone_number || ""}</p>
                   </div>
                   <div>
-                    <Label>완료일시</Label>
-                    <p className="text-lg">{new Date(selectedResponse.created_at).toLocaleString("ko-KR")}</p>
+                    <Label className="text-sm text-gray-600">완료일시</Label>
+                    <p className="text-lg font-medium">
+                      {new Date(selectedResponse.created_at).toLocaleString("ko-KR")}
+                    </p>
                   </div>
                 </div>
-                <div>
-                  <Label>총점</Label>
-                  <p className="text-2xl font-bold">
+
+                <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                  <Label className="text-sm text-blue-800">총점</Label>
+                  <p className="text-3xl font-bold text-blue-600">
                     {selectedResponse.total_score || 0} / {selectedResponse.max_possible_score || 0}
                   </p>
+                </div>
+
+                <div>
+                  <h3 className="text-xl font-semibold mb-4">문항별 응답</h3>
+                  {loadingDetails ? (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">응답 내역을 불러오는 중...</p>
+                    </div>
+                  ) : detailedResponses.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">응답 내역이 없습니다.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {detailedResponses.map((detail, index) => (
+                        <div key={index} className="p-4 border rounded-lg hover:bg-gray-50">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-semibold text-gray-700">문항 {detail.question_number}</span>
+                                <span
+                                  className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                    detail.question_type === "subjective"
+                                      ? "bg-purple-100 text-purple-700"
+                                      : "bg-blue-100 text-blue-700"
+                                  }`}
+                                >
+                                  {detail.question_type === "subjective" ? "주관식" : "객관식"}
+                                </span>
+                              </div>
+                              <p className="text-gray-800">{detail.question_text}</p>
+                            </div>
+                          </div>
+                          <div className="mt-3 pl-4 border-l-4 border-gray-200">
+                            {detail.question_type === "subjective" ? (
+                              <div>
+                                <Label className="text-sm text-gray-600">응답 내용:</Label>
+                                <p className="mt-1 text-lg text-gray-900 whitespace-pre-wrap">
+                                  {detail.response_text || "(응답 없음)"}
+                                </p>
+                              </div>
+                            ) : (
+                              <div>
+                                <Label className="text-sm text-gray-600">점수:</Label>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-2xl font-bold text-blue-600">{detail.response_value || 0}</span>
+                                  <span className="text-gray-500">/ 5점</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
             <DialogFooter>
-              <Button onClick={() => setShowDetailModal(false)}>닫기</Button>
+              <Button onClick={() => setShowDetailModal(false)} className="px-6">
+                닫기
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
