@@ -187,14 +187,14 @@ export default function HospitalSurvey() {
   const handleSubmit = async () => {
     const allAnswered = questions.every((question) => {
       if (question.question_type === "subjective") {
-        return subjectiveAnswers[question.id]?.trim().length > 0
+        return true // 주관식은 미입력 허용
       } else {
         return answers[question.id] !== undefined
       }
     })
 
     if (!allAnswered) {
-      alert("모든 문항에 답변해 주세요.")
+      alert("모든 객관식 문항에 답변해 주세요.")
       return
     }
 
@@ -211,7 +211,7 @@ export default function HospitalSurvey() {
         participant_token: participant.token,
         question_id: question.id,
         response_value: question.question_type === "objective" ? answers[question.id] : null,
-        response_text: question.question_type === "subjective" ? subjectiveAnswers[question.id] : null,
+        response_text: question.question_type === "subjective" ? subjectiveAnswers[question.id]?.trim() || null : null,
       }))
 
       console.log("[v0] Responses to submit:", responses)
@@ -291,10 +291,7 @@ export default function HospitalSurvey() {
   }
 
   const currentQuestionData = questions[currentQuestion]
-  const currentAnswer =
-    currentQuestionData?.question_type === "objective"
-      ? answers[currentQuestionData?.id]
-      : subjectiveAnswers[currentQuestionData?.id]
+  const currentAnswer = currentQuestionData?.question_type === "objective" ? answers[currentQuestionData?.id] : true // 주관식은 항상 true로 설정하여 다음 버튼 활성화
   const progress = ((currentQuestion + 1) / questions.length) * 100
 
   const scaleLabels =
@@ -394,7 +391,10 @@ export default function HospitalSurvey() {
                 {currentQuestion === questions.length - 1 ? (
                   <Button
                     onClick={handleSubmit}
-                    disabled={!currentAnswer || isSubmitting}
+                    disabled={
+                      questions.some((q) => q.question_type === "objective" && answers[q.id] === undefined) ||
+                      isSubmitting
+                    }
                     size="lg"
                     className="text-base px-4 py-2 h-auto bg-green-600 hover:bg-green-700"
                   >
@@ -416,7 +416,7 @@ export default function HospitalSurvey() {
                   placeholder="여기에 답변을 입력해 주세요..."
                   className="min-h-[200px] text-base p-4 resize-none"
                 />
-                <p className="text-sm text-gray-500 text-center">자유롭게 의견을 작성해 주세요</p>
+                <p className="text-sm text-gray-500 text-center">자유롭게 의견을 작성해 주세요 (선택 사항)</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -445,10 +445,7 @@ export default function HospitalSurvey() {
           <h3 className="text-xl font-medium text-gray-800 mb-4">답변 현황</h3>
           <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
             {questions.map((question, index) => {
-              const isAnswered =
-                question.question_type === "objective"
-                  ? answers[question.id] !== undefined
-                  : subjectiveAnswers[question.id]?.trim().length > 0
+              const isAnswered = question.question_type === "objective" ? answers[question.id] !== undefined : true // 주관식은 항상 답변된 것으로 표시
               const isCurrent = index === currentQuestion
 
               return (
