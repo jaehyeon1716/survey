@@ -625,7 +625,6 @@ export default function AdminPage() {
 
       const questionStatsMap = questionsData.map((question) => {
         const questionResponses = filteredResponses.filter((r) => r.question_id === question.id)
-        const totalResponses = questionResponses.length
 
         // For objective questions, calculate average score
         const objectiveResponses = questionResponses.filter((r) => r.response_value !== null)
@@ -638,6 +637,8 @@ export default function AdminPage() {
         const textResponses = questionResponses
           .filter((r) => r.response_text !== null && r.response_text.trim() !== "")
           .map((r) => r.response_text)
+
+        const totalResponses = question.question_type === "subjective" ? textResponses.length : questionResponses.length
 
         return {
           id: question.id,
@@ -1011,23 +1012,31 @@ export default function AdminPage() {
 
     try {
       if (supabase) {
+        const { data: allQuestions, error: questionsError } = await supabase
+          .from("survey_questions")
+          .select("*")
+          .eq("survey_id", selectedSurvey.id)
+          .order("question_number", { ascending: true })
+
+        console.log("[v0] All questions for Excel:", allQuestions)
+
+        if (questionsError || !allQuestions) {
+          console.error("[v0] Error fetching questions:", questionsError)
+          alert("문항 정보를 가져오는 중 오류가 발생했습니다.")
+          return
+        }
+
         const { data: detailedResponses, error } = await supabase
           .from("survey_responses")
           .select(`
             question_id,
             response_value,
             response_text,
-            participant_token,
-            survey_questions (
-              question_text,
-              question_number,
-              question_type,
-              response_scale_type // response_scale_type 조회
-            )
+            participant_token
           `)
           .in(
             "question_id",
-            questionStats.map((q) => q.id),
+            allQuestions.map((q) => q.id),
           )
 
         console.log("[v0] Detailed responses query result:", { detailedResponses, error })
@@ -1053,13 +1062,19 @@ export default function AdminPage() {
             })
           }
 
+          const questionMap = new Map(allQuestions.map((q) => [q.id, q]))
+
           detailedResponses.forEach((response: any) => {
             const hospital = tokenToHospital[response.participant_token] || "알 수 없음"
             const questionId = response.question_id
-            const questionNumber = response.survey_questions?.question_number || 0
-            const questionText = response.survey_questions?.question_text || ""
-            const questionType = response.survey_questions?.question_type || "objective"
-            const responseScaleType = response.survey_questions?.response_scale_type || "agreement" // responseScaleType 사용
+            const question = questionMap.get(questionId)
+
+            if (!question) return
+
+            const questionNumber = question.question_number
+            const questionText = question.question_text
+            const questionType = question.question_type || "objective"
+            const responseScaleType = question.response_scale_type || "agreement"
 
             if (!hospitalQuestionStats[hospital]) {
               hospitalQuestionStats[hospital] = {}
@@ -1070,7 +1085,7 @@ export default function AdminPage() {
                 questionNumber,
                 questionText,
                 questionType,
-                responseScaleType, // responseScaleType 저장
+                responseScaleType,
                 responses: [],
                 textResponses: [],
                 total: 0,
@@ -1108,7 +1123,9 @@ export default function AdminPage() {
       [
         "전체 평균 점수",
         responses.length > 0
-          ? `${(responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length).toFixed(1)}/${responses.length > 0 ? responses[0].max_possible_score : 0}`
+          ? `${(responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length).toFixed(1)}/${
+              responses.length > 0 ? responses[0].max_possible_score : 0
+            }`
           : "0",
       ],
       [""],
