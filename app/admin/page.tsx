@@ -628,7 +628,7 @@ export default function AdminPage() {
 
       setQuestionStats(questionStatsMap)
     } catch (err) {
-      console.error("문항별 통계 조회 오류:", err)
+      setError("문항별 통계 조회 중 오류가 발생했습니다.")
     }
   }
 
@@ -986,14 +986,12 @@ export default function AdminPage() {
           .select(`
             question_id,
             response_value,
-            response_text, // Added response_text for subjective questions
+            response_text,
+            participant_token,
             survey_questions (
               question_text,
               question_number,
-              question_type // Added question_type
-            ),
-            survey_participants!inner (
-              hospital_name
+              question_type
             )
           `)
           .in(
@@ -1001,9 +999,31 @@ export default function AdminPage() {
             questionStats.map((q) => q.id),
           )
 
+        console.log("[v0] Detailed responses query result:", { detailedResponses, error })
+
+        if (error) {
+          console.error("[v0] Error fetching detailed responses:", error)
+        }
+
         if (!error && detailedResponses) {
+          const tokens = [...new Set(detailedResponses.map((r: any) => r.participant_token))]
+          const { data: participantsData, error: participantsError } = await supabase
+            .from("survey_participants")
+            .select("token, hospital_name")
+            .in("token", tokens)
+
+          console.log("[v0] Participants data:", { participantsData, participantsError })
+
+          // Create a map of token to hospital_name
+          const tokenToHospital: Record<string, string> = {}
+          if (participantsData) {
+            participantsData.forEach((p: any) => {
+              tokenToHospital[p.token] = p.hospital_name
+            })
+          }
+
           detailedResponses.forEach((response: any) => {
-            const hospital = response.survey_participants?.hospital_name || "알 수 없음"
+            const hospital = tokenToHospital[response.participant_token] || "알 수 없음"
             const questionId = response.question_id
             const questionNumber = response.survey_questions?.question_number || 0
             const questionText = response.survey_questions?.question_text || ""
@@ -1019,7 +1039,7 @@ export default function AdminPage() {
                 questionText,
                 questionType,
                 responses: [],
-                textResponses: [], // Added for subjective questions
+                textResponses: [],
                 total: 0,
                 count: 0,
               }
@@ -1032,12 +1052,8 @@ export default function AdminPage() {
                 hospitalQuestionStats[hospital][questionId].count += 1
               }
             } else {
-              // subjective question
               if (response.response_text !== null && response.response_text.trim() !== "") {
                 hospitalQuestionStats[hospital][questionId].textResponses.push(response.response_text)
-              }
-              // For subjective questions, count is based on presence of text response
-              if (response.response_text !== null && response.response_text.trim() !== "") {
                 hospitalQuestionStats[hospital][questionId].count += 1
               }
             }
@@ -1045,8 +1061,10 @@ export default function AdminPage() {
         }
       }
     } catch (err) {
-      console.error("병원별 문항별 통계 조회 오류:", err)
+      console.error("[v0] 병원별 문항별 통계 조회 오류:", err)
     }
+
+    console.log("[v0] Hospital question stats:", hospitalQuestionStats)
 
     const basicStats = [
       ["통계 항목", "값"],
@@ -1170,6 +1188,8 @@ export default function AdminPage() {
       ...hospitalStatsData,
       ...hospitalQuestionStatsData,
     ]
+
+    console.log("[v0] Excel data rows:", allData.length)
 
     const csvContent = allData.map((row) => row.map((field) => `"${field}"`).join(",")).join("\n")
 
