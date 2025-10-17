@@ -204,6 +204,8 @@ export default function HospitalSurvey() {
         throw new Error("설문 제출에 필요한 정보가 없습니다.")
       }
 
+      console.log("[v0] Submitting responses for participant:", participant.token)
+
       const responses = questions.map((question) => ({
         participant_token: participant.token,
         question_id: question.id,
@@ -211,22 +213,32 @@ export default function HospitalSurvey() {
         response_text: question.question_type === "subjective" ? subjectiveAnswers[question.id] : null,
       }))
 
+      console.log("[v0] Responses to submit:", responses)
+
       await supabase.from("survey_responses").delete().eq("participant_token", participant.token)
 
       const { error: insertError } = await supabase.from("survey_responses").insert(responses)
 
       if (insertError) {
+        console.error("[v0] Error submitting survey:", insertError)
+        console.error("[v0] Error details:", {
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint,
+          code: insertError.code,
+        })
+
         if (insertError.message.includes("이미 설문을 완료한 참여자입니다")) {
           setError("이미 완료된 설문입니다. 중복 응답은 불가능합니다.")
           return
         }
-        console.error("Error submitting survey:", insertError)
-        alert("설문 제출 중 오류가 발생했습니다. 다시 시도해 주세요.")
+        alert(`설문 제출 중 오류가 발생했습니다: ${insertError.message}`)
       } else {
+        console.log("[v0] Survey submitted successfully")
         setIsSubmitted(true)
       }
     } catch (error) {
-      console.error("Error:", error)
+      console.error("[v0] Unexpected error:", error)
       alert("설문 제출 중 오류가 발생했습니다. 다시 시도해 주세요.")
     } finally {
       setIsSubmitting(false)
