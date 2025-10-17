@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
 import { supabase } from "@/lib/supabase/client"
 import { CheckCircle, Heart, AlertCircle } from "lucide-react"
 
@@ -44,6 +45,7 @@ type Question = {
   id: number
   question_number: number
   question_text: string
+  question_type: "objective" | "subjective"
 }
 
 export default function HospitalSurvey() {
@@ -54,6 +56,7 @@ export default function HospitalSurvey() {
   const [survey, setSurvey] = useState<Survey | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
   const [answers, setAnswers] = useState<Record<number, number>>({})
+  const [subjectiveAnswers, setSubjectiveAnswers] = useState<Record<number, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [currentQuestion, setCurrentQuestion] = useState(0)
@@ -126,15 +129,22 @@ export default function HospitalSurvey() {
 
         const { data: existingResponses, error: responsesError } = await supabase
           .from("survey_responses")
-          .select("question_id, response_value")
+          .select("question_id, response_value, response_text")
           .eq("participant_token", token)
 
         if (!responsesError && existingResponses) {
           const existingAnswers: Record<number, number> = {}
+          const existingSubjectiveAnswers: Record<number, string> = {}
           existingResponses.forEach((response) => {
-            existingAnswers[response.question_id] = response.response_value
+            if (response.response_value !== null) {
+              existingAnswers[response.question_id] = response.response_value
+            }
+            if (response.response_text) {
+              existingSubjectiveAnswers[response.question_id] = response.response_text
+            }
           })
           setAnswers(existingAnswers)
+          setSubjectiveAnswers(existingSubjectiveAnswers)
         }
       } catch (err) {
         console.error("Token validation error:", err)
@@ -146,6 +156,82 @@ export default function HospitalSurvey() {
 
     validateTokenAndLoadSurvey()
   }, [token])
+
+  const handleAnswer = (questionId: number, value: number) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]: value,
+    }))
+  }
+
+  const handleSubjectiveAnswer = (questionId: number, text: string) => {
+    setSubjectiveAnswers((prev) => ({
+      ...prev,
+      [questionId]: text,
+    }))
+  }
+
+  const handleNext = () => {
+    if (currentQuestion < questions.length - 1) {
+      setCurrentQuestion(currentQuestion + 1)
+    }
+  }
+
+  const handlePrevious = () => {
+    if (currentQuestion > 0) {
+      setCurrentQuestion(currentQuestion - 1)
+    }
+  }
+
+  const handleSubmit = async () => {
+    const allAnswered = questions.every((question) => {
+      if (question.question_type === "subjective") {
+        return subjectiveAnswers[question.id]?.trim().length > 0
+      } else {
+        return answers[question.id] !== undefined
+      }
+    })
+
+    if (!allAnswered) {
+      alert("모든 문항에 답변해 주세요.")
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      if (!supabase || !participant) {
+        throw new Error("설문 제출에 필요한 정보가 없습니다.")
+      }
+
+      const responses = questions.map((question) => ({
+        participant_token: participant.token,
+        question_id: question.id,
+        response_value: question.question_type === "objective" ? answers[question.id] : null,
+        response_text: question.question_type === "subjective" ? subjectiveAnswers[question.id] : null,
+      }))
+
+      await supabase.from("survey_responses").delete().eq("participant_token", participant.token)
+
+      const { error: insertError } = await supabase.from("survey_responses").insert(responses)
+
+      if (insertError) {
+        if (insertError.message.includes("이미 설문을 완료한 참여자입니다")) {
+          setError("이미 완료된 설문입니다. 중복 응답은 불가능합니다.")
+          return
+        }
+        console.error("Error submitting survey:", insertError)
+        alert("설문 제출 중 오류가 발생했습니다. 다시 시도해 주세요.")
+      } else {
+        setIsSubmitted(true)
+      }
+    } catch (error) {
+      console.error("Error:", error)
+      alert("설문 제출 중 오류가 발생했습니다. 다시 시도해 주세요.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   if (!supabase) {
     return (
@@ -191,67 +277,14 @@ export default function HospitalSurvey() {
     )
   }
 
-  const handleAnswer = (questionId: number, value: number) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: value,
-    }))
-  }
+  const currentQuestionData = questions[currentQuestion]
+  const currentAnswer =
+    currentQuestionData?.question_type === "objective"
+      ? answers[currentQuestionData?.id]
+      : subjectiveAnswers[currentQuestionData?.id]
+  const progress = ((currentQuestion + 1) / questions.length) * 100
 
-  const handleNext = () => {
-    if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(currentQuestion + 1)
-    }
-  }
-
-  const handlePrevious = () => {
-    if (currentQuestion > 0) {
-      setCurrentQuestion(currentQuestion - 1)
-    }
-  }
-
-  const handleSubmit = async () => {
-    const allAnswered = questions.every((question) => answers[question.id] !== undefined)
-
-    if (!allAnswered) {
-      alert("모든 문항에 답변해 주세요.")
-      return
-    }
-
-    setIsSubmitting(true)
-
-    try {
-      if (!supabase || !participant) {
-        throw new Error("설문 제출에 필요한 정보가 없습니다.")
-      }
-
-      const responses = questions.map((question) => ({
-        participant_token: participant.token,
-        question_id: question.id,
-        response_value: answers[question.id],
-      }))
-
-      await supabase.from("survey_responses").delete().eq("participant_token", participant.token)
-
-      const { error: insertError } = await supabase.from("survey_responses").insert(responses)
-
-      if (insertError) {
-        if (insertError.message.includes("이미 설문을 완료한 참여자입니다")) {
-          setError("이미 완료된 설문입니다. 중복 응답은 불가능합니다.")
-          return
-        }
-        console.error("Error submitting survey:", insertError)
-        alert("설문 제출 중 오류가 발생했습니다. 다시 시도해 주세요.")
-      } else {
-        setIsSubmitted(true)
-      }
-    } catch (error) {
-      console.error("Error:", error)
-      alert("설문 제출 중 오류가 발생했습니다. 다시 시도해 주세요.")
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+  const scaleLabels = currentQuestionData.id === 33 ? scaleLabels_9 : scaleLabels_default
 
   if (!questions.length) {
     return (
@@ -267,12 +300,6 @@ export default function HospitalSurvey() {
       </div>
     )
   }
-
-  const currentQuestionData = questions[currentQuestion]
-  const currentAnswer = answers[currentQuestionData?.id]
-  const progress = ((currentQuestion + 1) / questions.length) * 100
-
-  const scaleLabels = currentQuestionData.id === 33 ? scaleLabels_9 : scaleLabels_default;
 
   if (isSubmitted) {
     return (
@@ -297,7 +324,6 @@ export default function HospitalSurvey() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
       <div className="max-w-4xl mx-auto">
-        {/* 헤더 */}
         <div className="text-center mb-8">
           <Heart className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-4xl font-bold text-gray-800 mb-2">{survey?.title || "설문조사"}</h1>
@@ -315,7 +341,6 @@ export default function HospitalSurvey() {
           )}
         </div>
 
-        {/* 진행률 표시 */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-2">
             <span className="text-lg font-medium text-gray-700">
@@ -331,7 +356,6 @@ export default function HospitalSurvey() {
           </div>
         </div>
 
-        {/* 현재 질문 */}
         <Card className="mb-6">
           <CardHeader className="pb-4">
             <CardTitle className="text-xl text-center text-gray-800">문항 {currentQuestion + 1}</CardTitle>
@@ -341,7 +365,6 @@ export default function HospitalSurvey() {
               {currentQuestionData?.question_text}
             </h2>
 
-            {/* 네비게이션 버튼 */}
             <div className="flex justify-between items-center mb-6">
               <Button
                 onClick={handlePrevious}
@@ -371,24 +394,36 @@ export default function HospitalSurvey() {
               </div>
             </div>
 
-            <div className="space-y-3">
-              {scaleLabels.map((scale) => (
-                <button
-                  key={scale.value}
-                  onClick={() => handleAnswer(currentQuestionData.id, scale.value)}
-                  className={`w-full px-3 py-2 rounded-xl border-2 transition-all duration-200 text-base font-medium ${
-                    currentAnswer === scale.value
-                      ? `${scale.color} text-white border-gray-400 shadow-lg scale-105`
-                      : "bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:shadow-md"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span>{scale.label}</span>
-                    <span className="text-lg font-bold">{scale.value}점</span>
-                  </div>
-                </button>
-              ))}
-            </div>
+            {currentQuestionData?.question_type === "subjective" ? (
+              <div className="space-y-4">
+                <Textarea
+                  value={subjectiveAnswers[currentQuestionData.id] || ""}
+                  onChange={(e) => handleSubjectiveAnswer(currentQuestionData.id, e.target.value)}
+                  placeholder="여기에 답변을 입력해 주세요..."
+                  className="min-h-[200px] text-base p-4 resize-none"
+                />
+                <p className="text-sm text-gray-500 text-center">자유롭게 의견을 작성해 주세요</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {scaleLabels.map((scale) => (
+                  <button
+                    key={scale.value}
+                    onClick={() => handleAnswer(currentQuestionData.id, scale.value)}
+                    className={`w-full px-3 py-2 rounded-xl border-2 transition-all duration-200 text-base font-medium ${
+                      answers[currentQuestionData.id] === scale.value
+                        ? `${scale.color} text-white border-gray-400 shadow-lg scale-105`
+                        : "bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:shadow-md"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>{scale.label}</span>
+                      <span className="text-lg font-bold">{scale.value}점</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -396,7 +431,10 @@ export default function HospitalSurvey() {
           <h3 className="text-xl font-medium text-gray-800 mb-4">답변 현황</h3>
           <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
             {questions.map((question, index) => {
-              const isAnswered = answers[question.id] !== undefined
+              const isAnswered =
+                question.question_type === "objective"
+                  ? answers[question.id] !== undefined
+                  : subjectiveAnswers[question.id]?.trim().length > 0
               const isCurrent = index === currentQuestion
 
               return (
