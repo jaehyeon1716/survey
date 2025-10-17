@@ -85,9 +85,11 @@ interface QuestionStat {
   id: number
   questionNumber: number
   questionText: string
+  questionType: string
   totalResponses: number
   averageScore: string
   maxScore: number
+  textResponses?: string[] // For subjective questions
 }
 
 export default function AdminPage() {
@@ -572,10 +574,12 @@ export default function AdminPage() {
         .select(`
           question_id,
           response_value,
+          response_text,
           participant_token,
           survey_questions (
             question_text,
-            question_number
+            question_number,
+            question_type
           ),
           survey_participants!inner (
             hospital_name
@@ -597,16 +601,28 @@ export default function AdminPage() {
       const questionStatsMap = questionsData.map((question) => {
         const questionResponses = responsesData.filter((r: any) => r.question_id === question.id)
         const totalResponses = questionResponses.length
+
+        // For objective questions, calculate average score
+        const objectiveResponses = questionResponses.filter((r: any) => r.response_value !== null)
         const averageScore =
-          totalResponses > 0 ? questionResponses.reduce((sum, r: any) => sum + r.response_value, 0) / totalResponses : 0
+          objectiveResponses.length > 0
+            ? objectiveResponses.reduce((sum, r: any) => sum + r.response_value, 0) / objectiveResponses.length
+            : 0
+
+        // For subjective questions, collect text responses
+        const textResponses = questionResponses
+          .filter((r: any) => r.response_text !== null && r.response_text.trim() !== "")
+          .map((r: any) => r.response_text)
 
         return {
           id: question.id,
           questionNumber: question.question_number,
           questionText: question.question_text,
+          questionType: question.question_type || "objective",
           totalResponses,
           averageScore: averageScore.toFixed(1),
           maxScore: 5,
+          textResponses,
         }
       })
 
@@ -970,9 +986,11 @@ export default function AdminPage() {
           .select(`
             question_id,
             response_value,
+            response_text, // Added response_text for subjective questions
             survey_questions (
               question_text,
-              question_number
+              question_number,
+              question_type // Added question_type
             ),
             survey_participants!inner (
               hospital_name
@@ -989,6 +1007,7 @@ export default function AdminPage() {
             const questionId = response.question_id
             const questionNumber = response.survey_questions?.question_number || 0
             const questionText = response.survey_questions?.question_text || ""
+            const questionType = response.survey_questions?.question_type || "objective"
 
             if (!hospitalQuestionStats[hospital]) {
               hospitalQuestionStats[hospital] = {}
@@ -998,15 +1017,30 @@ export default function AdminPage() {
               hospitalQuestionStats[hospital][questionId] = {
                 questionNumber,
                 questionText,
+                questionType,
                 responses: [],
+                textResponses: [], // Added for subjective questions
                 total: 0,
                 count: 0,
               }
             }
 
-            hospitalQuestionStats[hospital][questionId].responses.push(response.response_value)
-            hospitalQuestionStats[hospital][questionId].total += response.response_value
-            hospitalQuestionStats[hospital][questionId].count += 1
+            if (questionType === "objective") {
+              if (response.response_value !== null) {
+                hospitalQuestionStats[hospital][questionId].responses.push(response.response_value)
+                hospitalQuestionStats[hospital][questionId].total += response.response_value
+                hospitalQuestionStats[hospital][questionId].count += 1
+              }
+            } else {
+              // subjective question
+              if (response.response_text !== null && response.response_text.trim() !== "") {
+                hospitalQuestionStats[hospital][questionId].textResponses.push(response.response_text)
+              }
+              // For subjective questions, count is based on presence of text response
+              if (response.response_text !== null && response.response_text.trim() !== "") {
+                hospitalQuestionStats[hospital][questionId].count += 1
+              }
+            }
           })
         }
       }
@@ -1029,15 +1063,26 @@ export default function AdminPage() {
       [""],
     ]
 
-    const questionStatsData = [
-      ["문항별 통계"],
+    const objectiveQuestionStatsData = [
+      ["객관식 문항별 통계"],
       ["문항 번호", "문항 내용", "응답 수", "평균 점수"],
-      ...questionStats.map((stat) => [
-        stat.questionNumber.toString(),
-        stat.questionText,
-        stat.totalResponses.toString(),
-        `${stat.averageScore}/${stat.maxScore}`,
-      ]),
+      ...questionStats
+        .filter((stat) => stat.questionType === "objective")
+        .map((stat) => [
+          stat.questionNumber.toString(),
+          stat.questionText,
+          stat.totalResponses.toString(),
+          `${stat.averageScore}/${stat.maxScore}`,
+        ]),
+      [""],
+    ]
+
+    const subjectiveQuestionStatsData = [
+      ["주관식 문항별 통계"],
+      ["문항 번호", "문항 내용", "응답 수"],
+      ...questionStats
+        .filter((stat) => stat.questionType === "subjective")
+        .map((stat) => [stat.questionNumber.toString(), stat.questionText, stat.totalResponses.toString()]),
       [""],
     ]
 
@@ -1064,7 +1109,7 @@ export default function AdminPage() {
 
     const hospitalQuestionStatsData = [
       ["병원별 문항별 상세 통계"],
-      ["병원명", "문항 번호", "문항 내용", "응답 수", "평균 점수"],
+      ["병원명", "문항 번호", "문항 내용", "문항 유형", "응답 수", "평균 점수", "응답 내용 (주관식)"],
     ]
 
     Object.keys(hospitalQuestionStats)
@@ -1077,14 +1122,29 @@ export default function AdminPage() {
         )
 
         sortedQuestions.forEach((questionData: any) => {
-          const average = questionData.count > 0 ? (questionData.total / questionData.count).toFixed(1) : "0"
-          hospitalQuestionStatsData.push([
-            hospital,
-            questionData.questionNumber.toString(),
-            questionData.questionText,
-            questionData.count.toString(),
-            `${average}/5`,
-          ])
+          if (questionData.questionType === "objective") {
+            const average = questionData.count > 0 ? (questionData.total / questionData.count).toFixed(1) : "0"
+            hospitalQuestionStatsData.push([
+              hospital,
+              questionData.questionNumber.toString(),
+              questionData.questionText,
+              "객관식",
+              questionData.count.toString(),
+              `${average}/5`,
+              "", // No subjective responses for objective questions
+            ])
+          } else {
+            // subjective
+            hospitalQuestionStatsData.push([
+              hospital,
+              questionData.questionNumber.toString(),
+              questionData.questionText,
+              "주관식",
+              questionData.count.toString(),
+              "", // No average score for subjective questions
+              questionData.textResponses ? questionData.textResponses.join("; ") : "", // Join multiple responses
+            ])
+          }
         })
 
         const hospitalTotalStats = hospitalStats[hospital]
@@ -1093,15 +1153,23 @@ export default function AdminPage() {
             hospital,
             "전체",
             "모든 문항 평균",
+            "",
             hospitalTotalStats.count.toString(),
             `${(hospitalTotalStats.totalScore / hospitalTotalStats.count).toFixed(1)}/${hospitalTotalStats.maxScore}`,
+            "",
           ])
         }
 
-        hospitalQuestionStatsData.push(["", "", "", "", ""])
+        hospitalQuestionStatsData.push(["", "", "", "", "", "", ""])
       })
 
-    const allData = [...basicStats, ...questionStatsData, ...hospitalStatsData, ...hospitalQuestionStatsData]
+    const allData = [
+      ...basicStats,
+      ...objectiveQuestionStatsData,
+      ...subjectiveQuestionStatsData,
+      ...hospitalStatsData,
+      ...hospitalQuestionStatsData,
+    ]
 
     const csvContent = allData.map((row) => row.map((field) => `"${field}"`).join(",")).join("\n")
 
@@ -1777,7 +1845,7 @@ export default function AdminPage() {
 
                       <div>
                         <div className="flex justify-between items-center mb-4">
-                          <h3 className="text-xl font-semibold">문항별 평균점수</h3>
+                          <h3 className="text-xl font-semibold">객관식 문항 평균점수</h3>
                           <div className="flex items-center space-x-2">
                             <Label htmlFor="hospitalFilter" className="text-sm">
                               병원 필터:
@@ -1791,7 +1859,7 @@ export default function AdminPage() {
                             />
                           </div>
                         </div>
-                        {questionStats.length > 0 ? (
+                        {questionStats.filter((stat) => stat.questionType === "objective").length > 0 ? (
                           <div className="overflow-x-auto">
                             <table className="w-full border-collapse border border-gray-300">
                               <thead>
@@ -1809,58 +1877,59 @@ export default function AdminPage() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {questionStats.map((stat) => (
-                                  <tr key={stat.id} className="hover:bg-gray-50">
-                                    <td className="border border-gray-300 px-4 py-3">{stat.questionNumber}</td>
-                                    <td className="border border-gray-300 px-4 py-3">{stat.questionText}</td>
-                                    <td className="border border-gray-300 px-4 py-3">{stat.totalResponses}</td>
-                                    <td className="border border-gray-300 px-4 py-3">
-                                      {stat.averageScore}/{stat.maxScore}
-                                    </td>
-                                  </tr>
-                                ))}
+                                {questionStats
+                                  .filter((stat) => stat.questionType === "objective")
+                                  .map((stat) => (
+                                    <tr key={stat.id} className="hover:bg-gray-50">
+                                      <td className="border border-gray-300 px-4 py-3">{stat.questionNumber}</td>
+                                      <td className="border border-gray-300 px-4 py-3">{stat.questionText}</td>
+                                      <td className="border border-gray-300 px-4 py-3">{stat.totalResponses}</td>
+                                      <td className="border border-gray-300 px-4 py-3">
+                                        {stat.averageScore}/{stat.maxScore}
+                                      </td>
+                                    </tr>
+                                  ))}
                               </tbody>
                             </table>
                           </div>
                         ) : (
-                          <p className="text-gray-500">문항별 통계 데이터가 없습니다.</p>
+                          <p className="text-gray-500">객관식 문항이 없습니다.</p>
                         )}
                       </div>
 
                       <div>
-                        <h3 className="text-xl font-semibold mb-4">병원별 통계</h3>
-                        <div className="overflow-x-auto">
-                          <table className="w-full border-collapse border border-gray-300">
-                            <thead>
-                              <tr className="bg-gray-100">
-                                <th className="border border-gray-300 px-4 py-3 text-left font-semibold">병원명</th>
-                                <th className="border border-gray-300 px-4 py-3 text-left font-semibold">응답 수</th>
-                                <th className="border border-gray-300 px-4 py-3 text-left font-semibold">평균 점수</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {Object.entries(
-                                responses.reduce((acc: Record<string, any>, response) => {
-                                  const hospital = response.survey_participants?.hospital_name || "알 수 없음"
-                                  if (!acc[hospital]) {
-                                    acc[hospital] = { count: 0, totalScore: 0, maxScore: response.max_possible_score }
-                                  }
-                                  acc[hospital].count += 1
-                                  acc[hospital].totalScore += response.total_score || 0
-                                  return acc
-                                }, {}),
-                              ).map(([hospital, stats]: [string, any]) => (
-                                <tr key={hospital} className="hover:bg-gray-50">
-                                  <td className="border border-gray-300 px-4 py-3">{hospital}</td>
-                                  <td className="border border-gray-300 px-4 py-3">{stats.count}</td>
-                                  <td className="border border-gray-300 px-4 py-3">
-                                    {(stats.totalScore / stats.count).toFixed(1)}/{stats.maxScore}
-                                  </td>
-                                </tr>
+                        <h3 className="text-xl font-semibold mb-4">주관식 문항 응답</h3>
+                        {questionStats.filter((stat) => stat.questionType === "subjective").length > 0 ? (
+                          <div className="space-y-6">
+                            {questionStats
+                              .filter((stat) => stat.questionType === "subjective")
+                              .map((stat) => (
+                                <Card key={stat.id}>
+                                  <CardHeader>
+                                    <CardTitle className="text-lg">
+                                      {stat.questionNumber}. {stat.questionText}
+                                    </CardTitle>
+                                    <CardDescription>총 {stat.totalResponses}개의 응답</CardDescription>
+                                  </CardHeader>
+                                  <CardContent>
+                                    {stat.textResponses && stat.textResponses.length > 0 ? (
+                                      <div className="space-y-3">
+                                        {stat.textResponses.map((response, index) => (
+                                          <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                            <p className="text-sm text-gray-700">{response}</p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-gray-500">응답이 없습니다.</p>
+                                    )}
+                                  </CardContent>
+                                </Card>
                               ))}
-                            </tbody>
-                          </table>
-                        </div>
+                          </div>
+                        ) : (
+                          <p className="text-gray-500">주관식 문항이 없습니다.</p>
+                        )}
                       </div>
                     </div>
                   )}
