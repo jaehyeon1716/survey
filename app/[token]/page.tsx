@@ -39,6 +39,7 @@ type Survey = {
   title: string
   description: string
   is_active: boolean
+  response_scale_type?: string
 }
 
 type Question = {
@@ -86,7 +87,8 @@ export default function HospitalSurvey() {
               id,
               title,
               description,
-              is_active
+              is_active,
+              response_scale_type
             )
           `)
           .eq("token", token)
@@ -296,7 +298,7 @@ export default function HospitalSurvey() {
       : subjectiveAnswers[currentQuestionData?.id]
   const progress = ((currentQuestion + 1) / questions.length) * 100
 
-  const scaleLabels = currentQuestionData.id === 33 ? scaleLabels_9 : scaleLabels_default
+  const scaleLabels = survey?.response_scale_type === "satisfaction" ? scaleLabels_9 : scaleLabels_default
 
   if (!questions.length) {
     return (

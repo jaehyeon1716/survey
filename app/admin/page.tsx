@@ -39,6 +39,7 @@ interface Survey {
   description: string
   is_active: boolean
   created_at: string
+  response_scale_type?: "agreement" | "satisfaction" // Added response scale type
   survey_questions?: Array<{
     id: number
     question_text: string
@@ -113,6 +114,7 @@ export default function AdminPage() {
   const [newSurveyQuestions, setNewSurveyQuestions] = useState<Array<{ text: string; type: string }>>([
     { text: "", type: "objective" },
   ])
+  const [responseScaleType, setResponseScaleType] = useState<"agreement" | "satisfaction">("agreement")
   const [createLoading, setCreateLoading] = useState(false)
 
   const [questionStats, setQuestionStats] = useState<QuestionStat[]>([])
@@ -215,6 +217,7 @@ export default function AdminPage() {
                 <li>설문지 제목과 설명을 입력합니다</li>
                 <li>문항을 하나씩 추가합니다 (예: "의료진의 친절도에 만족하십니까?")</li>
                 <li>문항 유형을 선택하세요 (객관식 - 5점 척도 / 주관식 - 텍스트)</li>
+                <li><span class="highlight">응답 척도 유형을 선택하세요.</span></li>
               </ul>
               <div class="info">
                 💡 <strong>팁:</strong> 문항은 명확하고 이해하기 쉽게 작성하세요. 고령자가 주 대상이므로 간단한 표현을 사용하는 것이 좋습니다.
@@ -656,8 +659,8 @@ export default function AdminPage() {
         body: JSON.stringify({
           title: newSurveyTitle.trim(),
           description: newSurveyDescription.trim(),
-          // Pass questions with text and type
           questions: validQuestions.map((q) => ({ text: q.text, type: q.type })),
+          responseScaleType: responseScaleType,
         }),
       })
 
@@ -668,6 +671,7 @@ export default function AdminPage() {
         setNewSurveyTitle("")
         setNewSurveyDescription("")
         setNewSurveyQuestions([{ text: "", type: "objective" }])
+        setResponseScaleType("agreement")
         fetchSurveys()
       } else {
         setError(data.error || "설문지 생성 중 오류가 발생했습니다.")
@@ -1350,6 +1354,28 @@ export default function AdminPage() {
                       placeholder="설문지에 대한 간단한 설명을 입력하세요"
                       rows={3}
                     />
+                  </div>
+
+                  <div className="p-4 border rounded-lg bg-blue-50">
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        id="satisfactionScale"
+                        checked={responseScaleType === "satisfaction"}
+                        onChange={(e) => setResponseScaleType(e.target.checked ? "satisfaction" : "agreement")}
+                        className="mt-1 w-5 h-5 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <Label htmlFor="satisfactionScale" className="text-base font-medium cursor-pointer">
+                          만족도 척도 사용
+                        </Label>
+                        <p className="text-sm text-gray-600 mt-1">
+                          체크 시: 매우 만족한다 ~ 매우 만족하지 않는다
+                          <br />
+                          미체크 시: 매우 그렇다 ~ 전혀 그렇지 않다
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
                   <div>

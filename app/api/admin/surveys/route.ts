@@ -45,19 +45,19 @@ export async function POST(request: NextRequest) {
   const supabase = createClient(supabaseUrl, supabaseKey)
 
   try {
-    const { title, description, questions } = await request.json()
+    const { title, description, questions, responseScaleType } = await request.json()
 
     if (!title || !questions || questions.length === 0) {
       return NextResponse.json({ error: "제목과 문항은 필수입니다." }, { status: 400 })
     }
 
-    // 설문지 생성
     const { data: survey, error: surveyError } = await supabase
       .from("surveys")
       .insert({
         title,
         description: description || "",
         is_active: true,
+        response_scale_type: responseScaleType || "agreement",
       })
       .select()
       .single()
