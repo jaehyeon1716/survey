@@ -148,6 +148,12 @@ export default function AdminPage() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deletePassword, setDeletePassword] = useState("")
 
+  const [uploadProgress, setUploadProgress] = useState<{
+    current: number
+    total: number
+    percentage: number
+  } | null>(null)
+
   const downloadParticipantsExcel = () => {
     if (!selectedSurvey || filteredParticipants.length === 0) {
       alert("다운로드할 참여자 데이터가 없습니다.")
@@ -762,41 +768,102 @@ export default function AdminPage() {
     setLoading(true)
     setError("")
     setUploadSuccess("")
+    setUploadProgress(null)
 
     try {
-      const formData = new FormData()
-      formData.append("csvFile", selectedFile)
+      // Read and parse CSV on client side
+      const csvText = await selectedFile.text()
+      const lines = csvText.trim().split("\n")
 
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 600000) // 10 minutes
-
-      const response = await fetch(`/api/admin/surveys/${selectedSurvey.id}/participants`, {
-        method: "POST",
-        body: formData,
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
-
-      const result = await response.json()
-
-      if (response.ok) {
-        const batchInfo = result.batches ? ` (${result.batches}개 배치로 처리됨)` : ""
-        setUploadSuccess(result.message + batchInfo)
-        setSelectedFile(null)
-        const fileInput = document.getElementById("csvFile") as HTMLInputElement
-        if (fileInput) fileInput.value = ""
-        fetchParticipants(selectedSurvey.id)
-      } else {
-        setError(result.error || "업로드 중 오류가 발생했습니다.")
+      if (lines.length === 0) {
+        setError("CSV 파일이 비어있습니다.")
+        setLoading(false)
+        return
       }
+
+      // Parse all participants
+      const participants: Array<{
+        hospital_name: string
+        participant_name: string
+        phone_number: string
+      }> = []
+      const uniqueParticipants = new Set()
+
+      for (const line of lines) {
+        const [hospitalName, participantName, phoneNumber] = line.split("|").map((item) => item.trim())
+
+        if (!hospitalName || !participantName || !phoneNumber) {
+          continue
+        }
+
+        const participantKey = `${hospitalName}|${participantName}|${phoneNumber}`
+        if (uniqueParticipants.has(participantKey)) {
+          continue
+        }
+        uniqueParticipants.add(participantKey)
+
+        participants.push({
+          hospital_name: hospitalName,
+          participant_name: participantName,
+          phone_number: phoneNumber,
+        })
+      }
+
+      if (participants.length === 0) {
+        setError("유효한 참여자 데이터가 없습니다.")
+        setLoading(false)
+        return
+      }
+
+      // Split into chunks of 500 participants
+      const CHUNK_SIZE = 500
+      const chunks: (typeof participants)[] = []
+      for (let i = 0; i < participants.length; i += CHUNK_SIZE) {
+        chunks.push(participants.slice(i, i + CHUNK_SIZE))
+      }
+
+      console.log(`[v0] 총 ${participants.length}명을 ${chunks.length}개 청크로 나누어 업로드 시작`)
+
+      // Upload each chunk
+      let successCount = 0
+      for (let i = 0; i < chunks.length; i++) {
+        setUploadProgress({
+          current: i + 1,
+          total: chunks.length,
+          percentage: Math.round(((i + 1) / chunks.length) * 100),
+        })
+
+        const response = await fetch(`/api/admin/surveys/${selectedSurvey.id}/participants`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            participants: chunks[i],
+            isFirstBatch: i === 0,
+          }),
+        })
+
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.error || `청크 ${i + 1}/${chunks.length} 업로드 실패`)
+        }
+
+        successCount += chunks[i].length
+        console.log(`[v0] 청크 ${i + 1}/${chunks.length} 완료: ${successCount}/${participants.length}명 등록됨`)
+      }
+
+      setUploadSuccess(`${successCount}명의 참여자가 성공적으로 등록되었습니다. (${chunks.length}개 배치로 처리됨)`)
+      setSelectedFile(null)
+      setUploadProgress(null)
+      const fileInput = document.getElementById("csvFile") as HTMLInputElement
+      if (fileInput) fileInput.value = ""
+      fetchParticipants(selectedSurvey.id)
     } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
-        setError("업로드 시간이 초과되었습니다. 파일 크기를 줄이거나 나누어서 업로드해주세요.")
-      } else {
-        setError("업로드 중 오류가 발생했습니다.")
-      }
+      setError(err instanceof Error ? err.message : "업로드 중 오류가 발생했습니다.")
       console.error("[v0] Upload error:", err)
+      setUploadProgress(null)
     } finally {
       setLoading(false)
     }
@@ -1675,6 +1742,23 @@ export default function AdminPage() {
                       >
                         {loading ? "업로드 중..." : "CSV 파일 업로드"}
                       </Button>
+
+                      {uploadProgress && (
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm text-gray-600">
+                            <span>
+                              진행 중: {uploadProgress.current} / {uploadProgress.total} 배치
+                            </span>
+                            <span>{uploadProgress.percentage}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-3">
+                            <div
+                              className="bg-green-600 h-3 rounded-full transition-all duration-300"
+                              style={{ width: `${uploadProgress.percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
 
                       {uploadSuccess && (
                         <Alert className="border-green-200 bg-green-50">
