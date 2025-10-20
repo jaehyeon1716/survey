@@ -1714,7 +1714,7 @@ export default function AdminPage() {
                       value={newSurveyTitle}
                       onChange={(e) => setNewSurveyTitle(e.target.value)}
                       className="mt-2 h-12 text-lg"
-                      placeholder="예: 2024년 병원 만족도 조사"
+                      placeholder="예: 2025년 병원 만족도 조사"
                     />
                   </div>
 
