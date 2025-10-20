@@ -654,7 +654,7 @@ export default function AdminPage() {
     }
   }
 
-  const fetchResponses = async (surveyId?: number) => {
+  const fetchResponses = async (surveyId?: number, hospitalName?: string) => {
     if (!supabase) return
 
     setLoading(true)
@@ -664,6 +664,26 @@ export default function AdminPage() {
 
       if (surveyId) {
         countQuery = countQuery.eq("survey_id", surveyId)
+      }
+
+      if (hospitalName && hospitalName.trim()) {
+        // Need to join with survey_participants to filter by hospital
+        const { data: participantTokens } = await supabase
+          .from("survey_participants")
+          .select("token")
+          .eq("survey_id", surveyId || 0)
+          .ilike("hospital_name", `%${hospitalName.trim()}%`)
+
+        if (participantTokens && participantTokens.length > 0) {
+          const tokens = participantTokens.map((p) => p.token)
+          countQuery = countQuery.in("participant_token", tokens)
+        } else {
+          // No participants match the filter, set count to 0
+          setTotalResponsesCount(0)
+          setResponses([])
+          setLoading(false)
+          return
+        }
       }
 
       const { count, error: countError } = await countQuery
@@ -681,10 +701,23 @@ export default function AdminPage() {
           )
         `)
         .order("created_at", { ascending: false })
-        .range(0, 9999) // Fetch first 10k for display
+        .range(0, 9999)
 
       if (surveyId) {
         query = query.eq("survey_id", surveyId)
+      }
+
+      if (hospitalName && hospitalName.trim()) {
+        const { data: participantTokens } = await supabase
+          .from("survey_participants")
+          .select("token")
+          .eq("survey_id", surveyId || 0)
+          .ilike("hospital_name", `%${hospitalName.trim()}%`)
+
+        if (participantTokens && participantTokens.length > 0) {
+          const tokens = participantTokens.map((p) => p.token)
+          query = query.in("participant_token", tokens)
+        }
       }
 
       const { data, error } = await query
@@ -693,10 +726,9 @@ export default function AdminPage() {
       setResponses(data || [])
 
       if (surveyId) {
-        await fetchQuestionStats(surveyId)
+        await fetchQuestionStats(surveyId, hospitalName)
       }
     } catch (err) {
-      // Consider adding an error state for response fetching if needed
       console.error("Error fetching responses:", err)
     } finally {
       setLoading(false)
@@ -1501,8 +1533,8 @@ export default function AdminPage() {
     try {
       await Promise.all([
         fetchSurveys(),
-        fetchParticipants(selectedSurvey.id, participantsPage, participantsPerPage), // Pass pagination params
-        fetchResponses(selectedSurvey.id),
+        fetchParticipants(selectedSurvey.id, participantsPage, participantsPerPage),
+        fetchResponses(selectedSurvey.id, hospitalFilter),
         fetchQuestionStats(selectedSurvey.id, hospitalFilter),
       ])
     } catch (err) {
@@ -1523,7 +1555,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (selectedSurvey) {
       fetchParticipants(selectedSurvey.id, participantsPage, participantsPerPage)
-      fetchResponses(selectedSurvey.id)
+      fetchResponses(selectedSurvey.id, hospitalFilter)
     }
   }, [selectedSurvey, participantsPage, participantsPerPage, hospitalFilter, statusFilter])
 
