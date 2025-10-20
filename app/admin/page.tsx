@@ -238,7 +238,7 @@ export default function AdminPage() {
         .join("\n")
 
       const BOM = "\uFEFF"
-      const blob = new Blob([BOM + headers.join(",") + "\n" + csvContent], { type: "text/csv;charset=utf-8;" })
+      const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" })
 
       const link = document.createElement("a")
       const url = URL.createObjectURL(blob)
@@ -2300,7 +2300,6 @@ export default function AdminPage() {
                     </div>
                   ) : (
                     <div className="space-y-8">
-                      {/* START: CHANGED CODE */}
                       <div className="mb-4">
                         <h3 className="text-xl font-semibold mb-2">설문 통계</h3>
                         <div className="grid grid-cols-4 gap-4">
@@ -2354,7 +2353,6 @@ export default function AdminPage() {
                           </Card>
                         </div>
                       </div>
-                      {/* END: CHANGED CODE */}
 
                       <div>
                         <div className="flex justify-between items-center mb-4">
