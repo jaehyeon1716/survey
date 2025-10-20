@@ -159,6 +159,9 @@ export default function AdminPage() {
   const [responsesPage, setResponsesPage] = useState(1)
   const [responsesPerPage, setResponsesPerPage] = useState(10)
 
+  const [totalParticipantsCount, setTotalParticipantsCount] = useState(0)
+  const [totalResponsesCount, setTotalResponsesCount] = useState(0)
+
   const downloadParticipantsExcel = () => {
     if (!selectedSurvey || filteredParticipants.length === 0) {
       alert("다운로드할 참여자 데이터가 없습니다.")
@@ -531,7 +534,21 @@ export default function AdminPage() {
 
     setLoading(true)
     try {
-      let query = supabase.from("survey_participants").select("*").order("created_at", { ascending: false })
+      let countQuery = supabase.from("survey_participants").select("*", { count: "exact", head: true })
+
+      if (surveyId) {
+        countQuery = countQuery.eq("survey_id", surveyId)
+      }
+
+      const { count, error: countError } = await countQuery
+      if (countError) throw countError
+      setTotalParticipantsCount(count || 0)
+
+      let query = supabase
+        .from("survey_participants")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .range(0, 9999) // Fetch first 10k for display
 
       if (surveyId) {
         query = query.eq("survey_id", surveyId)
@@ -553,6 +570,16 @@ export default function AdminPage() {
 
     setLoading(true)
     try {
+      let countQuery = supabase.from("survey_response_summaries").select("*", { count: "exact", head: true })
+
+      if (surveyId) {
+        countQuery = countQuery.eq("survey_id", surveyId)
+      }
+
+      const { count, error: countError } = await countQuery
+      if (countError) throw countError
+      setTotalResponsesCount(count || 0)
+
       let query = supabase
         .from("survey_response_summaries")
         .select(`
@@ -564,6 +591,7 @@ export default function AdminPage() {
           )
         `)
         .order("created_at", { ascending: false })
+        .range(0, 9999) // Fetch first 10k for display
 
       if (surveyId) {
         query = query.eq("survey_id", surveyId)
@@ -1895,7 +1923,9 @@ export default function AdminPage() {
                     </div>
 
                     <div className="text-sm text-gray-600 mb-2">
-                      총 {participants.length}명 중 {filteredParticipants.length}명 표시
+                      총 {totalParticipantsCount.toLocaleString()}명 중{" "}
+                      {Math.min(participantsPage * participantsPerPage, filteredParticipants.length).toLocaleString()}명
+                      표시
                     </div>
 
                     <div className="flex justify-between items-center mb-4">
@@ -2160,31 +2190,37 @@ export default function AdminPage() {
                     </div>
                   ) : (
                     <div className="space-y-8">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                        <div className="bg-blue-50 p-6 rounded-lg">
-                          <h3 className="text-lg font-semibold text-blue-800">총 참여자</h3>
-                          <p className="text-3xl font-bold text-blue-600">{participants.length}명</p>
-                        </div>
-                        <div className="bg-green-50 p-6 rounded-lg">
-                          <h3 className="text-lg font-semibold text-green-800">완료된 설문</h3>
-                          <p className="text-3xl font-bold text-green-600">{responses.length}명</p>
-                        </div>
-                        <div className="bg-yellow-50 p-6 rounded-lg">
-                          <h3 className="text-lg font-semibold text-yellow-800">완료율</h3>
-                          <p className="text-3xl font-bold text-yellow-600">
-                            {participants.length > 0 ? Math.round((responses.length / participants.length) * 100) : 0}%
-                          </p>
-                        </div>
-                        <div className="bg-purple-50 p-6 rounded-lg">
-                          <h3 className="text-lg font-semibold text-purple-800">평균 점수</h3>
-                          <p className="text-3xl font-bold text-purple-600">
-                            {responses.length > 0
-                              ? (
-                                  responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length
-                                ).toFixed(1)
-                              : "0"}
-                            /{responses.length > 0 ? responses[0].max_possible_score : 0}
-                          </p>
+                      <div className="mb-4">
+                        <h3 className="text-xl font-semibold mb-2">설문 통계</h3>
+                        <div className="grid grid-cols-3 gap-4">
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm font-medium text-muted-foreground">총 참여자</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-2xl font-bold">{totalParticipantsCount.toLocaleString()}명</div>
+                            </CardContent>
+                          </Card>
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm font-medium text-muted-foreground">완료</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-2xl font-bold text-green-600">
+                                {totalResponsesCount.toLocaleString()}명
+                              </div>
+                            </CardContent>
+                          </Card>
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm font-medium text-muted-foreground">미완료</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-2xl font-bold text-orange-600">
+                                {(totalParticipantsCount - totalResponsesCount).toLocaleString()}명
+                              </div>
+                            </CardContent>
+                          </Card>
                         </div>
                       </div>
 
