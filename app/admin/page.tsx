@@ -133,8 +133,11 @@ export default function AdminPage() {
 
   const [surveyError, setSurveyError] = useState("")
   const [surveySuccess, setSurveySuccess] = useState("")
-  const [participantError, setParticipantError] = useState("")
+  const [duplicateParticipants, setDuplicateParticipants] = useState<
+    Array<{ hospital_name: string; participant_name: string; phone_number: string }>
+  >([])
   const [participantSuccess, setParticipantSuccess] = useState("")
+  const [participantError, setParticipantError] = useState("")
 
   const [questionStats, setQuestionStats] = useState<QuestionStat[]>([])
   const [hospitalFilter, setHospitalFilter] = useState<string>("")
@@ -732,7 +735,7 @@ export default function AdminPage() {
       setResponses(data || [])
 
       if (surveyId) {
-        await fetchQuestionStats(surveyId, hospitalName)
+        await fetchQuestionStats(surveyId, hospitalFilter)
       }
     } catch (err) {
       console.error("Error fetching responses:", err)
@@ -935,6 +938,7 @@ export default function AdminPage() {
     setParticipantError("")
     setParticipantSuccess("")
     setUploadProgress(null)
+    setDuplicateParticipants([])
 
     try {
       // Read and parse CSV on client side
@@ -954,6 +958,11 @@ export default function AdminPage() {
         phone_number: string
       }> = []
       const uniqueParticipants = new Set()
+      const duplicates: Array<{
+        hospital_name: string
+        participant_name: string
+        phone_number: string
+      }> = []
 
       for (const line of lines) {
         const [hospitalName, participantName, phoneNumber] = line.split("|").map((item) => item.trim())
@@ -964,6 +973,11 @@ export default function AdminPage() {
 
         const participantKey = `${hospitalName}|${participantName}|${phoneNumber}`
         if (uniqueParticipants.has(participantKey)) {
+          duplicates.push({
+            hospital_name: hospitalName,
+            participant_name: participantName,
+            phone_number: phoneNumber,
+          })
           continue
         }
         uniqueParticipants.add(participantKey)
@@ -1020,9 +1034,13 @@ export default function AdminPage() {
         console.log(`[v0] 청크 ${i + 1}/${chunks.length} 완료: ${totalUploaded}/${participants.length}명 등록됨`)
       }
 
-      setParticipantSuccess(
-        `${totalUploaded}명의 참여자가 성공적으로 등록되었습니다. (${chunks.length}개 배치로 처리됨)`,
-      )
+      let successMessage = `${totalUploaded}명의 참여자가 성공적으로 등록되었습니다.`
+      if (duplicates.length > 0) {
+        successMessage += ` (중복 ${duplicates.length}건 제외)`
+        setDuplicateParticipants(duplicates)
+      }
+
+      setParticipantSuccess(successMessage)
       setSelectedFile(null)
       setUploadProgress(null)
       const fileInput = document.getElementById("csvFile") as HTMLInputElement
@@ -1965,12 +1983,42 @@ export default function AdminPage() {
                         </div>
                       )}
 
-                      {/* Update to use participantSuccess and participantError */}
                       {participantSuccess && (
                         <Alert className="border-green-200 bg-green-50">
                           <CheckCircle2 className="h-5 w-5 text-green-600" />
                           <AlertDescription className="text-green-700 text-lg font-medium">
                             {participantSuccess}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      {duplicateParticipants.length > 0 && (
+                        <Alert className="border-yellow-200 bg-yellow-50 mt-4">
+                          <AlertCircle className="h-5 w-5 text-yellow-600" />
+                          <AlertDescription>
+                            <div className="text-yellow-800">
+                              <p className="font-semibold mb-2">중복된 참여자 {duplicateParticipants.length}건</p>
+                              <div className="max-h-60 overflow-y-auto">
+                                <table className="w-full text-sm">
+                                  <thead className="bg-yellow-100 sticky top-0">
+                                    <tr>
+                                      <th className="px-2 py-1 text-left">병원명</th>
+                                      <th className="px-2 py-1 text-left">참여자명</th>
+                                      <th className="px-2 py-1 text-left">휴대폰번호</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {duplicateParticipants.map((dup, index) => (
+                                      <tr key={index} className="border-t border-yellow-200">
+                                        <td className="px-2 py-1">{dup.hospital_name}</td>
+                                        <td className="px-2 py-1">{dup.participant_name}</td>
+                                        <td className="px-2 py-1">{dup.phone_number}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
                           </AlertDescription>
                         </Alert>
                       )}
@@ -2664,7 +2712,7 @@ export default function AdminPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>설문지 삭제</AlertDialogTitle>
               <AlertDialogDescription>
-                정말로 이 설문지를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                정말로 이 설문지를 삭제하겠습니까? 이 작업은 되돌릴 수 없습니다.
                 <br />
                 <br />
                 삭제하려면 관리자 비밀번호를 입력하세요:
