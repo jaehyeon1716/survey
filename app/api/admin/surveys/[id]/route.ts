@@ -80,17 +80,45 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
     if (participants && participants.length > 0) {
       const tokens = participants.map((p) => p.token)
-      const { error: responsesError } = await supabase.from("survey_responses").delete().in("participant_token", tokens)
+      const batchSize = 500
 
-      if (responsesError) throw responsesError
+      for (let i = 0; i < tokens.length; i += batchSize) {
+        const batch = tokens.slice(i, i + batchSize)
+        const { error: responsesError } = await supabase
+          .from("survey_responses")
+          .delete()
+          .in("participant_token", batch)
+
+        if (responsesError) throw responsesError
+      }
     }
 
-    const { error: participantsError } = await supabase
-      .from("survey_participants")
-      .delete()
-      .eq("survey_id", Number.parseInt(surveyId))
+    const participantBatchSize = 1000
+    let deletedCount = 0
 
-    if (participantsError) throw participantsError
+    while (true) {
+      const { data: batch, error: batchError } = await supabase
+        .from("survey_participants")
+        .select("id")
+        .eq("survey_id", Number.parseInt(surveyId))
+        .limit(participantBatchSize)
+
+      if (batchError) throw batchError
+      if (!batch || batch.length === 0) break
+
+      const { error: deleteError } = await supabase
+        .from("survey_participants")
+        .delete()
+        .in(
+          "id",
+          batch.map((p) => p.id),
+        )
+
+      if (deleteError) throw deleteError
+
+      deletedCount += batch.length
+      if (batch.length < participantBatchSize) break
+    }
 
     const { error: questionsError } = await supabase
       .from("survey_questions")

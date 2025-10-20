@@ -1072,6 +1072,7 @@ export default function AdminPage() {
     try {
       const response = await fetch(`/api/admin/surveys/${surveyToDelete.id}`, {
         method: "DELETE",
+        signal: AbortSignal.timeout(600000), // 10 minutes
       })
 
       const data = await response.json()
@@ -1089,7 +1090,8 @@ export default function AdminPage() {
         setError(data.error || "설문지 삭제 중 오류가 발생했습니다.")
       }
     } catch (err) {
-      setError("설문지 삭제 중 오류가 발생했습니다.")
+      console.error("[v0] 설문지 삭제 오류:", err)
+      setError("설문지 삭제 중 오류가 발생했습니다. 참여자가 많은 경우 시간이 걸릴 수 있습니다.")
     } finally {
       setDeleteLoading(false)
     }
