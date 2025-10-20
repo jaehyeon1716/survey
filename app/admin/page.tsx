@@ -232,7 +232,7 @@ export default function AdminPage() {
             <div class="step-content">
               <ul>
                 <li><span class="highlight">'설문지 목록'</span> 탭에서 기존 설문지를 확인할 수 있습니다</li>
-                <li><span class="highlight">'수정'</span> 버튼으로 설문지 내용을 변경할 수 있습니다</li>
+                //<li><span class="highlight">'수정'</span> 버튼으로 설문지 내용을 변경할 수 있습니다</li>
                 <li><span class="highlight">'삭제'</span> 시에는 보안을 위해 관리자 비밀번호를 다시 입력해야 합니다</li>
               </ul>
               <div class="warning">
@@ -625,6 +625,7 @@ export default function AdminPage() {
 
       const questionStatsMap = questionsData.map((question) => {
         const questionResponses = filteredResponses.filter((r) => r.question_id === question.id)
+        const totalResponses = questionResponses.length
 
         // For objective questions, calculate average score
         const objectiveResponses = questionResponses.filter((r) => r.response_value !== null)
@@ -637,8 +638,6 @@ export default function AdminPage() {
         const textResponses = questionResponses
           .filter((r) => r.response_text !== null && r.response_text.trim() !== "")
           .map((r) => r.response_text)
-
-        const totalResponses = question.question_type === "subjective" ? textResponses.length : questionResponses.length
 
         return {
           id: question.id,
@@ -1009,35 +1008,26 @@ export default function AdminPage() {
     }
 
     const hospitalQuestionStats: Record<string, Record<number, any>> = {}
-    const allSubjectiveResponses: Array<{ questionNumber: number; hospitalName: string; responseText: string }> = []
 
     try {
       if (supabase) {
-        const { data: allQuestions, error: questionsError } = await supabase
-          .from("survey_questions")
-          .select("*")
-          .eq("survey_id", selectedSurvey.id)
-          .order("question_number", { ascending: true })
-
-        console.log("[v0] All questions for Excel:", allQuestions)
-
-        if (questionsError || !allQuestions) {
-          console.error("[v0] Error fetching questions:", questionsError)
-          alert("문항 정보를 가져오는 중 오류가 발생했습니다.")
-          return
-        }
-
         const { data: detailedResponses, error } = await supabase
           .from("survey_responses")
           .select(`
             question_id,
             response_value,
             response_text,
-            participant_token
+            participant_token,
+            survey_questions (
+              question_text,
+              question_number,
+              question_type,
+              response_scale_type // response_scale_type 조회
+            )
           `)
           .in(
             "question_id",
-            allQuestions.map((q) => q.id),
+            questionStats.map((q) => q.id),
           )
 
         console.log("[v0] Detailed responses query result:", { detailedResponses, error })
@@ -1055,6 +1045,7 @@ export default function AdminPage() {
 
           console.log("[v0] Participants data:", { participantsData, participantsError })
 
+          // Create a map of token to hospital_name
           const tokenToHospital: Record<string, string> = {}
           if (participantsData) {
             participantsData.forEach((p: any) => {
@@ -1062,19 +1053,13 @@ export default function AdminPage() {
             })
           }
 
-          const questionMap = new Map(allQuestions.map((q) => [q.id, q]))
-
           detailedResponses.forEach((response: any) => {
             const hospital = tokenToHospital[response.participant_token] || "알 수 없음"
             const questionId = response.question_id
-            const question = questionMap.get(questionId)
-
-            if (!question) return
-
-            const questionNumber = question.question_number
-            const questionText = question.question_text
-            const questionType = question.question_type || "objective"
-            const responseScaleType = question.response_scale_type || "agreement"
+            const questionNumber = response.survey_questions?.question_number || 0
+            const questionText = response.survey_questions?.question_text || ""
+            const questionType = response.survey_questions?.question_type || "objective"
+            const responseScaleType = response.survey_questions?.response_scale_type || "agreement" // responseScaleType 사용
 
             if (!hospitalQuestionStats[hospital]) {
               hospitalQuestionStats[hospital] = {}
@@ -1085,7 +1070,7 @@ export default function AdminPage() {
                 questionNumber,
                 questionText,
                 questionType,
-                responseScaleType,
+                responseScaleType, // responseScaleType 저장
                 responses: [],
                 textResponses: [],
                 total: 0,
@@ -1103,12 +1088,6 @@ export default function AdminPage() {
               if (response.response_text !== null && response.response_text.trim() !== "") {
                 hospitalQuestionStats[hospital][questionId].textResponses.push(response.response_text)
                 hospitalQuestionStats[hospital][questionId].count += 1
-
-                allSubjectiveResponses.push({
-                  questionNumber,
-                  hospitalName: hospital,
-                  responseText: response.response_text,
-                })
               }
             }
           })
@@ -1129,9 +1108,7 @@ export default function AdminPage() {
       [
         "전체 평균 점수",
         responses.length > 0
-          ? `${(responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length).toFixed(1)}/${
-              responses.length > 0 ? responses[0].max_possible_score : 0
-            }`
+          ? `${(responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length).toFixed(1)}/${responses.length > 0 ? responses[0].max_possible_score : 0}`
           : "0",
       ],
       [""],
@@ -1240,22 +1217,12 @@ export default function AdminPage() {
         hospitalQuestionStatsData.push(["", "", "", "", "", "", "", ""]) // 열 개수 조정
       })
 
-    const subjectiveResponsesData = [
-      ["주관식 응답내용"],
-      ["문항번호", "병원명", "응답내용"],
-      ...allSubjectiveResponses
-        .sort((a, b) => a.questionNumber - b.questionNumber)
-        .map((response) => [response.questionNumber.toString(), response.hospitalName, response.responseText]),
-      [""],
-    ]
-
     const allData = [
       ...basicStats,
       ...objectiveQuestionStatsData,
       ...subjectiveQuestionStatsData,
       ...hospitalStatsData,
       ...hospitalQuestionStatsData,
-      ...subjectiveResponsesData, // Added new subjective responses section
     ]
 
     console.log("[v0] Excel data rows:", allData.length)
