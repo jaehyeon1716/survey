@@ -154,6 +154,11 @@ export default function AdminPage() {
     percentage: number
   } | null>(null)
 
+  const [participantsPage, setParticipantsPage] = useState(1)
+  const [participantsPerPage, setParticipantsPerPage] = useState(10)
+  const [responsesPage, setResponsesPage] = useState(1)
+  const [responsesPerPage, setResponsesPerPage] = useState(10)
+
   const downloadParticipantsExcel = () => {
     if (!selectedSurvey || filteredParticipants.length === 0) {
       alert("다운로드할 참여자 데이터가 없습니다.")
@@ -1409,6 +1414,14 @@ export default function AdminPage() {
     filterParticipants()
   }, [filterParticipants])
 
+  useEffect(() => {
+    setParticipantsPage(1)
+  }, [hospitalFilter, statusFilter, filteredParticipants.length])
+
+  useEffect(() => {
+    setResponsesPage(1)
+  }, [responses.length])
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -1447,6 +1460,15 @@ export default function AdminPage() {
       </div>
     )
   }
+
+  const paginatedParticipants = filteredParticipants.slice(
+    (participantsPage - 1) * participantsPerPage,
+    participantsPage * participantsPerPage,
+  )
+  const totalParticipantsPages = Math.ceil(filteredParticipants.length / participantsPerPage)
+
+  const paginatedResponses = responses.slice((responsesPage - 1) * responsesPerPage, responsesPage * responsesPerPage)
+  const totalResponsesPages = Math.ceil(responses.length / responsesPerPage)
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -1876,6 +1898,45 @@ export default function AdminPage() {
                       총 {participants.length}명 중 {filteredParticipants.length}명 표시
                     </div>
 
+                    <div className="flex justify-between items-center mb-4">
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium text-gray-700">페이지당 표시:</label>
+                        <select
+                          value={participantsPerPage}
+                          onChange={(e) => {
+                            setParticipantsPerPage(Number(e.target.value))
+                            setParticipantsPage(1)
+                          }}
+                          className="px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value={10}>10건</option>
+                          <option value={100}>100건</option>
+                          <option value={1000}>1000건</option>
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => setParticipantsPage((prev) => Math.max(1, prev - 1))}
+                          disabled={participantsPage === 1}
+                          variant="outline"
+                          size="sm"
+                        >
+                          이전
+                        </Button>
+                        <span className="text-sm text-gray-700">
+                          {participantsPage} / {totalParticipantsPages || 1}
+                        </span>
+                        <Button
+                          onClick={() => setParticipantsPage((prev) => Math.min(totalParticipantsPages, prev + 1))}
+                          disabled={participantsPage >= totalParticipantsPages}
+                          variant="outline"
+                          size="sm"
+                        >
+                          다음
+                        </Button>
+                      </div>
+                    </div>
+
                     <div className="overflow-x-auto">
                       <table className="w-full border-collapse border border-gray-300">
                         <thead>
@@ -1895,7 +1956,7 @@ export default function AdminPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredParticipants.map((participant) => (
+                          {paginatedParticipants.map((participant) => (
                             <tr key={participant.id} className="hover:bg-gray-50">
                               <td className="border border-gray-300 px-4 py-3 text-lg">{participant.hospital_name}</td>
                               <td className="border border-gray-300 px-4 py-3 text-lg">
@@ -1980,6 +2041,45 @@ export default function AdminPage() {
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
+                    <div className="flex justify-between items-center mb-4">
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium text-gray-700">페이지당 표시:</label>
+                        <select
+                          value={responsesPerPage}
+                          onChange={(e) => {
+                            setResponsesPerPage(Number(e.target.value))
+                            setResponsesPage(1)
+                          }}
+                          className="px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value={10}>10건</option>
+                          <option value={100}>100건</option>
+                          <option value={1000}>1000건</option>
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => setResponsesPage((prev) => Math.max(1, prev - 1))}
+                          disabled={responsesPage === 1}
+                          variant="outline"
+                          size="sm"
+                        >
+                          이전
+                        </Button>
+                        <span className="text-sm text-gray-700">
+                          {responsesPage} / {totalResponsesPages || 1}
+                        </span>
+                        <Button
+                          onClick={() => setResponsesPage((prev) => Math.min(totalResponsesPages, prev + 1))}
+                          disabled={responsesPage >= totalResponsesPages}
+                          variant="outline"
+                          size="sm"
+                        >
+                          다음
+                        </Button>
+                      </div>
+                    </div>
+
                     <table className="w-full border-collapse border border-gray-300">
                       <thead>
                         <tr className="bg-gray-100">
@@ -1994,7 +2094,7 @@ export default function AdminPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {responses.map((response) => (
+                        {paginatedResponses.map((response) => (
                           <tr key={response.id} className="hover:bg-gray-50">
                             <td className="border border-gray-300 px-4 py-3 text-lg">
                               {response.survey_participants?.hospital_name || ""}
