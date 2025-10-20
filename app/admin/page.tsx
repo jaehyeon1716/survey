@@ -767,15 +767,22 @@ export default function AdminPage() {
       const formData = new FormData()
       formData.append("csvFile", selectedFile)
 
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 600000) // 10 minutes
+
       const response = await fetch(`/api/admin/surveys/${selectedSurvey.id}/participants`, {
         method: "POST",
         body: formData,
+        signal: controller.signal,
       })
+
+      clearTimeout(timeoutId)
 
       const result = await response.json()
 
       if (response.ok) {
-        setUploadSuccess(result.message)
+        const batchInfo = result.batches ? ` (${result.batches}개 배치로 처리됨)` : ""
+        setUploadSuccess(result.message + batchInfo)
         setSelectedFile(null)
         const fileInput = document.getElementById("csvFile") as HTMLInputElement
         if (fileInput) fileInput.value = ""
@@ -784,7 +791,12 @@ export default function AdminPage() {
         setError(result.error || "업로드 중 오류가 발생했습니다.")
       }
     } catch (err) {
-      setError("업로드 중 오류가 발생했습니다.")
+      if (err instanceof Error && err.name === "AbortError") {
+        setError("업로드 시간이 초과되었습니다. 파일 크기를 줄이거나 나누어서 업로드해주세요.")
+      } else {
+        setError("업로드 중 오류가 발생했습니다.")
+      }
+      console.error("[v0] Upload error:", err)
     } finally {
       setLoading(false)
     }

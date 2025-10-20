@@ -2,6 +2,8 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { randomBytes } from "crypto"
 
+const BATCH_SIZE = 1000
+
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     await supabase.from("survey_participants").delete().eq("survey_id", Number.parseInt(surveyId))
 
     const participants = []
-    const uniqueParticipants = new Set() // 중복 방지를 위한 Set
+    const uniqueParticipants = new Set()
 
     for (const line of lines) {
       const [hospitalName, participantName, phoneNumber] = line.split("|").map((item) => item.trim())
@@ -67,16 +69,36 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "유효한 참여자 데이터가 없습니다." }, { status: 400 })
     }
 
-    const { error } = await supabase.from("survey_participants").insert(participants)
+    let totalInserted = 0
+    const totalBatches = Math.ceil(participants.length / BATCH_SIZE)
 
-    if (error) throw error
+    for (let i = 0; i < participants.length; i += BATCH_SIZE) {
+      const batch = participants.slice(i, i + BATCH_SIZE)
+      const { error } = await supabase.from("survey_participants").insert(batch)
+
+      if (error) {
+        console.error(`배치 ${Math.floor(i / BATCH_SIZE) + 1}/${totalBatches} 삽입 오류:`, error)
+        throw new Error(`배치 처리 중 오류 발생: ${error.message}`)
+      }
+
+      totalInserted += batch.length
+      console.log(
+        `[v0] 진행률: ${totalInserted}/${participants.length} (${Math.round((totalInserted / participants.length) * 100)}%)`,
+      )
+    }
 
     return NextResponse.json({
       message: `${participants.length}명의 참여자가 성공적으로 등록되었습니다.`,
       count: participants.length,
+      batches: totalBatches,
     })
   } catch (error) {
     console.error("참여자 등록 오류:", error)
-    return NextResponse.json({ error: "참여자 등록 중 오류가 발생했습니다." }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "참여자 등록 중 오류가 발생했습니다.",
+      },
+      { status: 500 },
+    )
   }
 }
