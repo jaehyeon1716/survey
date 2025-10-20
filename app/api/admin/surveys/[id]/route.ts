@@ -71,51 +71,62 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   const surveyId = params.id
 
   try {
-    const batchSize = 500
-    let totalDeleted = 0
+    // Step 1: Delete all responses for this survey's participants using subquery
+    const { error: responsesError } = await supabase
+      .from("survey_responses")
+      .delete()
+      .in(
+        "participant_token",
+        supabase.from("survey_participants").select("token").eq("survey_id", Number.parseInt(surveyId)),
+      )
 
-    while (true) {
-      const { data: participantBatch, error: fetchError } = await supabase
-        .from("survey_participants")
-        .select("token, id")
-        .eq("survey_id", Number.parseInt(surveyId))
-        .limit(batchSize)
-
-      if (fetchError) throw fetchError
-      if (!participantBatch || participantBatch.length === 0) break
-
-      const tokens = participantBatch.map((p) => p.token)
-      const ids = participantBatch.map((p) => p.id)
-
-      const { error: responsesError } = await supabase.from("survey_responses").delete().in("participant_token", tokens)
-
-      if (responsesError) throw responsesError
-
-      const { error: participantsError } = await supabase.from("survey_participants").delete().in("id", ids)
-
-      if (participantsError) throw participantsError
-
-      totalDeleted += participantBatch.length
-
-      if (participantBatch.length < batchSize) break
+    if (responsesError) {
+      console.error("[v0] 응답 삭제 오류:", responsesError)
+      throw responsesError
     }
 
+    // Step 2: Delete all participants for this survey
+    const { error: participantsError } = await supabase
+      .from("survey_participants")
+      .delete()
+      .eq("survey_id", Number.parseInt(surveyId))
+
+    if (participantsError) {
+      console.error("[v0] 참여자 삭제 오류:", participantsError)
+      throw participantsError
+    }
+
+    // Step 3: Delete all questions for this survey
     const { error: questionsError } = await supabase
       .from("survey_questions")
       .delete()
       .eq("survey_id", Number.parseInt(surveyId))
 
-    if (questionsError) throw questionsError
+    if (questionsError) {
+      console.error("[v0] 문항 삭제 오류:", questionsError)
+      throw questionsError
+    }
 
+    // Step 4: Delete the survey itself
     const { error: surveyError } = await supabase.from("surveys").delete().eq("id", Number.parseInt(surveyId))
 
-    if (surveyError) throw surveyError
+    if (surveyError) {
+      console.error("[v0] 설문지 삭제 오류:", surveyError)
+      throw surveyError
+    }
+
+    console.log("[v0] 설문지 삭제 완료:", surveyId)
 
     return NextResponse.json({
-      message: `설문지가 성공적으로 삭제되었습니다. (${totalDeleted}명의 참여자 삭제됨)`,
+      message: "설문지가 성공적으로 삭제되었습니다.",
     })
   } catch (error) {
-    console.error("설문지 삭제 오류:", error)
-    return NextResponse.json({ error: "설문지 삭제 중 오류가 발생했습니다." }, { status: 500 })
+    console.error("[v0] 설문지 삭제 오류:", error)
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "설문지 삭제 중 오류가 발생했습니다.",
+      },
+      { status: 500 },
+    )
   }
 }
