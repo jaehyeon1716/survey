@@ -20,8 +20,8 @@ const scaleLabels_satisfaction = [
   { value: 5, label: "매우 만족한다", color: "bg-green-500" },
   { value: 4, label: "만족한다", color: "bg-green-400" },
   { value: 3, label: "보통이다", color: "bg-yellow-400" },
-  { value: 2, label: "불만족한다", color: "bg-orange-400" },
-  { value: 1, label: "매우 불만족한다", color: "bg-red-400" },
+  { value: 2, label: "만족하지 않는다", color: "bg-orange-400" },
+  { value: 1, label: "매우 만족하지 않는다", color: "bg-red-400" },
 ]
 
 type Participant = {
@@ -187,7 +187,7 @@ export default function HospitalSurvey() {
   const handleSubmit = async () => {
     const allAnswered = questions.every((question) => {
       if (question.question_type === "subjective") {
-        return true // 주관식은 미입력 허용
+        return subjectiveAnswers[question.id]?.trim().length > 0 // 주관식은 실제 입력이 있을 때만 답변된 것으로 표시
       } else {
         return answers[question.id] !== undefined
       }
@@ -393,6 +393,9 @@ export default function HospitalSurvey() {
                     onClick={handleSubmit}
                     disabled={
                       questions.some((q) => q.question_type === "objective" && answers[q.id] === undefined) ||
+                      questions.some(
+                        (q) => q.question_type === "subjective" && subjectiveAnswers[q.id]?.trim().length === 0,
+                      ) ||
                       isSubmitting
                     }
                     size="lg"
@@ -445,7 +448,10 @@ export default function HospitalSurvey() {
           <h3 className="text-xl font-medium text-gray-800 mb-4">답변 현황</h3>
           <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
             {questions.map((question, index) => {
-              const isAnswered = question.question_type === "objective" ? answers[question.id] !== undefined : true // 주관식은 항상 답변된 것으로 표시
+              const isAnswered =
+                question.question_type === "objective"
+                  ? answers[question.id] !== undefined
+                  : subjectiveAnswers[question.id]?.trim().length > 0 // 주관식도 실제 입력이 있을 때만 답변된 것으로 표시
               const isCurrent = index === currentQuestion
 
               return (
