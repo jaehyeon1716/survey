@@ -132,6 +132,7 @@ export default function AdminPage() {
 
   const [questionStats, setQuestionStats] = useState<QuestionStat[]>([])
   const [hospitalFilter, setHospitalFilter] = useState<string>("")
+  const [hospitalSearchInput, setHospitalSearchInput] = useState<string>("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [filteredParticipants, setFilteredParticipants] = useState<Participant[]>([])
 
@@ -161,6 +162,17 @@ export default function AdminPage() {
 
   const [totalParticipantsCount, setTotalParticipantsCount] = useState(0)
   const [totalResponsesCount, setTotalResponsesCount] = useState(0)
+
+  const handleHospitalSearch = () => {
+    setHospitalFilter(hospitalSearchInput)
+    setParticipantsPage(1)
+  }
+
+  const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleHospitalSearch()
+    }
+  }
 
   const downloadParticipantsExcel = () => {
     if (!selectedSurvey || filteredParticipants.length === 0) {
@@ -1889,16 +1901,22 @@ export default function AdminPage() {
                     <div className="flex flex-col sm:flex-row gap-4 p-4 bg-gray-50 rounded-lg">
                       <div className="flex-1">
                         <label className="block text-sm font-medium text-gray-700 mb-2">병원명 검색</label>
-                        <input
-                          type="text"
-                          placeholder="병원명을 입력하세요"
-                          value={hospitalFilter}
-                          onChange={(e) => {
-                            setHospitalFilter(e.target.value)
-                            setParticipantsPage(1)
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="병원명을 입력하세요"
+                            value={hospitalSearchInput}
+                            onChange={(e) => setHospitalSearchInput(e.target.value)}
+                            onKeyPress={handleSearchKeyPress}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                          <Button
+                            onClick={handleHospitalSearch}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            검색
+                          </Button>
+                        </div>
                       </div>
                       <div className="flex-1">
                         <label className="block text-sm font-medium text-gray-700 mb-2">완료 상태</label>
@@ -1926,6 +1944,7 @@ export default function AdminPage() {
                         </Button>
                         <Button
                           onClick={() => {
+                            setHospitalSearchInput("")
                             setHospitalFilter("")
                             setStatusFilter("all")
                             setParticipantsPage(1)
@@ -2297,11 +2316,9 @@ export default function AdminPage() {
                             </Label>
                             <Input
                               id="hospitalFilter"
-                              value={hospitalFilter}
-                              onChange={(e) => {
-                                setHospitalFilter(e.target.value)
-                                setParticipantsPage(1) // Reset to first page on filter change
-                              }}
+                              value={hospitalSearchInput}
+                              onChange={(e) => setHospitalSearchInput(e.target.value)}
+                              onKeyPress={handleSearchKeyPress}
                               placeholder="병원명 입력"
                               className="w-48"
                             />
