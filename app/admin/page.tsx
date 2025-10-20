@@ -174,6 +174,12 @@ export default function AdminPage() {
     setParticipantsPage(1)
   }
 
+  const handleResetHospitalFilter = () => {
+    setHospitalSearchInput("")
+    setHospitalFilter("")
+    setParticipantsPage(1)
+  }
+
   const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       handleHospitalSearch()
@@ -2376,155 +2382,168 @@ export default function AdminPage() {
                     <div className="text-center py-8">
                       <p className="text-xl text-gray-500">설문지를 선택해주세요</p>
                     </div>
-                  ) : responses.length === 0 ? (
-                    <div className="text-center py-8">
-                      <p className="text-xl text-gray-500">통계를 표시할 데이터가 없습니다</p>
-                    </div>
                   ) : (
                     <div className="space-y-8">
-                      <div className="mb-4">
-                        <h3 className="text-xl font-semibold mb-2">설문 통계</h3>
-                        <div className="grid grid-cols-4 gap-4">
-                          <Card>
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm font-medium text-muted-foreground">총 참여자</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="text-2xl font-bold">{totalParticipantsCount.toLocaleString()}명</div>
-                            </CardContent>
-                          </Card>
-                          <Card>
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm font-medium text-muted-foreground">완료</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="text-2xl font-bold text-green-600">
-                                {totalResponsesCount.toLocaleString()}명
-                              </div>
-                            </CardContent>
-                          </Card>
-                          <Card>
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm font-medium text-muted-foreground">완료율</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="text-2xl font-bold text-blue-600">
-                                {totalParticipantsCount > 0
-                                  ? ((totalResponsesCount / totalParticipantsCount) * 100).toFixed(1)
-                                  : "0.0"}
-                                %
-                              </div>
-                            </CardContent>
-                          </Card>
-                          <Card>
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm font-medium text-muted-foreground">평균 점수</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="text-2xl font-bold text-purple-600">
-                                {responses.length > 0
-                                  ? (
-                                      responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length
-                                    ).toFixed(2)
-                                  : "0.00"}
-                                {responses.length > 0 && responses[0]?.max_possible_score
-                                  ? ` / ${responses[0].max_possible_score}`
-                                  : ""}
-                              </div>
-                            </CardContent>
-                          </Card>
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-xl font-semibold">병원 필터</h3>
+                        <div className="flex items-center space-x-2">
+                          <Input
+                            value={hospitalSearchInput}
+                            onChange={(e) => setHospitalSearchInput(e.target.value)}
+                            onKeyPress={handleSearchKeyPress}
+                            placeholder="병원명 입력"
+                            className="w-48"
+                          />
+                          <Button onClick={handleHospitalSearch} variant="outline">
+                            검색
+                          </Button>
+                          <Button onClick={handleResetHospitalFilter} variant="outline">
+                            필터 초기화
+                          </Button>
                         </div>
                       </div>
 
-                      <div>
-                        <div className="flex justify-between items-center mb-4">
-                          <h3 className="text-xl font-semibold">객관식 문항 평균점수</h3>
-                          <div className="flex items-center space-x-2">
-                            <Label htmlFor="hospitalFilter" className="text-sm">
-                              병원 필터:
-                            </Label>
-                            <Input
-                              id="hospitalFilter"
-                              value={hospitalSearchInput}
-                              onChange={(e) => setHospitalSearchInput(e.target.value)}
-                              onKeyPress={handleSearchKeyPress}
-                              placeholder="병원명 입력"
-                              className="w-48"
-                            />
-                          </div>
+                      {responses.length === 0 ? (
+                        <div className="text-center py-8">
+                          <p className="text-xl text-gray-500">통계를 표시할 데이터가 없습니다</p>
                         </div>
-                        {questionStats.filter((stat) => stat.questionType === "objective").length > 0 ? (
-                          <div className="overflow-x-auto">
-                            <table className="w-full border-collapse border border-gray-300">
-                              <thead>
-                                <tr className="bg-gray-100">
-                                  <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
-                                    문항 번호
-                                  </th>
-                                  <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
-                                    문항 내용
-                                  </th>
-                                  <th className="border border-gray-300 px-4 py-3 text-left font-semibold">응답 수</th>
-                                  <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
-                                    평균 점수
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {questionStats
-                                  .filter((stat) => stat.questionType === "objective")
-                                  .map((stat) => (
-                                    <tr key={stat.id} className="hover:bg-gray-50">
-                                      <td className="border border-gray-300 px-4 py-3">{stat.questionNumber}</td>
-                                      <td className="border border-gray-300 px-4 py-3">{stat.questionText}</td>
-                                      <td className="border border-gray-300 px-4 py-3">{stat.totalResponses}</td>
-                                      <td className="border border-gray-300 px-4 py-3">
-                                        {stat.averageScore}/{stat.maxScore}
-                                      </td>
+                      ) : (
+                        <>
+                          <div className="mb-4">
+                            <h3 className="text-xl font-semibold mb-2">설문 통계</h3>
+                            <div className="grid grid-cols-4 gap-4">
+                              <Card>
+                                <CardHeader className="pb-2">
+                                  <CardTitle className="text-sm font-medium text-muted-foreground">총 참여자</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  <div className="text-2xl font-bold">{totalParticipantsCount.toLocaleString()}명</div>
+                                </CardContent>
+                              </Card>
+                              <Card>
+                                <CardHeader className="pb-2">
+                                  <CardTitle className="text-sm font-medium text-muted-foreground">완료</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  <div className="text-2xl font-bold text-green-600">
+                                    {totalResponsesCount.toLocaleString()}명
+                                  </div>
+                                </CardContent>
+                              </Card>
+                              <Card>
+                                <CardHeader className="pb-2">
+                                  <CardTitle className="text-sm font-medium text-muted-foreground">완료율</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  <div className="text-2xl font-bold text-blue-600">
+                                    {totalParticipantsCount > 0
+                                      ? ((totalResponsesCount / totalParticipantsCount) * 100).toFixed(1)
+                                      : "0.0"}
+                                    %
+                                  </div>
+                                </CardContent>
+                              </Card>
+                              <Card>
+                                <CardHeader className="pb-2">
+                                  <CardTitle className="text-sm font-medium text-muted-foreground">평균 점수</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  <div className="text-2xl font-bold text-purple-600">
+                                    {responses.length > 0
+                                      ? (
+                                          responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length
+                                        ).toFixed(2)
+                                      : "0.00"}
+                                    {responses.length > 0 && responses[0]?.max_possible_score
+                                      ? ` / ${responses[0].max_possible_score}`
+                                      : ""}
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </div>
+                          </div>
+
+                          <div>
+                            <h3 className="text-xl font-semibold mb-4">객관식 문항 평균점수</h3>
+                            {questionStats.filter((stat) => stat.questionType === "objective").length > 0 ? (
+                              <div className="overflow-x-auto">
+                                <table className="w-full border-collapse border border-gray-300">
+                                  <thead>
+                                    <tr className="bg-gray-100">
+                                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                                        문항 번호
+                                      </th>
+                                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                                        문항 내용
+                                      </th>
+                                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                                        응답 수
+                                      </th>
+                                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                                        평균 점수
+                                      </th>
                                     </tr>
-                                  ))}
-                              </tbody>
-                            </table>
+                                  </thead>
+                                  <tbody>
+                                    {questionStats
+                                      .filter((stat) => stat.questionType === "objective")
+                                      .map((stat) => (
+                                        <tr key={stat.id} className="hover:bg-gray-50">
+                                          <td className="border border-gray-300 px-4 py-3">{stat.questionNumber}</td>
+                                          <td className="border border-gray-300 px-4 py-3">{stat.questionText}</td>
+                                          <td className="border border-gray-300 px-4 py-3">{stat.totalResponses}</td>
+                                          <td className="border border-gray-300 px-4 py-3">
+                                            {stat.averageScore}/{stat.maxScore}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <p className="text-gray-500">객관식 문항이 없습니다.</p>
+                            )}
                           </div>
-                        ) : (
-                          <p className="text-gray-500">객관식 문항이 없습니다.</p>
-                        )}
-                      </div>
 
-                      <div>
-                        <h3 className="text-xl font-semibold mb-4">주관식 문항 응답</h3>
-                        {questionStats.filter((stat) => stat.questionType === "subjective").length > 0 ? (
-                          <div className="space-y-6">
-                            {questionStats
-                              .filter((stat) => stat.questionType === "subjective")
-                              .map((stat) => (
-                                <Card key={stat.id}>
-                                  <CardHeader>
-                                    <CardTitle className="text-lg">
-                                      {stat.questionNumber}. {stat.questionText}
-                                    </CardTitle>
-                                    <CardDescription>총 {stat.totalResponses}개의 응답</CardDescription>
-                                  </CardHeader>
-                                  <CardContent>
-                                    {stat.textResponses && stat.textResponses.length > 0 ? (
-                                      <div className="space-y-3">
-                                        {stat.textResponses.map((response, index) => (
-                                          <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                            <p className="text-sm text-gray-700">{response}</p>
+                          <div>
+                            <h3 className="text-xl font-semibold mb-4">주관식 문항 응답</h3>
+                            {questionStats.filter((stat) => stat.questionType === "subjective").length > 0 ? (
+                              <div className="space-y-6">
+                                {questionStats
+                                  .filter((stat) => stat.questionType === "subjective")
+                                  .map((stat) => (
+                                    <Card key={stat.id}>
+                                      <CardHeader>
+                                        <CardTitle className="text-lg">
+                                          {stat.questionNumber}. {stat.questionText}
+                                        </CardTitle>
+                                        <CardDescription>총 {stat.totalResponses}개의 응답</CardDescription>
+                                      </CardHeader>
+                                      <CardContent>
+                                        {stat.textResponses && stat.textResponses.length > 0 ? (
+                                          <div className="space-y-3">
+                                            {stat.textResponses.map((response, index) => (
+                                              <div
+                                                key={index}
+                                                className="p-3 bg-gray-50 rounded-lg border border-gray-200"
+                                              >
+                                                <p className="text-sm text-gray-700">{response}</p>
+                                              </div>
+                                            ))}
                                           </div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <p className="text-gray-500">응답이 없습니다.</p>
-                                    )}
-                                  </CardContent>
-                                </Card>
-                              ))}
+                                        ) : (
+                                          <p className="text-gray-500">응답이 없습니다.</p>
+                                        )}
+                                      </CardContent>
+                                    </Card>
+                                  ))}
+                              </div>
+                            ) : (
+                              <p className="text-gray-500">주관식 문항이 없습니다.</p>
+                            )}
                           </div>
-                        ) : (
-                          <p className="text-gray-500">주관식 문항이 없습니다.</p>
-                        )}
-                      </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </CardContent>
