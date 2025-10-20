@@ -29,9 +29,20 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from "@/lib/supabase/client"
-import { Copy, Download, ExternalLink, Eye, Plus, Trash2, Edit, RefreshCw } from "lucide-react"
+import {
+  Copy,
+  Download,
+  ExternalLink,
+  Eye,
+  Plus,
+  Trash2,
+  Edit,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react"
 
-const ADMIN_PASSWORD = "bohun#1234"
+const ADMIN_PASSWORD = "hospital2024"
 
 interface Survey {
   id: number
@@ -380,7 +391,7 @@ export default function AdminPage() {
           <div class="step">
             <div class="step-content">
               <ul>
-                <li><strong>관리자 비밀번호:</strong> <span class="highlight"></span></li>
+                <li><strong>관리자 비밀번호:</strong> <span class="highlight">hospital2024</span></li>
                 <li><strong>지원 브라우저:</strong> Chrome, Firefox, Safari, Edge 최신 버전</li>
                 <li><strong>권장 해상도:</strong> 1280x720 이상</li>
                 <li><strong>CSV 파일 인코딩:</strong> UTF-8</li>
@@ -729,9 +740,11 @@ export default function AdminPage() {
     if (file && file.type === "text/csv") {
       setSelectedFile(file)
       setError("")
+      setUploadSuccess("") // Clear previous messages
     } else {
       setError("CSV 파일만 업로드 가능합니다.")
       setSelectedFile(null)
+      setUploadSuccess("") // Clear previous messages
     }
   }
 
@@ -1556,7 +1569,7 @@ export default function AdminPage() {
                               >
                                 {survey.is_active ? "활성" : "비활성"}
                               </span>
-                              {/* <Button
+                              <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleEditSurvey(survey)
@@ -1567,7 +1580,7 @@ export default function AdminPage() {
                               >
                                 <Edit className="w-3 h-3 mr-1" />
                                 수정
-                              </Button> */}
+                              </Button>
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -1599,7 +1612,7 @@ export default function AdminPage() {
                   선택한 설문지에 참여자를 등록합니다. 병원명|대상자이름|휴대폰번호 형식의 CSV 파일을 업로드하세요
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent>
                 <div>
                   <Label className="text-lg font-medium">설문지 선택 *</Label>
                   <div className="mt-2 p-4 border rounded-lg">
@@ -1650,6 +1663,22 @@ export default function AdminPage() {
                       >
                         {loading ? "업로드 중..." : "CSV 파일 업로드"}
                       </Button>
+
+                      {uploadSuccess && (
+                        <Alert className="border-green-200 bg-green-50">
+                          <CheckCircle2 className="h-5 w-5 text-green-600" />
+                          <AlertDescription className="text-green-700 text-lg font-medium">
+                            {uploadSuccess}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      {error && (
+                        <Alert className="border-red-200 bg-red-50">
+                          <AlertCircle className="h-5 w-5 text-red-600" />
+                          <AlertDescription className="text-red-700 text-lg font-medium">{error}</AlertDescription>
+                        </Alert>
+                      )}
                     </div>
 
                     <div className="mt-8 p-6 bg-gray-50 rounded-lg">
