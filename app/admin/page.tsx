@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from "@/lib/supabase/client"
-import { Copy, Download, ExternalLink, Eye, Plus, Trash2, Edit, FileText } from "lucide-react"
+import { Copy, Download, ExternalLink, Eye, Plus, Trash2, Edit, RefreshCw } from "lucide-react"
 
 const ADMIN_PASSWORD = "hospital2024"
 
@@ -625,7 +625,6 @@ export default function AdminPage() {
 
       const questionStatsMap = questionsData.map((question) => {
         const questionResponses = filteredResponses.filter((r) => r.question_id === question.id)
-        const totalResponses = questionResponses.length
 
         // For objective questions, calculate average score
         const objectiveResponses = questionResponses.filter((r) => r.response_value !== null)
@@ -638,6 +637,8 @@ export default function AdminPage() {
         const textResponses = questionResponses
           .filter((r) => r.response_text !== null && r.response_text.trim() !== "")
           .map((r) => r.response_text)
+
+        const totalResponses = question.question_type === "subjective" ? textResponses.length : questionResponses.length
 
         return {
           id: question.id,
@@ -1008,26 +1009,35 @@ export default function AdminPage() {
     }
 
     const hospitalQuestionStats: Record<string, Record<number, any>> = {}
+    const allSubjectiveResponses: Array<{ questionNumber: number; hospitalName: string; responseText: string }> = []
 
     try {
       if (supabase) {
+        const { data: allQuestions, error: questionsError } = await supabase
+          .from("survey_questions")
+          .select("*")
+          .eq("survey_id", selectedSurvey.id)
+          .order("question_number", { ascending: true })
+
+        console.log("[v0] All questions for Excel:", allQuestions)
+
+        if (questionsError || !allQuestions) {
+          console.error("[v0] Error fetching questions:", questionsError)
+          alert("문항 정보를 가져오는 중 오류가 발생했습니다.")
+          return
+        }
+
         const { data: detailedResponses, error } = await supabase
           .from("survey_responses")
           .select(`
             question_id,
             response_value,
             response_text,
-            participant_token,
-            survey_questions (
-              question_text,
-              question_number,
-              question_type,
-              response_scale_type // response_scale_type 조회
-            )
+            participant_token
           `)
           .in(
             "question_id",
-            questionStats.map((q) => q.id),
+            allQuestions.map((q) => q.id),
           )
 
         console.log("[v0] Detailed responses query result:", { detailedResponses, error })
@@ -1045,7 +1055,6 @@ export default function AdminPage() {
 
           console.log("[v0] Participants data:", { participantsData, participantsError })
 
-          // Create a map of token to hospital_name
           const tokenToHospital: Record<string, string> = {}
           if (participantsData) {
             participantsData.forEach((p: any) => {
@@ -1053,13 +1062,19 @@ export default function AdminPage() {
             })
           }
 
+          const questionMap = new Map(allQuestions.map((q) => [q.id, q]))
+
           detailedResponses.forEach((response: any) => {
             const hospital = tokenToHospital[response.participant_token] || "알 수 없음"
             const questionId = response.question_id
-            const questionNumber = response.survey_questions?.question_number || 0
-            const questionText = response.survey_questions?.question_text || ""
-            const questionType = response.survey_questions?.question_type || "objective"
-            const responseScaleType = response.survey_questions?.response_scale_type || "agreement" // responseScaleType 사용
+            const question = questionMap.get(questionId)
+
+            if (!question) return
+
+            const questionNumber = question.question_number
+            const questionText = question.question_text
+            const questionType = question.question_type || "objective"
+            const responseScaleType = question.response_scale_type || "agreement"
 
             if (!hospitalQuestionStats[hospital]) {
               hospitalQuestionStats[hospital] = {}
@@ -1070,7 +1085,7 @@ export default function AdminPage() {
                 questionNumber,
                 questionText,
                 questionType,
-                responseScaleType, // responseScaleType 저장
+                responseScaleType,
                 responses: [],
                 textResponses: [],
                 total: 0,
@@ -1088,6 +1103,12 @@ export default function AdminPage() {
               if (response.response_text !== null && response.response_text.trim() !== "") {
                 hospitalQuestionStats[hospital][questionId].textResponses.push(response.response_text)
                 hospitalQuestionStats[hospital][questionId].count += 1
+
+                allSubjectiveResponses.push({
+                  questionNumber,
+                  hospitalName: hospital,
+                  responseText: response.response_text,
+                })
               }
             }
           })
@@ -1108,7 +1129,9 @@ export default function AdminPage() {
       [
         "전체 평균 점수",
         responses.length > 0
-          ? `${(responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length).toFixed(1)}/${responses.length > 0 ? responses[0].max_possible_score : 0}`
+          ? `${(responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length).toFixed(1)}/${
+              responses.length > 0 ? responses[0].max_possible_score : 0
+            }`
           : "0",
       ],
       [""],
@@ -1217,12 +1240,22 @@ export default function AdminPage() {
         hospitalQuestionStatsData.push(["", "", "", "", "", "", "", ""]) // 열 개수 조정
       })
 
+    const subjectiveResponsesData = [
+      ["주관식 응답내용"],
+      ["문항번호", "병원명", "응답내용"],
+      ...allSubjectiveResponses
+        .sort((a, b) => a.questionNumber - b.questionNumber)
+        .map((response) => [response.questionNumber.toString(), response.hospitalName, response.responseText]),
+      [""],
+    ]
+
     const allData = [
       ...basicStats,
       ...objectiveQuestionStatsData,
       ...subjectiveQuestionStatsData,
       ...hospitalStatsData,
       ...hospitalQuestionStatsData,
+      ...subjectiveResponsesData, // Added new subjective responses section
     ]
 
     console.log("[v0] Excel data rows:", allData.length)
@@ -1238,6 +1271,27 @@ export default function AdminPage() {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+  }
+
+  const handleRefresh = async () => {
+    if (!selectedSurvey) {
+      await fetchSurveys()
+      return
+    }
+
+    setLoading(true)
+    try {
+      await Promise.all([
+        fetchSurveys(),
+        fetchParticipants(selectedSurvey.id),
+        fetchResponses(selectedSurvey.id),
+        fetchQuestionStats(selectedSurvey.id, hospitalFilter),
+      ])
+    } catch (err) {
+      setError("데이터 새로고침 중 오류가 발생했습니다.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -1307,30 +1361,21 @@ export default function AdminPage() {
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold text-gray-900">병원 만족도 조사 관리 시스템</h1>
-          <Button onClick={() => setIsAuthenticated(false)} variant="outline" className="text-lg px-6 py-2">
-            로그아웃
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleRefresh}
+              variant="outline"
+              className="flex items-center gap-2 bg-transparent"
+              disabled={loading}
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+              새로고침
+            </Button>
+            <Button onClick={() => setIsAuthenticated(false)} variant="outline" className="text-lg px-6 py-2">
+              로그아웃
+            </Button>
+          </div>
         </div>
-
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">병원 만족도 조사 관리자</h1>
-          <Button onClick={downloadGuide} variant="outline" className="flex items-center space-x-2 bg-transparent">
-            <FileText className="w-4 h-4" />
-            <span>사용 가이드 다운로드</span>
-          </Button>
-        </div>
-
-        {error && (
-          <Alert className="mb-6 border-red-200 bg-red-50">
-            <AlertDescription className="text-red-700 text-lg">{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {uploadSuccess && (
-          <Alert className="mb-6 border-green-200 bg-green-50">
-            <AlertDescription className="text-green-700 text-lg">{uploadSuccess}</AlertDescription>
-          </Alert>
-        )}
 
         <Tabs defaultValue="surveys" className="space-y-6">
           <TabsList className="grid w-full grid-cols-5 h-12">
@@ -1511,7 +1556,7 @@ export default function AdminPage() {
                               >
                                 {survey.is_active ? "활성" : "비활성"}
                               </span>
-                              {/* <Button
+                              <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleEditSurvey(survey)
@@ -1522,7 +1567,7 @@ export default function AdminPage() {
                               >
                                 <Edit className="w-3 h-3 mr-1" />
                                 수정
-                              </Button> */}
+                              </Button>
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
