@@ -120,6 +120,7 @@ export default function AdminPage() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [detailedResponses, setDetailedResponses] = useState<DetailedQuestionResponse[]>([])
   const [loadingDetails, setLoadingDetails] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
 
   const [newSurveyTitle, setNewSurveyTitle] = useState("")
   const [newSurveyDescription, setNewSurveyDescription] = useState("")
@@ -174,44 +175,88 @@ export default function AdminPage() {
     }
   }
 
-  const downloadParticipantsExcel = () => {
-    if (!selectedSurvey || filteredParticipants.length === 0) {
+  const downloadParticipantsExcel = async () => {
+    if (!selectedSurvey) {
+      alert("설문지를 선택해주세요.")
+      return
+    }
+
+    if (totalParticipantsCount === 0) {
       alert("다운로드할 참여자 데이터가 없습니다.")
       return
     }
 
-    const excelData = filteredParticipants.map((participant) => ({
-      참여자명: participant.participant_name,
-      휴대폰번호: participant.phone_number,
-      병원명: participant.hospital_name,
-      설문링크: `${window.location.origin}/${participant.token}`,
-    }))
+    setIsDownloading(true)
 
-    const headers = Object.keys(excelData[0])
-    const csvContent = excelData
-      .map((row) =>
-        headers
-          .map((header) => {
-            const value = row[header as keyof typeof row]
-            return typeof value === "string" && (value.includes(",") || value.includes('"'))
-              ? `"${value.replace(/"/g, '""')}"`
-              : value
-          })
-          .join(","),
+    try {
+      // Fetch all participants in batches
+      const allParticipants: any[] = []
+      const batchSize = 1000
+      let offset = 0
+
+      while (offset < totalParticipantsCount) {
+        const { data, error } = await supabase
+          .from("survey_participants")
+          .select("*")
+          .eq("survey_id", selectedSurvey.id)
+          .range(offset, offset + batchSize - 1)
+          .order("created_at", { ascending: true })
+
+        if (error) {
+          console.error("[v0] Error fetching participants for download:", error)
+          throw error
+        }
+
+        if (data) {
+          allParticipants.push(...data)
+        }
+
+        offset += batchSize
+      }
+
+      console.log(`[v0] Downloaded ${allParticipants.length} participants for Excel`)
+
+      const excelData = allParticipants.map((participant) => ({
+        참여자명: participant.participant_name,
+        휴대폰번호: participant.phone_number,
+        병원명: participant.hospital_name,
+        설문링크: `${window.location.origin}/${participant.token}`,
+      }))
+
+      const headers = Object.keys(excelData[0])
+      const csvContent = excelData
+        .map((row) =>
+          headers
+            .map((header) => {
+              const value = row[header as keyof typeof row]
+              return typeof value === "string" && (value.includes(",") || value.includes('"'))
+                ? `"${value.replace(/"/g, '""')}"`
+                : value
+            })
+            .join(","),
+        )
+        .join("\n")
+
+      const BOM = "\uFEFF"
+      const blob = new Blob([BOM + headers.join(",") + "\n" + csvContent], { type: "text/csv;charset=utf-8;" })
+
+      const link = document.createElement("a")
+      const url = URL.createObjectURL(blob)
+      link.setAttribute("href", url)
+      link.setAttribute(
+        "download",
+        `${selectedSurvey.title}_참여자연락처_${new Date().toISOString().split("T")[0]}.csv`,
       )
-      .join("\n")
-
-    const BOM = "\uFEFF"
-    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" })
-
-    const link = document.createElement("a")
-    const url = URL.createObjectURL(blob)
-    link.setAttribute("href", url)
-    link.setAttribute("download", `${selectedSurvey.title}_참여자연락처_${new Date().toISOString().split("T")[0]}.csv`)
-    link.style.visibility = "hidden"
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+      link.style.visibility = "hidden"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (error) {
+      console.error("[v0] Error downloading participants:", error)
+      alert("연락처 다운로드 중 오류가 발생했습니다.")
+    } finally {
+      setIsDownloading(false)
+    }
   }
 
   const downloadGuide = () => {
@@ -1937,10 +1982,14 @@ export default function AdminPage() {
                         <Button
                           onClick={downloadParticipantsExcel}
                           className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white"
-                          disabled={filteredParticipants.length === 0}
+                          disabled={filteredParticipants.length === 0 || isDownloading}
                         >
-                          <Download className="w-4 h-4 mr-2" />
-                          연락처 다운로드
+                          {isDownloading ? (
+                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Download className="w-4 h-4 mr-2" />
+                          )}
+                          {isDownloading ? "다운로드 중..." : "연락처 다운로드"}
                         </Button>
                         <Button
                           onClick={() => {
