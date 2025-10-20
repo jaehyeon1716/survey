@@ -232,7 +232,7 @@ export default function AdminPage() {
             <div class="step-content">
               <ul>
                 <li><span class="highlight">'설문지 목록'</span> 탭에서 기존 설문지를 확인할 수 있습니다</li>
-                //<li><span class="highlight">'수정'</span> 버튼으로 설문지 내용을 변경할 수 있습니다</li>
+                <li><span class="highlight">'수정'</span> 버튼으로 설문지 내용을 변경할 수 있습니다</li>
                 <li><span class="highlight">'삭제'</span> 시에는 보안을 위해 관리자 비밀번호를 다시 입력해야 합니다</li>
               </ul>
               <div class="warning">
@@ -1511,7 +1511,7 @@ export default function AdminPage() {
                               >
                                 {survey.is_active ? "활성" : "비활성"}
                               </span>
-                              <Button
+                              {/* <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleEditSurvey(survey)
@@ -1522,7 +1522,7 @@ export default function AdminPage() {
                               >
                                 <Edit className="w-3 h-3 mr-1" />
                                 수정
-                              </Button>
+                              </Button> */}
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
