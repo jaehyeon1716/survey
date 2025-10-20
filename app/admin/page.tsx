@@ -1248,16 +1248,19 @@ export default function AdminPage() {
     const basicStats = [
       ["통계 항목", "값"],
       ["설문지 제목", selectedSurvey.title],
-      ["총 참여자 수", participants.length.toString()],
-      ["완료된 설문 수", responses.length.toString()],
-      ["완료율", `${participants.length > 0 ? Math.round((responses.length / participants.length) * 100) : 0}%`],
+      ["총 참여자 수", totalParticipantsCount.toLocaleString()],
+      ["완료된 설문 수", totalResponsesCount.toLocaleString()],
+      [
+        "완료율",
+        `${totalParticipantsCount > 0 ? ((totalResponsesCount / totalParticipantsCount) * 100).toFixed(1) : "0.0"}%`,
+      ],
       [
         "전체 평균 점수",
         responses.length > 0
-          ? `${(responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length).toFixed(1)}/${
-              responses.length > 0 ? responses[0].max_possible_score : 0
-            }`
-          : "0",
+          ? `${(responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length).toFixed(
+              2,
+            )}/${responses.length > 0 ? responses[0].max_possible_score : 0}`
+          : "0.00",
       ],
       [""],
     ]
@@ -2190,9 +2193,10 @@ export default function AdminPage() {
                     </div>
                   ) : (
                     <div className="space-y-8">
+                      {/* START: CHANGED CODE */}
                       <div className="mb-4">
                         <h3 className="text-xl font-semibold mb-2">설문 통계</h3>
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-4 gap-4">
                           <Card>
                             <CardHeader className="pb-2">
                               <CardTitle className="text-sm font-medium text-muted-foreground">총 참여자</CardTitle>
@@ -2213,16 +2217,37 @@ export default function AdminPage() {
                           </Card>
                           <Card>
                             <CardHeader className="pb-2">
-                              <CardTitle className="text-sm font-medium text-muted-foreground">미완료</CardTitle>
+                              <CardTitle className="text-sm font-medium text-muted-foreground">완료율</CardTitle>
                             </CardHeader>
                             <CardContent>
-                              <div className="text-2xl font-bold text-orange-600">
-                                {(totalParticipantsCount - totalResponsesCount).toLocaleString()}명
+                              <div className="text-2xl font-bold text-blue-600">
+                                {totalParticipantsCount > 0
+                                  ? ((totalResponsesCount / totalParticipantsCount) * 100).toFixed(1)
+                                  : "0.0"}
+                                %
+                              </div>
+                            </CardContent>
+                          </Card>
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm font-medium text-muted-foreground">평균 점수</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-2xl font-bold text-purple-600">
+                                {responses.length > 0
+                                  ? (
+                                      responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length
+                                    ).toFixed(2)
+                                  : "0.00"}
+                                {responses.length > 0 && responses[0]?.max_possible_score
+                                  ? ` / ${responses[0].max_possible_score}`
+                                  : ""}
                               </div>
                             </CardContent>
                           </Card>
                         </div>
                       </div>
+                      {/* END: CHANGED CODE */}
 
                       <div>
                         <div className="flex justify-between items-center mb-4">
