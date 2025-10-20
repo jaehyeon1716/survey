@@ -1151,13 +1151,13 @@ export default function AdminPage() {
     try {
       const response = await fetch(`/api/admin/surveys/${surveyToDelete.id}`, {
         method: "DELETE",
-        signal: AbortSignal.timeout(600000), // 10 minutes
+        signal: AbortSignal.timeout(900000), // 15 minutes for large datasets
       })
 
       const data = await response.json()
 
       if (response.ok) {
-        setUploadSuccess("설문지가 성공적으로 삭제되었습니다.")
+        setUploadSuccess(data.message || "설문지가 성공적으로 삭제되었습니다.")
         setShowDeleteConfirm(false)
         setSurveyToDelete(null)
         setDeletePassword("")
@@ -1170,7 +1170,7 @@ export default function AdminPage() {
       }
     } catch (err) {
       console.error("[v0] 설문지 삭제 오류:", err)
-      setError("설문지 삭제 중 오류가 발생했습니다. 참여자가 많은 경우 시간이 걸릴 수 있습니다.")
+      setError("설문지 삭제 중 오류가 발생했습니다. 대용량 데이터의 경우 시간이 오래 걸릴 수 있습니다.")
     } finally {
       setDeleteLoading(false)
     }

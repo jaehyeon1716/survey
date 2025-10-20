@@ -71,53 +71,33 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   const surveyId = params.id
 
   try {
-    const { data: participants, error: participantsSelectError } = await supabase
-      .from("survey_participants")
-      .select("token")
-      .eq("survey_id", Number.parseInt(surveyId))
-
-    if (participantsSelectError) throw participantsSelectError
-
-    if (participants && participants.length > 0) {
-      const tokens = participants.map((p) => p.token)
-      const batchSize = 500
-
-      for (let i = 0; i < tokens.length; i += batchSize) {
-        const batch = tokens.slice(i, i + batchSize)
-        const { error: responsesError } = await supabase
-          .from("survey_responses")
-          .delete()
-          .in("participant_token", batch)
-
-        if (responsesError) throw responsesError
-      }
-    }
-
-    const participantBatchSize = 1000
-    let deletedCount = 0
+    const batchSize = 500
+    let totalDeleted = 0
 
     while (true) {
-      const { data: batch, error: batchError } = await supabase
+      const { data: participantBatch, error: fetchError } = await supabase
         .from("survey_participants")
-        .select("id")
+        .select("token, id")
         .eq("survey_id", Number.parseInt(surveyId))
-        .limit(participantBatchSize)
+        .limit(batchSize)
 
-      if (batchError) throw batchError
-      if (!batch || batch.length === 0) break
+      if (fetchError) throw fetchError
+      if (!participantBatch || participantBatch.length === 0) break
 
-      const { error: deleteError } = await supabase
-        .from("survey_participants")
-        .delete()
-        .in(
-          "id",
-          batch.map((p) => p.id),
-        )
+      const tokens = participantBatch.map((p) => p.token)
+      const ids = participantBatch.map((p) => p.id)
 
-      if (deleteError) throw deleteError
+      const { error: responsesError } = await supabase.from("survey_responses").delete().in("participant_token", tokens)
 
-      deletedCount += batch.length
-      if (batch.length < participantBatchSize) break
+      if (responsesError) throw responsesError
+
+      const { error: participantsError } = await supabase.from("survey_participants").delete().in("id", ids)
+
+      if (participantsError) throw participantsError
+
+      totalDeleted += participantBatch.length
+
+      if (participantBatch.length < batchSize) break
     }
 
     const { error: questionsError } = await supabase
@@ -132,7 +112,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     if (surveyError) throw surveyError
 
     return NextResponse.json({
-      message: "설문지가 성공적으로 삭제되었습니다.",
+      message: `설문지가 성공적으로 삭제되었습니다. (${totalDeleted}명의 참여자 삭제됨)`,
     })
   } catch (error) {
     console.error("설문지 삭제 오류:", error)
