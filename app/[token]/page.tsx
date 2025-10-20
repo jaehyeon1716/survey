@@ -185,15 +185,14 @@ export default function HospitalSurvey() {
   }
 
   const handleSubmit = async () => {
-    const allAnswered = questions.every((question) => {
-      if (question.question_type === "subjective") {
-        return subjectiveAnswers[question.id]?.trim().length > 0 // 주관식은 실제 입력이 있을 때만 답변된 것으로 표시
-      } else {
+    const allObjectiveAnswered = questions.every((question) => {
+      if (question.question_type === "objective") {
         return answers[question.id] !== undefined
       }
+      return true // 주관식은 항상 통과
     })
 
-    if (!allAnswered) {
+    if (!allObjectiveAnswered) {
       alert("모든 객관식 문항에 답변해 주세요.")
       return
     }
@@ -393,9 +392,6 @@ export default function HospitalSurvey() {
                     onClick={handleSubmit}
                     disabled={
                       questions.some((q) => q.question_type === "objective" && answers[q.id] === undefined) ||
-                      questions.some(
-                        (q) => q.question_type === "subjective" && subjectiveAnswers[q.id]?.trim().length === 0,
-                      ) ||
                       isSubmitting
                     }
                     size="lg"
