@@ -1884,10 +1884,6 @@ export default function AdminPage() {
                   <div className="text-center py-8">
                     <p className="text-xl">데이터를 불러오는 중...</p>
                   </div>
-                ) : participants.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-xl text-gray-500">등록된 참여자가 없습니다</p>
-                  </div>
                 ) : (
                   <div className="space-y-4">
                     <div className="flex flex-col sm:flex-row gap-4 p-4 bg-gray-50 rounded-lg">
@@ -1899,7 +1895,7 @@ export default function AdminPage() {
                           value={hospitalFilter}
                           onChange={(e) => {
                             setHospitalFilter(e.target.value)
-                            setParticipantsPage(1) // Reset to first page on filter change
+                            setParticipantsPage(1)
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
@@ -1910,7 +1906,7 @@ export default function AdminPage() {
                           value={statusFilter}
                           onChange={(e) => {
                             setStatusFilter(e.target.value)
-                            setParticipantsPage(1) // Reset to first page on filter change
+                            setParticipantsPage(1)
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
@@ -1932,7 +1928,7 @@ export default function AdminPage() {
                           onClick={() => {
                             setHospitalFilter("")
                             setStatusFilter("all")
-                            setParticipantsPage(1) // Reset to first page on filter change
+                            setParticipantsPage(1)
                           }}
                           variant="outline"
                           className="px-4 py-2"
@@ -1942,118 +1938,144 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    <div className="text-sm text-gray-600 mb-2">
-                      총 {totalParticipantsCount.toLocaleString()}명 중{" "}
-                      {Math.min(participantsPage * participantsPerPage, filteredParticipants.length).toLocaleString()}명
-                      표시
-                    </div>
-
-                    <div className="flex justify-between items-center mb-4">
-                      <div className="flex items-center gap-2">
-                        <label className="text-sm font-medium text-gray-700">페이지당 표시:</label>
-                        <select
-                          value={participantsPerPage}
-                          onChange={(e) => {
-                            setParticipantsPerPage(Number(e.target.value))
-                            setParticipantsPage(1)
-                          }}
-                          className="px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value={10}>10건</option>
-                          <option value={100}>100건</option>
-                          <option value={1000}>1000건</option>
-                        </select>
+                    {totalParticipantsCount === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-xl text-gray-500">등록된 참여자가 없습니다</p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={() => setParticipantsPage((prev) => Math.max(1, prev - 1))}
-                          disabled={participantsPage === 1}
-                          variant="outline"
-                          size="sm"
-                        >
-                          이전
-                        </Button>
-                        <span className="text-sm text-gray-700">
-                          {participantsPage} / {totalParticipantsPages || 1}
-                        </span>
-                        <Button
-                          onClick={() => setParticipantsPage((prev) => Math.min(totalParticipantsPages, prev + 1))}
-                          disabled={participantsPage >= totalParticipantsPages}
-                          variant="outline"
-                          size="sm"
-                        >
-                          다음
-                        </Button>
+                    ) : participants.length === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-xl text-gray-500">검색 결과가 없습니다</p>
+                        <p className="text-sm text-gray-400 mt-2">다른 검색어를 입력하거나 필터를 초기화해주세요</p>
                       </div>
-                    </div>
+                    ) : (
+                      <>
+                        <div className="text-sm text-gray-600 mb-2">
+                          총 {totalParticipantsCount.toLocaleString()}명 중{" "}
+                          {Math.min(
+                            participantsPage * participantsPerPage,
+                            filteredParticipants.length,
+                          ).toLocaleString()}
+                          명 표시
+                        </div>
 
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse border border-gray-300">
-                        <thead>
-                          <tr className="bg-gray-100">
-                            <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">병원명</th>
-                            <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
-                              참여자명
-                            </th>
-                            <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
-                              휴대폰번호
-                            </th>
-                            <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">상태</th>
-                            <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">등록일</th>
-                            <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
-                              설문 링크
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {paginatedParticipants.map((participant) => (
-                            <tr key={participant.id} className="hover:bg-gray-50">
-                              <td className="border border-gray-300 px-4 py-3 text-lg">{participant.hospital_name}</td>
-                              <td className="border border-gray-300 px-4 py-3 text-lg">
-                                {participant.participant_name}
-                              </td>
-                              <td className="border border-gray-300 px-4 py-3 text-lg">{participant.phone_number}</td>
-                              <td className="border border-gray-300 px-4 py-3">
-                                <span
-                                  className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                                    participant.is_completed
-                                      ? "bg-green-100 text-green-800"
-                                      : "bg-yellow-100 text-yellow-800"
-                                  }`}
-                                >
-                                  {participant.is_completed ? "완료" : "미완료"}
-                                </span>
-                              </td>
-                              <td className="border border-gray-300 px-4 py-3 text-lg">
-                                {new Date(participant.created_at).toLocaleDateString("ko-KR")}
-                              </td>
-                              <td className="border border-gray-300 px-4 py-3">
-                                <div className="flex space-x-2">
-                                  <Button
-                                    onClick={() => copyToClipboard(participant.token)}
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-sm"
-                                  >
-                                    <Copy className="w-4 h-4 mr-1" />
-                                    링크 복사
-                                  </Button>
-                                  <Button
-                                    onClick={() => window.open(`/${participant.token}`, "_blank")}
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-sm"
-                                  >
-                                    <ExternalLink className="w-4 h-4 mr-1" />
-                                    열기
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                        <div className="flex justify-between items-center mb-4">
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm font-medium text-gray-700">페이지당 표시:</label>
+                            <select
+                              value={participantsPerPage}
+                              onChange={(e) => {
+                                setParticipantsPerPage(Number(e.target.value))
+                                setParticipantsPage(1)
+                              }}
+                              className="px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value={10}>10건</option>
+                              <option value={100}>100건</option>
+                              <option value={1000}>1000건</option>
+                            </select>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              onClick={() => setParticipantsPage((prev) => Math.max(1, prev - 1))}
+                              disabled={participantsPage === 1}
+                              variant="outline"
+                              size="sm"
+                            >
+                              이전
+                            </Button>
+                            <span className="text-sm text-gray-700">
+                              {participantsPage} / {totalParticipantsPages || 1}
+                            </span>
+                            <Button
+                              onClick={() => setParticipantsPage((prev) => Math.min(totalParticipantsPages, prev + 1))}
+                              disabled={participantsPage >= totalParticipantsPages}
+                              variant="outline"
+                              size="sm"
+                            >
+                              다음
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse border border-gray-300">
+                            <thead>
+                              <tr className="bg-gray-100">
+                                <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
+                                  병원명
+                                </th>
+                                <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
+                                  참여자명
+                                </th>
+                                <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
+                                  휴대폰번호
+                                </th>
+                                <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
+                                  상태
+                                </th>
+                                <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
+                                  등록일
+                                </th>
+                                <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
+                                  설문 링크
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {paginatedParticipants.map((participant) => (
+                                <tr key={participant.id} className="hover:bg-gray-50">
+                                  <td className="border border-gray-300 px-4 py-3 text-lg">
+                                    {participant.hospital_name}
+                                  </td>
+                                  <td className="border border-gray-300 px-4 py-3 text-lg">
+                                    {participant.participant_name}
+                                  </td>
+                                  <td className="border border-gray-300 px-4 py-3 text-lg">
+                                    {participant.phone_number}
+                                  </td>
+                                  <td className="border border-gray-300 px-4 py-3">
+                                    <span
+                                      className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                                        participant.is_completed
+                                          ? "bg-green-100 text-green-800"
+                                          : "bg-yellow-100 text-yellow-800"
+                                      }`}
+                                    >
+                                      {participant.is_completed ? "완료" : "미완료"}
+                                    </span>
+                                  </td>
+                                  <td className="border border-gray-300 px-4 py-3 text-lg">
+                                    {new Date(participant.created_at).toLocaleDateString("ko-KR")}
+                                  </td>
+                                  <td className="border border-gray-300 px-4 py-3">
+                                    <div className="flex space-x-2">
+                                      <Button
+                                        onClick={() => copyToClipboard(participant.token)}
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-sm"
+                                      >
+                                        <Copy className="w-4 h-4 mr-1" />
+                                        링크 복사
+                                      </Button>
+                                      <Button
+                                        onClick={() => window.open(`/${participant.token}`, "_blank")}
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-sm"
+                                      >
+                                        <ExternalLink className="w-4 h-4 mr-1" />
+                                        열기
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </CardContent>
