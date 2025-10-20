@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -529,35 +529,57 @@ export default function AdminPage() {
     }
   }
 
-  const fetchParticipants = async (surveyId?: number) => {
+  const fetchParticipants = async (surveyId?: number, page = 1, perPage = 10) => {
     if (!supabase) return
 
     setLoading(true)
     try {
+      // Get total count
       let countQuery = supabase.from("survey_participants").select("*", { count: "exact", head: true })
 
       if (surveyId) {
         countQuery = countQuery.eq("survey_id", surveyId)
       }
 
+      // Apply filters to count query
+      if (hospitalFilter.trim()) {
+        countQuery = countQuery.ilike("hospital_name", `%${hospitalFilter}%`)
+      }
+      if (statusFilter !== "all") {
+        countQuery = countQuery.eq("is_completed", statusFilter === "completed")
+      }
+
       const { count, error: countError } = await countQuery
       if (countError) throw countError
       setTotalParticipantsCount(count || 0)
+
+      // Fetch only the current page of data
+      const start = (page - 1) * perPage
+      const end = start + perPage - 1
 
       let query = supabase
         .from("survey_participants")
         .select("*")
         .order("created_at", { ascending: false })
-        .range(0, 9999) // Fetch first 10k for display
+        .range(start, end)
 
       if (surveyId) {
         query = query.eq("survey_id", surveyId)
+      }
+
+      // Apply filters to data query
+      if (hospitalFilter.trim()) {
+        query = query.ilike("hospital_name", `%${hospitalFilter}%`)
+      }
+      if (statusFilter !== "all") {
+        query = query.eq("is_completed", statusFilter === "completed")
       }
 
       const { data, error } = await query
 
       if (error) throw error
       setParticipants(data || [])
+      setFilteredParticipants(data || [])
     } catch (err) {
       setError("참여자 데이터를 불러오는데 실패했습니다.")
     } finally {
@@ -1114,20 +1136,7 @@ export default function AdminPage() {
     setEditQuestions(updated)
   }
 
-  const filterParticipants = useCallback(() => {
-    let filtered = participants
-
-    if (hospitalFilter.trim()) {
-      filtered = filtered.filter((p) => p.hospital_name.toLowerCase().includes(hospitalFilter.toLowerCase()))
-    }
-
-    if (statusFilter !== "all") {
-      const isCompleted = statusFilter === "completed"
-      filtered = filtered.filter((p) => p.is_completed === isCompleted)
-    }
-
-    setFilteredParticipants(filtered)
-  }, [participants, hospitalFilter, statusFilter])
+  // const filterParticipants = useCallback(() => { ... }, [...])
 
   const downloadStatsExcel = async () => {
     if (!selectedSurvey || responses.length === 0) {
@@ -1413,7 +1422,7 @@ export default function AdminPage() {
     try {
       await Promise.all([
         fetchSurveys(),
-        fetchParticipants(selectedSurvey.id),
+        fetchParticipants(selectedSurvey.id, participantsPage, participantsPerPage), // Pass pagination params
         fetchResponses(selectedSurvey.id),
         fetchQuestionStats(selectedSurvey.id, hospitalFilter),
       ])
@@ -1432,10 +1441,10 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (selectedSurvey) {
-      fetchParticipants(selectedSurvey.id)
+      fetchParticipants(selectedSurvey.id, participantsPage, participantsPerPage)
       fetchResponses(selectedSurvey.id)
     }
-  }, [selectedSurvey])
+  }, [selectedSurvey, participantsPage, participantsPerPage, hospitalFilter, statusFilter])
 
   useEffect(() => {
     if (selectedSurvey) {
@@ -1443,13 +1452,15 @@ export default function AdminPage() {
     }
   }, [selectedSurvey, hospitalFilter])
 
-  useEffect(() => {
-    filterParticipants()
-  }, [filterParticipants])
+  // useEffect(() => {
+  //   filterParticipants()
+  // }, [filterParticipants])
 
   useEffect(() => {
+    // This effect is now tied to the fetchParticipants call, which is in the main useEffect.
+    // We need to ensure pages reset correctly when filters change.
     setParticipantsPage(1)
-  }, [hospitalFilter, statusFilter, filteredParticipants.length])
+  }, [hospitalFilter, statusFilter, totalParticipantsCount]) // Depend on totalParticipantsCount to re-evaluate pages
 
   useEffect(() => {
     setResponsesPage(1)
@@ -1494,11 +1505,8 @@ export default function AdminPage() {
     )
   }
 
-  const paginatedParticipants = filteredParticipants.slice(
-    (participantsPage - 1) * participantsPerPage,
-    participantsPage * participantsPerPage,
-  )
-  const totalParticipantsPages = Math.ceil(filteredParticipants.length / participantsPerPage)
+  const paginatedParticipants = filteredParticipants
+  const totalParticipantsPages = Math.ceil(totalParticipantsCount / participantsPerPage)
 
   const paginatedResponses = responses.slice((responsesPage - 1) * responsesPerPage, responsesPage * responsesPerPage)
   const totalResponsesPages = Math.ceil(responses.length / responsesPerPage)
@@ -1889,7 +1897,10 @@ export default function AdminPage() {
                           type="text"
                           placeholder="병원명을 입력하세요"
                           value={hospitalFilter}
-                          onChange={(e) => setHospitalFilter(e.target.value)}
+                          onChange={(e) => {
+                            setHospitalFilter(e.target.value)
+                            setParticipantsPage(1) // Reset to first page on filter change
+                          }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
@@ -1897,7 +1908,10 @@ export default function AdminPage() {
                         <label className="block text-sm font-medium text-gray-700 mb-2">완료 상태</label>
                         <select
                           value={statusFilter}
-                          onChange={(e) => setStatusFilter(e.target.value)}
+                          onChange={(e) => {
+                            setStatusFilter(e.target.value)
+                            setParticipantsPage(1) // Reset to first page on filter change
+                          }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                           <option value="all">전체</option>
@@ -1918,6 +1932,7 @@ export default function AdminPage() {
                           onClick={() => {
                             setHospitalFilter("")
                             setStatusFilter("all")
+                            setParticipantsPage(1) // Reset to first page on filter change
                           }}
                           variant="outline"
                           className="px-4 py-2"
@@ -2261,7 +2276,10 @@ export default function AdminPage() {
                             <Input
                               id="hospitalFilter"
                               value={hospitalFilter}
-                              onChange={(e) => setHospitalFilter(e.target.value)}
+                              onChange={(e) => {
+                                setHospitalFilter(e.target.value)
+                                setParticipantsPage(1) // Reset to first page on filter change
+                              }}
                               placeholder="병원명 입력"
                               className="w-48"
                             />
