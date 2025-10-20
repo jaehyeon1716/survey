@@ -113,7 +113,7 @@ export default function AdminPage() {
   const [participants, setParticipants] = useState<Participant[]>([])
   const [responses, setResponses] = useState<SurveyResponse[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
+  // const [error, setError] = useState("") // This will be replaced by tab-specific errors
   const [uploadSuccess, setUploadSuccess] = useState("")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [selectedResponse, setSelectedResponse] = useState<SurveyResponse | null>(null)
@@ -130,6 +130,11 @@ export default function AdminPage() {
     { text: "", type: "objective", scaleType: "agreement" }, // scaleType 추가
   ])
   const [createLoading, setCreateLoading] = useState(false)
+
+  const [surveyError, setSurveyError] = useState("")
+  const [surveySuccess, setSurveySuccess] = useState("")
+  const [participantError, setParticipantError] = useState("")
+  const [participantSuccess, setParticipantSuccess] = useState("")
 
   const [questionStats, setQuestionStats] = useState<QuestionStat[]>([])
   const [hospitalFilter, setHospitalFilter] = useState<string>("")
@@ -562,14 +567,17 @@ export default function AdminPage() {
     e.preventDefault()
     if (password === ADMIN_PASSWORD) {
       setIsAuthenticated(true)
-      setError("")
+      // Removed setError("") here, as login error is handled separately
     } else {
-      setError("비밀번호가 올바르지 않습니다.")
+      // Moved error handling to the login form component
+      // setError("비밀번호가 올바르지 않습니다.")
     }
   }
 
   const fetchSurveys = async () => {
     setLoading(true)
+    setSurveyError("") // Clear previous error
+    setSurveySuccess("") // Clear previous success
     try {
       const response = await fetch("/api/admin/surveys")
       const data = await response.json()
@@ -577,10 +585,10 @@ export default function AdminPage() {
       if (response.ok) {
         setSurveys(data.surveys || [])
       } else {
-        setError(data.error || "설문지 조회 중 오류가 발생했습니다.")
+        setSurveyError(data.error || "설문지 조회 중 오류가 발생했습니다.")
       }
     } catch (err) {
-      setError("설문지 데이터를 불러오는데 실패했습니다.")
+      setSurveyError("설문지 데이터를 불러오는데 실패했습니다.")
     } finally {
       setLoading(false)
     }
@@ -590,6 +598,8 @@ export default function AdminPage() {
     if (!supabase) return
 
     setLoading(true)
+    setParticipantError("") // Clear previous error
+    setParticipantSuccess("") // Clear previous success
     try {
       // Get total count
       let countQuery = supabase.from("survey_participants").select("*", { count: "exact", head: true })
@@ -638,7 +648,7 @@ export default function AdminPage() {
       setParticipants(data || [])
       setFilteredParticipants(data || [])
     } catch (err) {
-      setError("참여자 데이터를 불러오는데 실패했습니다.")
+      setParticipantError("참여자 데이터를 불러오는데 실패했습니다.")
     } finally {
       setLoading(false)
     }
@@ -648,6 +658,7 @@ export default function AdminPage() {
     if (!supabase) return
 
     setLoading(true)
+    // No specific error/success state for this fetch, it's part of the overall loading
     try {
       let countQuery = supabase.from("survey_response_summaries").select("*", { count: "exact", head: true })
 
@@ -685,7 +696,8 @@ export default function AdminPage() {
         await fetchQuestionStats(surveyId)
       }
     } catch (err) {
-      setError("설문 응답 데이터를 불러오는데 실패했습니다.")
+      // Consider adding an error state for response fetching if needed
+      console.error("Error fetching responses:", err)
     } finally {
       setLoading(false)
     }
@@ -786,24 +798,25 @@ export default function AdminPage() {
       setQuestionStats(questionStatsMap)
     } catch (err) {
       console.error("[v0] Error in fetchQuestionStats:", err)
-      setError("문항별 통계 조회 중 오류가 발생했습니다.")
+      setSurveyError("문항별 통계 조회 중 오류가 발생했습니다.")
     }
   }
 
   const handleCreateSurvey = async () => {
     if (!newSurveyTitle.trim()) {
-      setError("설문지 제목을 입력해주세요.")
+      setSurveyError("설문지 제목을 입력해주세요.")
       return
     }
 
     const validQuestions = newSurveyQuestions.filter((q) => q.text.trim() !== "")
     if (validQuestions.length === 0) {
-      setError("최소 1개의 문항을 입력해주세요.")
+      setSurveyError("최소 1개의 문항을 입력해주세요.")
       return
     }
 
     setCreateLoading(true)
-    setError("")
+    setSurveyError("")
+    setSurveySuccess("")
 
     try {
       const response = await fetch("/api/admin/surveys", {
@@ -820,17 +833,20 @@ export default function AdminPage() {
 
       const data = await response.json()
 
-      if (response.ok) {
-        setUploadSuccess("설문지가 성공적으로 생성되었습니다.")
-        setNewSurveyTitle("")
-        setNewSurveyDescription("")
-        setNewSurveyQuestions([{ text: "", type: "objective", scaleType: "agreement" }]) // scaleType 초기화
-        fetchSurveys()
-      } else {
-        setError(data.error || "설문지 생성 중 오류가 발생했습니다.")
+      if (!response.ok) {
+        // Update the error message based on the response from the API
+        setSurveyError(data.error || "설문지 생성 중 오류가 발생했습니다.")
+        return
       }
+
+      // Clear form and show success message
+      setSurveySuccess("설문지가 성공적으로 생성되었습니다.")
+      setNewSurveyTitle("")
+      setNewSurveyDescription("")
+      setNewSurveyQuestions([{ text: "", type: "objective", scaleType: "agreement" }]) // scaleType 초기화
+      fetchSurveys()
     } catch (err) {
-      setError("설문지 생성 중 오류가 발생했습니다.")
+      setSurveyError("설문지 생성 중 오류가 발생했습니다.")
     } finally {
       setCreateLoading(false)
     }
@@ -857,29 +873,29 @@ export default function AdminPage() {
     const file = e.target.files?.[0]
     if (file && file.type === "text/csv") {
       setSelectedFile(file)
-      setError("")
-      setUploadSuccess("") // Clear previous messages
+      setParticipantError("") // Clear previous error
+      setParticipantSuccess("") // Clear previous success
     } else {
-      setError("CSV 파일만 업로드 가능합니다.")
+      setParticipantError("CSV 파일만 업로드 가능합니다.")
       setSelectedFile(null)
-      setUploadSuccess("") // Clear previous messages
+      setParticipantSuccess("") // Clear previous success
     }
   }
 
   const handleUpload = async () => {
     if (!selectedFile) {
-      setError("파일을 선택해주세요.")
+      setParticipantError("파일을 선택해주세요.")
       return
     }
 
     if (!selectedSurvey) {
-      setError("설문지를 선택해주세요.")
+      setParticipantError("설문지를 선택해주세요.")
       return
     }
 
     setLoading(true)
-    setError("")
-    setUploadSuccess("")
+    setParticipantError("")
+    setParticipantSuccess("")
     setUploadProgress(null)
 
     try {
@@ -888,7 +904,7 @@ export default function AdminPage() {
       const lines = csvText.trim().split("\n")
 
       if (lines.length === 0) {
-        setError("CSV 파일이 비어있습니다.")
+        setParticipantError("CSV 파일이 비어있습니다.")
         setLoading(false)
         return
       }
@@ -922,7 +938,7 @@ export default function AdminPage() {
       }
 
       if (participants.length === 0) {
-        setError("유효한 참여자 데이터가 없습니다.")
+        setParticipantError("유효한 참여자 데이터가 없습니다.")
         setLoading(false)
         return
       }
@@ -937,7 +953,7 @@ export default function AdminPage() {
       console.log(`[v0] 총 ${participants.length}명을 ${chunks.length}개 청크로 나누어 업로드 시작`)
 
       // Upload each chunk
-      let successCount = 0
+      let totalUploaded = 0
       for (let i = 0; i < chunks.length; i++) {
         setUploadProgress({
           current: i + 1,
@@ -962,18 +978,20 @@ export default function AdminPage() {
           throw new Error(result.error || `청크 ${i + 1}/${chunks.length} 업로드 실패`)
         }
 
-        successCount += chunks[i].length
-        console.log(`[v0] 청크 ${i + 1}/${chunks.length} 완료: ${successCount}/${participants.length}명 등록됨`)
+        totalUploaded += chunks[i].length
+        console.log(`[v0] 청크 ${i + 1}/${chunks.length} 완료: ${totalUploaded}/${participants.length}명 등록됨`)
       }
 
-      setUploadSuccess(`${successCount}명의 참여자가 성공적으로 등록되었습니다. (${chunks.length}개 배치로 처리됨)`)
+      setParticipantSuccess(
+        `${totalUploaded}명의 참여자가 성공적으로 등록되었습니다. (${chunks.length}개 배치로 처리됨)`,
+      )
       setSelectedFile(null)
       setUploadProgress(null)
       const fileInput = document.getElementById("csvFile") as HTMLInputElement
       if (fileInput) fileInput.value = ""
       fetchParticipants(selectedSurvey.id)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "업로드 중 오류가 발생했습니다.")
+      setParticipantError(err instanceof Error ? err.message : "업로드 중 오류가 발생했습니다.")
       console.error("[v0] Upload error:", err)
       setUploadProgress(null)
     } finally {
@@ -1085,18 +1103,19 @@ export default function AdminPage() {
 
   const handleSaveEdit = async () => {
     if (!editTitle.trim()) {
-      setError("설문지 제목을 입력해주세요.")
+      setSurveyError("설문지 제목을 입력해주세요.")
       return
     }
 
     const validQuestions = editQuestions.filter((q) => q.text.trim() !== "")
     if (validQuestions.length === 0) {
-      setError("최소 1개의 문항을 입력해주세요.")
+      setSurveyError("최소 1개의 문항을 입력해주세요.")
       return
     }
 
     setEditLoading(true)
-    setError("")
+    setSurveyError("")
+    setSurveySuccess("")
 
     try {
       const response = await fetch(`/api/admin/surveys/${editingSurvey?.id}`, {
@@ -1114,19 +1133,21 @@ export default function AdminPage() {
 
       const data = await response.json()
 
-      if (response.ok) {
-        setUploadSuccess("설문지가 성공적으로 수정되었습니다.")
-        setShowEditModal(false)
-        setEditingSurvey(null)
-        fetchSurveys()
-        if (selectedSurvey?.id === editingSurvey?.id) {
-          setSelectedSurvey(null)
-        }
-      } else {
-        setError(data.error || "설문지 수정 중 오류가 발생했습니다.")
+      if (!response.ok) {
+        setSurveyError(data.error || "설문지 수정 중 오류가 발생했습니다.")
+        return
+      }
+
+      setSurveySuccess("설문지가 성공적으로 수정되었습니다.")
+      setShowEditModal(false)
+      setEditingSurvey(null)
+      fetchSurveys()
+      if (selectedSurvey?.id === editingSurvey?.id) {
+        // If the edited survey was the selected one, clear selection to refetch data
+        setSelectedSurvey(null)
       }
     } catch (err) {
-      setError("설문지 수정 중 오류가 발생했습니다.")
+      setSurveyError("설문지 수정 중 오류가 발생했습니다.")
     } finally {
       setEditLoading(false)
     }
@@ -1137,40 +1158,41 @@ export default function AdminPage() {
     setShowDeleteConfirm(true)
   }
 
-  const handleDeleteSurvey = async () => {
+  const deleteSurvey = async (surveyId: number) => {
     if (!surveyToDelete) return
 
     if (deletePassword !== ADMIN_PASSWORD) {
-      setError("비밀번호가 올바르지 않습니다.")
+      setSurveyError("비밀번호가 올바르지 않습니다.")
       return
     }
 
     setDeleteLoading(true)
-    setError("")
+    setSurveyError("")
+    setSurveySuccess("")
 
     try {
-      const response = await fetch(`/api/admin/surveys/${surveyToDelete.id}`, {
+      const response = await fetch(`/api/admin/surveys/${surveyId}`, {
         method: "DELETE",
         signal: AbortSignal.timeout(900000), // 15 minutes for large datasets
       })
 
       const data = await response.json()
 
-      if (response.ok) {
-        setUploadSuccess(data.message || "설문지가 성공적으로 삭제되었습니다.")
+      if (!response.ok) {
+        setSurveyError(data.error || "설문지 삭제 중 오류가 발생했습니다.")
+      } else {
+        setSurveySuccess(data.message || "설문지가 성공적으로 삭제되었습니다.")
         setShowDeleteConfirm(false)
         setSurveyToDelete(null)
         setDeletePassword("")
         fetchSurveys()
-        if (selectedSurvey?.id === surveyToDelete.id) {
+        if (selectedSurvey?.id === surveyId) {
           setSelectedSurvey(null)
         }
-      } else {
-        setError(data.error || "설문지 삭제 중 오류가 발생했습니다.")
       }
     } catch (err) {
       console.error("[v0] 설문지 삭제 오류:", err)
-      setError("설문지 삭제 중 오류가 발생했습니다. 대용량 데이터의 경우 시간이 오래 걸릴 수 있습니다.")
+      setSurveyError("설문지 삭제 중 오류가 발생했습니다. 대용량 데이터의 경우 시간이 오래 걸릴 수 있습니다.")
     } finally {
       setDeleteLoading(false)
     }
@@ -1484,7 +1506,9 @@ export default function AdminPage() {
         fetchQuestionStats(selectedSurvey.id, hospitalFilter),
       ])
     } catch (err) {
-      setError("데이터 새로고침 중 오류가 발생했습니다.")
+      // Consider adding a general error state for refresh if needed
+      console.error("Refresh error:", err)
+      alert("데이터 새로고침 중 오류가 발생했습니다.")
     } finally {
       setLoading(false)
     }
@@ -1532,7 +1556,13 @@ export default function AdminPage() {
             <CardDescription>병원 만족도 조사 관리 시스템</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                handleLogin(e)
+              }}
+              className="space-y-4"
+            >
               <div>
                 <Label htmlFor="password" className="text-lg font-medium">
                   비밀번호
@@ -1547,9 +1577,10 @@ export default function AdminPage() {
                   required
                 />
               </div>
-              {error && (
+              {/* Replaced generic error state with specific login error handling */}
+              {password !== ADMIN_PASSWORD && password !== "" && (
                 <Alert className="border-red-200 bg-red-50">
-                  <AlertDescription className="text-red-700">{error}</AlertDescription>
+                  <AlertDescription className="text-red-700">비밀번호가 올바르지 않습니다.</AlertDescription>
                 </Alert>
               )}
               <Button type="submit" className="w-full h-12 text-lg font-semibold bg-blue-600 hover:bg-blue-700">
@@ -1723,6 +1754,22 @@ export default function AdminPage() {
                   >
                     {createLoading ? "생성 중..." : "설문지 생성"}
                   </Button>
+
+                  {surveySuccess && (
+                    <Alert className="border-green-200 bg-green-50">
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      <AlertDescription className="text-green-700 text-lg font-medium">
+                        {surveySuccess}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {surveyError && (
+                    <Alert className="border-red-200 bg-red-50">
+                      <AlertCircle className="h-5 w-5 text-red-600" />
+                      <AlertDescription className="text-red-700 text-lg font-medium">{surveyError}</AlertDescription>
+                    </Alert>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1880,19 +1927,22 @@ export default function AdminPage() {
                         </div>
                       )}
 
-                      {uploadSuccess && (
+                      {/* Update to use participantSuccess and participantError */}
+                      {participantSuccess && (
                         <Alert className="border-green-200 bg-green-50">
                           <CheckCircle2 className="h-5 w-5 text-green-600" />
                           <AlertDescription className="text-green-700 text-lg font-medium">
-                            {uploadSuccess}
+                            {participantSuccess}
                           </AlertDescription>
                         </Alert>
                       )}
 
-                      {error && (
+                      {participantError && (
                         <Alert className="border-red-200 bg-red-50">
                           <AlertCircle className="h-5 w-5 text-red-600" />
-                          <AlertDescription className="text-red-700 text-lg font-medium">{error}</AlertDescription>
+                          <AlertDescription className="text-red-700 text-lg font-medium">
+                            {participantError}
+                          </AlertDescription>
                         </Alert>
                       )}
                     </div>
@@ -2587,7 +2637,7 @@ export default function AdminPage() {
                 취소
               </AlertDialogCancel>
               <AlertDialogAction
-                onClick={handleDeleteSurvey}
+                onClick={() => deleteSurvey(surveyToDelete!.id)} // Use deleteSurvey function with surveyId
                 disabled={deleteLoading}
                 className="bg-red-600 hover:bg-red-700"
               >
