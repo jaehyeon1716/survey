@@ -1009,6 +1009,7 @@ export default function AdminPage() {
     }
 
     const hospitalQuestionStats: Record<string, Record<number, any>> = {}
+    const allSubjectiveResponses: Array<{ questionNumber: number; hospitalName: string; responseText: string }> = []
 
     try {
       if (supabase) {
@@ -1054,7 +1055,6 @@ export default function AdminPage() {
 
           console.log("[v0] Participants data:", { participantsData, participantsError })
 
-          // Create a map of token to hospital_name
           const tokenToHospital: Record<string, string> = {}
           if (participantsData) {
             participantsData.forEach((p: any) => {
@@ -1103,6 +1103,12 @@ export default function AdminPage() {
               if (response.response_text !== null && response.response_text.trim() !== "") {
                 hospitalQuestionStats[hospital][questionId].textResponses.push(response.response_text)
                 hospitalQuestionStats[hospital][questionId].count += 1
+
+                allSubjectiveResponses.push({
+                  questionNumber,
+                  hospitalName: hospital,
+                  responseText: response.response_text,
+                })
               }
             }
           })
@@ -1234,12 +1240,22 @@ export default function AdminPage() {
         hospitalQuestionStatsData.push(["", "", "", "", "", "", "", ""]) // 열 개수 조정
       })
 
+    const subjectiveResponsesData = [
+      ["주관식 응답내용"],
+      ["문항번호", "병원명", "응답내용"],
+      ...allSubjectiveResponses
+        .sort((a, b) => a.questionNumber - b.questionNumber)
+        .map((response) => [response.questionNumber.toString(), response.hospitalName, response.responseText]),
+      [""],
+    ]
+
     const allData = [
       ...basicStats,
       ...objectiveQuestionStatsData,
       ...subjectiveQuestionStatsData,
       ...hospitalStatsData,
       ...hospitalQuestionStatsData,
+      ...subjectiveResponsesData, // Added new subjective responses section
     ]
 
     console.log("[v0] Excel data rows:", allData.length)
