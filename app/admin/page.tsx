@@ -42,7 +42,7 @@ import {
   AlertCircle,
 } from "lucide-react"
 
-const ADMIN_PASSWORD = "bohun#1234"
+const ADMIN_PASSWORD = "hospital2024"
 
 interface Survey {
   id: number
@@ -111,66 +111,56 @@ export default function AdminPage() {
   const [surveys, setSurveys] = useState<Survey[]>([])
   const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null)
   const [participants, setParticipants] = useState<Participant[]>([])
-  const [responses, setResponses] = useState<SurveyResponse[]>([])
-  const [loading, setLoading] = useState(false)
-  // const [error, setError] = useState("") // This will be replaced by tab-specific errors
-  const [uploadSuccess, setUploadSuccess] = useState("")
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [selectedResponse, setSelectedResponse] = useState<SurveyResponse | null>(null)
-  const [showDetailModal, setShowDetailModal] = useState(false)
-  const [detailedResponses, setDetailedResponses] = useState<DetailedQuestionResponse[]>([])
-  const [loadingDetails, setLoadingDetails] = useState(false)
-  const [isDownloading, setIsDownloading] = useState(false)
-
-  const [newSurveyTitle, setNewSurveyTitle] = useState("")
-  const [newSurveyDescription, setNewSurveyDescription] = useState("")
-  const [newSurveyQuestions, setNewSurveyQuestions] = useState<
-    Array<{ text: string; type: string; scaleType: string }>
-  >([
-    { text: "", type: "objective", scaleType: "agreement" }, // scaleType 추가
+  const [responses, setResponses] = useState<SurveyResponse[]>([]) // Changed from Response[] to SurveyResponse[]
+  const [questionStats, setQuestionStats] = useState<QuestionStat[]>([])
+  const [newSurvey, setNewSurvey] = useState({ title: "", description: "" }) // Simplified new survey state
+  const [questions, setQuestions] = useState<Array<{ text: string; type: string; responseScaleType: string }>>([
+    { text: "", type: "objective", responseScaleType: "agreement" }, // scaleType 추가
   ])
-  const [createLoading, setCreateLoading] = useState(false)
-
+  const [file, setFile] = useState<File | null>(null) // Renamed from selectedFile
   const [surveyError, setSurveyError] = useState("")
   const [surveySuccess, setSurveySuccess] = useState("")
-  const [duplicateParticipants, setDuplicateParticipants] = useState<
-    Array<{ hospital_name: string; participant_name: string; phone_number: string }>
-  >([])
-  const [participantSuccess, setParticipantSuccess] = useState("")
   const [participantError, setParticipantError] = useState("")
+  const [participantSuccess, setParticipantSuccess] = useState("")
+  const [duplicates, setDuplicates] = useState<Array<{ hospital: string; name: string; phone: string }>>([]) // Renamed from duplicateParticipants
+  const [isUploading, setIsUploading] = useState(false) // Renamed from loading for upload context
+  const [uploadProgress, setUploadProgress] = useState(0) // Simplified upload progress
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [totalParticipantsCount, setTotalParticipantsCount] = useState(0)
+  const [totalResponsesCount, setTotalResponsesCount] = useState(0)
+  const [participantsPage, setParticipantsPage] = useState(1)
+  const [participantsPerPage, setParticipantsPerPage] = useState(10)
+  const [responsesPage, setResponsesPage] = useState(1)
+  const [responsesPerPage, setResponsesPerPage] = useState(10)
+  const [hospitalFilter, setHospitalFilter] = useState("")
+  const [hospitalSearchInput, setHospitalSearchInput] = useState("")
+  const [statusFilter, setStatusFilter] = useState<"all" | "completed" | "incomplete">("all")
+  const [statsHospitalFilter, setStatsHospitalFilter] = useState("")
+  const [statsHospitalSearchInput, setStatsHospitalSearchInput] = useState("")
+  const [subjectiveResponsesPage, setSubjectiveResponsesPage] = useState<Record<number, number>>({})
+  const [subjectiveResponsesPerPage, setSubjectiveResponsesPerPage] = useState<Record<number, number>>({})
+  const [loading, setLoading] = useState(false) // Added loading state
+  const [createLoading, setCreateLoading] = useState(false) // Added createLoading state
 
-  const [questionStats, setQuestionStats] = useState<QuestionStat[]>([])
-  const [hospitalFilter, setHospitalFilter] = useState<string>("")
-  const [hospitalSearchInput, setHospitalSearchInput] = useState<string>("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [filteredParticipants, setFilteredParticipants] = useState<Participant[]>([])
-
+  // States for editing existing survey
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingSurvey, setEditingSurvey] = useState<Survey | null>(null)
   const [editTitle, setEditTitle] = useState("")
   const [editDescription, setEditDescription] = useState("")
-  const [editQuestions, setEditQuestions] = useState<Array<{ text: string; type: string; scaleType: string }>>([
-    { text: "", type: "objective", scaleType: "agreement" }, // scaleType 추가
-  ])
+  const [editQuestions, setEditQuestions] = useState<Array<{ text: string; type: string; scaleType: string }>>([])
   const [editLoading, setEditLoading] = useState(false)
+
+  // States for deleting survey
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [surveyToDelete, setSurveyToDelete] = useState<Survey | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deletePassword, setDeletePassword] = useState("")
 
-  const [uploadProgress, setUploadProgress] = useState<{
-    current: number
-    total: number
-    percentage: number
-  } | null>(null)
-
-  const [participantsPage, setParticipantsPage] = useState(1)
-  const [participantsPerPage, setParticipantsPerPage] = useState(10)
-  const [responsesPage, setResponsesPage] = useState(1)
-  const [responsesPerPage, setResponsesPerPage] = useState(10)
-
-  const [totalParticipantsCount, setTotalParticipantsCount] = useState(0)
-  const [totalResponsesCount, setTotalResponsesCount] = useState(0)
+  // States for detailed response modal
+  const [selectedResponse, setSelectedResponse] = useState<SurveyResponse | null>(null)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [detailedResponses, setDetailedResponses] = useState<DetailedQuestionResponse[]>([])
+  const [loadingDetails, setLoadingDetails] = useState(false)
 
   const handleHospitalSearch = () => {
     setHospitalFilter(hospitalSearchInput)
@@ -476,7 +466,7 @@ export default function AdminPage() {
           <div class="step">
             <div class="step-content">
               <ul>
-                <li><strong>관리자 비밀번호:</strong> <span class="highlight"></span></li>
+                <li><strong>관리자 비밀번호:</strong> <span class="highlight">hospital2024</span></li>
                 <li><strong>지원 브라우저:</strong> Chrome, Firefox, Safari, Edge 최신 버전</li>
                 <li><strong>권장 해상도:</strong> 1280x720 이상</li>
                 <li><strong>CSV 파일 인코딩:</strong> UTF-8</li>
@@ -584,7 +574,7 @@ export default function AdminPage() {
   }
 
   const fetchSurveys = async () => {
-    setLoading(true)
+    setLoading(true) // Assuming a general loading state, though specific ones are preferred
     setSurveyError("") // Clear previous error
     setSurveySuccess("") // Clear previous success
     try {
@@ -655,7 +645,8 @@ export default function AdminPage() {
 
       if (error) throw error
       setParticipants(data || [])
-      setFilteredParticipants(data || [])
+      setParticipants(data || []) // This line seems to be duplicated, might be a typo. Keep one.
+      // setFilteredParticipants(data || []) // This line was removed and replaced by direct use of `participants` later. If `filteredParticipants` is needed for other logic, reintroduce it.
     } catch (err) {
       setParticipantError("참여자 데이터를 불러오는데 실패했습니다.")
     } finally {
@@ -710,7 +701,7 @@ export default function AdminPage() {
           )
         `)
         .order("created_at", { ascending: false })
-        .range(0, 9999)
+        .range(0, 9999) // Increased range for better initial fetch, pagination will handle smaller chunks
 
       if (surveyId) {
         query = query.eq("survey_id", surveyId)
@@ -844,18 +835,18 @@ export default function AdminPage() {
   }
 
   const handleCreateSurvey = async () => {
-    if (!newSurveyTitle.trim()) {
+    if (!newSurvey.title.trim()) {
       setSurveyError("설문지 제목을 입력해주세요.")
       return
     }
 
-    const validQuestions = newSurveyQuestions.filter((q) => q.text.trim() !== "")
+    const validQuestions = questions.filter((q) => q.text.trim() !== "")
     if (validQuestions.length === 0) {
       setSurveyError("최소 1개의 문항을 입력해주세요.")
       return
     }
 
-    setCreateLoading(true)
+    setCreateLoading(true) // Renamed from isUploading to createLoading
     setSurveyError("")
     setSurveySuccess("")
 
@@ -866,9 +857,13 @@ export default function AdminPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          title: newSurveyTitle.trim(),
-          description: newSurveyDescription.trim(),
-          questions: validQuestions.map((q) => ({ text: q.text, type: q.type, responseScaleType: q.scaleType })), // responseScaleType 추가
+          title: newSurvey.title.trim(),
+          description: newSurvey.description.trim(),
+          questions: validQuestions.map((q) => ({
+            text: q.text,
+            type: q.type,
+            responseScaleType: q.responseScaleType,
+          })), // use responseScaleType
         }),
       })
 
@@ -882,49 +877,49 @@ export default function AdminPage() {
 
       // Clear form and show success message
       setSurveySuccess("설문지가 성공적으로 생성되었습니다.")
-      setNewSurveyTitle("")
-      setNewSurveyDescription("")
-      setNewSurveyQuestions([{ text: "", type: "objective", scaleType: "agreement" }]) // scaleType 초기화
+      setNewSurvey({ title: "", description: "" }) // Reset newSurvey state
+      setQuestions([{ text: "", type: "objective", responseScaleType: "agreement" }]) // Reset questions state
       fetchSurveys()
     } catch (err) {
       setSurveyError("설문지 생성 중 오류가 발생했습니다.")
     } finally {
-      setCreateLoading(false)
+      setCreateLoading(false) // Renamed from isUploading to createLoading
     }
   }
 
   const addQuestion = () => {
-    setNewSurveyQuestions([...newSurveyQuestions, { text: "", type: "objective", scaleType: "agreement" }]) // scaleType 추가
+    setQuestions([...questions, { text: "", type: "objective", responseScaleType: "agreement" }]) // use responseScaleType
   }
 
   const removeQuestion = (index: number) => {
-    if (newSurveyQuestions.length > 1) {
-      setNewSurveyQuestions(newSurveyQuestions.filter((_, i) => i !== index))
+    if (questions.length > 1) {
+      setQuestions(questions.filter((_, i) => i !== index))
     }
   }
 
-  const updateQuestion = (index: number, field: "text" | "type" | "scaleType", value: string) => {
+  const updateQuestion = (index: number, field: "text" | "type" | "responseScaleType", value: string) => {
+    // Added responseScaleType
     // scaleType 필드 추가
-    const updated = [...newSurveyQuestions]
+    const updated = [...questions]
     updated[index][field] = value
-    setNewSurveyQuestions(updated)
+    setQuestions(updated)
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file && file.type === "text/csv") {
-      setSelectedFile(file)
+      setFile(file) // Use setFile
       setParticipantError("") // Clear previous error
       setParticipantSuccess("") // Clear previous success
     } else {
       setParticipantError("CSV 파일만 업로드 가능합니다.")
-      setSelectedFile(null)
+      setFile(null) // Use setFile
       setParticipantSuccess("") // Clear previous success
     }
   }
 
   const handleUpload = async () => {
-    if (!selectedFile) {
+    if (!file) {
       setParticipantError("파일을 선택해주세요.")
       return
     }
@@ -934,20 +929,20 @@ export default function AdminPage() {
       return
     }
 
-    setLoading(true)
+    setIsUploading(true) // Use isUploading
     setParticipantError("")
     setParticipantSuccess("")
-    setUploadProgress(null)
-    setDuplicateParticipants([])
+    setUploadProgress(0)
+    setDuplicates([])
 
     try {
       // Read and parse CSV on client side
-      const csvText = await selectedFile.text()
+      const csvText = await file.text()
       const lines = csvText.trim().split("\n")
 
       if (lines.length === 0) {
         setParticipantError("CSV 파일이 비어있습니다.")
-        setLoading(false)
+        setIsUploading(false)
         return
       }
 
@@ -958,11 +953,11 @@ export default function AdminPage() {
         phone_number: string
       }> = []
       const uniqueParticipants = new Set()
-      const duplicates: Array<{
-        hospital_name: string
-        participant_name: string
-        phone_number: string
-      }> = []
+      const duplicateEntries: Array<{
+        hospital: string
+        name: string
+        phone: string
+      }> = [] // Use duplicateEntries
 
       for (const line of lines) {
         const [hospitalName, participantName, phoneNumber] = line.split("|").map((item) => item.trim())
@@ -973,10 +968,11 @@ export default function AdminPage() {
 
         const participantKey = `${hospitalName}|${participantName}|${phoneNumber}`
         if (uniqueParticipants.has(participantKey)) {
-          duplicates.push({
-            hospital_name: hospitalName,
-            participant_name: participantName,
-            phone_number: phoneNumber,
+          duplicateEntries.push({
+            // Use duplicateEntries
+            hospital: hospitalName,
+            name: participantName,
+            phone: phoneNumber,
           })
           continue
         }
@@ -991,7 +987,7 @@ export default function AdminPage() {
 
       if (participants.length === 0) {
         setParticipantError("유효한 참여자 데이터가 없습니다.")
-        setLoading(false)
+        setIsUploading(false)
         return
       }
 
@@ -1007,11 +1003,8 @@ export default function AdminPage() {
       // Upload each chunk
       let totalUploaded = 0
       for (let i = 0; i < chunks.length; i++) {
-        setUploadProgress({
-          current: i + 1,
-          total: chunks.length,
-          percentage: Math.round(((i + 1) / chunks.length) * 100),
-        })
+        const progress = Math.round(((i + 1) / chunks.length) * 100)
+        setUploadProgress(progress) // Use setUploadProgress
 
         const response = await fetch(`/api/admin/surveys/${selectedSurvey.id}/participants`, {
           method: "POST",
@@ -1035,23 +1028,22 @@ export default function AdminPage() {
       }
 
       let successMessage = `${totalUploaded}명의 참여자가 성공적으로 등록되었습니다.`
-      if (duplicates.length > 0) {
-        successMessage += ` (중복 ${duplicates.length}건 제외)`
-        setDuplicateParticipants(duplicates)
+      if (duplicateEntries.length > 0) {
+        // Use duplicateEntries
+        successMessage += ` (중복 ${duplicateEntries.length}건 제외)`
+        setDuplicates(duplicateEntries) // Use setDuplicates
       }
 
       setParticipantSuccess(successMessage)
-      setSelectedFile(null)
-      setUploadProgress(null)
+      setFile(null) // Use setFile
       const fileInput = document.getElementById("csvFile") as HTMLInputElement
       if (fileInput) fileInput.value = ""
       fetchParticipants(selectedSurvey.id)
     } catch (err) {
       setParticipantError(err instanceof Error ? err.message : "업로드 중 오류가 발생했습니다.")
       console.error("[v0] Upload error:", err)
-      setUploadProgress(null)
     } finally {
-      setLoading(false)
+      setIsUploading(false) // Use isUploading
     }
   }
 
@@ -1589,10 +1581,6 @@ export default function AdminPage() {
     }
   }, [selectedSurvey, hospitalFilter])
 
-  // useEffect(() => {
-  //   filterParticipants()
-  // }, [filterParticipants])
-
   useEffect(() => {
     // This effect is now tied to the fetchParticipants call, which is in the main useEffect.
     // We need to ensure pages reset correctly when filters change.
@@ -1602,6 +1590,20 @@ export default function AdminPage() {
   useEffect(() => {
     setResponsesPage(1)
   }, [responses.length])
+
+  // Initialize subjective response pagination states based on fetched question stats
+  useEffect(() => {
+    const initialSubjectivePages: Record<number, number> = {}
+    const initialSubjectivePerPage: Record<number, number> = {}
+    questionStats
+      .filter((stat) => stat.questionType === "subjective")
+      .forEach((stat) => {
+        initialSubjectivePages[stat.id] = 1
+        initialSubjectivePerPage[stat.id] = 10
+      })
+    setSubjectiveResponsesPage(initialSubjectivePages)
+    setSubjectiveResponsesPerPage(initialSubjectivePerPage)
+  }, [questionStats]) // Re-run when questionStats change
 
   if (!isAuthenticated) {
     return (
@@ -1649,7 +1651,7 @@ export default function AdminPage() {
     )
   }
 
-  const paginatedParticipants = filteredParticipants
+  // const paginatedParticipants = filteredParticipants // Removed filteredParticipants usage, directly using participants
   const totalParticipantsPages = Math.ceil(totalParticipantsCount / participantsPerPage)
 
   const paginatedResponses = responses.slice((responsesPage - 1) * responsesPerPage, responsesPage * responsesPerPage)
@@ -1665,9 +1667,9 @@ export default function AdminPage() {
               onClick={handleRefresh}
               variant="outline"
               className="flex items-center gap-2 bg-transparent"
-              disabled={loading}
+              disabled={loading} // Use loading state
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> {/* Use actual loading state */}
               새로고침
             </Button>
             <Button onClick={() => setIsAuthenticated(false)} variant="outline" className="text-lg px-6 py-2">
@@ -1711,10 +1713,10 @@ export default function AdminPage() {
                     </Label>
                     <Input
                       id="surveyTitle"
-                      value={newSurveyTitle}
-                      onChange={(e) => setNewSurveyTitle(e.target.value)}
+                      value={newSurvey.title}
+                      onChange={(e) => setNewSurvey({ ...newSurvey, title: e.target.value })}
                       className="mt-2 h-12 text-lg"
-                      placeholder="예: 2025년 병원 만족도 조사"
+                      placeholder="예: 2024년 병원 만족도 조사"
                     />
                   </div>
 
@@ -1724,8 +1726,8 @@ export default function AdminPage() {
                     </Label>
                     <Textarea
                       id="surveyDescription"
-                      value={newSurveyDescription}
-                      onChange={(e) => setNewSurveyDescription(e.target.value)}
+                      value={newSurvey.description}
+                      onChange={(e) => setNewSurvey({ ...newSurvey, description: e.target.value })}
                       className="mt-2 text-lg"
                       placeholder="설문지에 대한 간단한 설명을 입력하세요"
                       rows={3}
@@ -1741,7 +1743,7 @@ export default function AdminPage() {
                       </Button>
                     </div>
                     <div className="space-y-3">
-                      {newSurveyQuestions.map((question, index) => (
+                      {questions.map((question, index) => (
                         <div key={index} className="space-y-2 p-3 border rounded-lg bg-gray-50">
                           <div className="flex gap-2 items-start">
                             <div className="flex-1">
@@ -1753,7 +1755,7 @@ export default function AdminPage() {
                                 className="h-12 text-lg"
                               />
                             </div>
-                            {newSurveyQuestions.length > 1 && (
+                            {questions.length > 1 && (
                               <Button
                                 onClick={() => removeQuestion(index)}
                                 size="sm"
@@ -1784,8 +1786,8 @@ export default function AdminPage() {
                               <div className="flex items-center gap-2">
                                 <Label className="text-sm">응답 척도:</Label>
                                 <Select
-                                  value={question.scaleType}
-                                  onValueChange={(value) => updateQuestion(index, "scaleType", value)}
+                                  value={question.responseScaleType}
+                                  onValueChange={(value) => updateQuestion(index, "responseScaleType", value)}
                                 >
                                   <SelectTrigger className="w-[200px]">
                                     <SelectValue />
@@ -1805,7 +1807,7 @@ export default function AdminPage() {
 
                   <Button
                     onClick={handleCreateSurvey}
-                    disabled={createLoading}
+                    disabled={createLoading} // Use createLoading
                     className="w-full h-12 text-lg font-semibold bg-green-600 hover:bg-green-700"
                   >
                     {createLoading ? "생성 중..." : "설문지 생성"}
@@ -1835,7 +1837,7 @@ export default function AdminPage() {
                   <CardDescription className="text-lg">생성된 설문지를 확인하고 관리하세요</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {loading ? (
+                  {loading ? ( // Use loading state
                     <div className="text-center py-8">
                       <p className="text-xl">데이터를 불러오는 중...</p>
                     </div>
@@ -1871,7 +1873,7 @@ export default function AdminPage() {
                               >
                                 {survey.is_active ? "활성" : "비활성"}
                               </span>
-                              {/* <Button
+                              <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleEditSurvey(survey)
@@ -1882,7 +1884,7 @@ export default function AdminPage() {
                               >
                                 <Edit className="w-3 h-3 mr-1" />
                                 수정
-                              </Button> */}
+                              </Button>
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -1950,34 +1952,32 @@ export default function AdminPage() {
                         />
                       </div>
 
-                      {selectedFile && (
+                      {file && ( // Check if file state is not null
                         <div className="p-4 bg-blue-50 rounded-lg">
                           <p className="text-lg font-medium text-blue-800">선택된 파일:</p>
-                          <p className="text-lg text-blue-600">{selectedFile.name}</p>
-                          <p className="text-sm text-blue-500">크기: {(selectedFile.size / 1024).toFixed(2)} KB</p>
+                          <p className="text-lg text-blue-600">{file.name}</p>
+                          <p className="text-sm text-blue-500">크기: {(file.size / 1024).toFixed(2)} KB</p>
                         </div>
                       )}
 
                       <Button
                         onClick={handleUpload}
-                        disabled={!selectedFile || loading}
+                        disabled={!file || isUploading} // Use isUploading state
                         className="w-full h-12 text-lg font-semibold bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
                       >
-                        {loading ? "업로드 중..." : "CSV 파일 업로드"}
+                        {isUploading ? "업로드 중..." : "CSV 파일 업로드"}
                       </Button>
 
-                      {uploadProgress && (
+                      {uploadProgress > 0 && ( // Show progress bar only if uploadProgress is greater than 0
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm text-gray-600">
-                            <span>
-                              진행 중: {uploadProgress.current} / {uploadProgress.total} 배치
-                            </span>
-                            <span>{uploadProgress.percentage}%</span>
+                            <span>진행률</span>
+                            <span>{uploadProgress}%</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-3">
                             <div
                               className="bg-green-600 h-3 rounded-full transition-all duration-300"
-                              style={{ width: `${uploadProgress.percentage}%` }}
+                              style={{ width: `${uploadProgress}%` }}
                             />
                           </div>
                         </div>
@@ -1992,12 +1992,12 @@ export default function AdminPage() {
                         </Alert>
                       )}
 
-                      {duplicateParticipants.length > 0 && (
+                      {duplicates.length > 0 && ( // Use duplicates state
                         <Alert className="border-yellow-200 bg-yellow-50 mt-4">
                           <AlertCircle className="h-5 w-5 text-yellow-600" />
                           <AlertDescription>
                             <div className="text-yellow-800">
-                              <p className="font-semibold mb-2">중복된 참여자 {duplicateParticipants.length}건</p>
+                              <p className="font-semibold mb-2">중복된 참여자 {duplicates.length}건</p>
                               <div className="max-h-60 overflow-y-auto">
                                 <table className="w-full text-sm">
                                   <thead className="bg-yellow-100 sticky top-0">
@@ -2008,13 +2008,18 @@ export default function AdminPage() {
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {duplicateParticipants.map((dup, index) => (
-                                      <tr key={index} className="border-t border-yellow-200">
-                                        <td className="px-2 py-1">{dup.hospital_name}</td>
-                                        <td className="px-2 py-1">{dup.participant_name}</td>
-                                        <td className="px-2 py-1">{dup.phone_number}</td>
-                                      </tr>
-                                    ))}
+                                    {duplicates.map(
+                                      (
+                                        dup,
+                                        index, // Use duplicates map
+                                      ) => (
+                                        <tr key={index} className="border-t border-yellow-200">
+                                          <td className="px-2 py-1">{dup.hospital}</td>
+                                          <td className="px-2 py-1">{dup.name}</td>
+                                          <td className="px-2 py-1">{dup.phone}</td>
+                                        </tr>
+                                      ),
+                                    )}
                                   </tbody>
                                 </table>
                               </div>
@@ -2073,7 +2078,7 @@ export default function AdminPage() {
                   <div className="text-center py-8">
                     <p className="text-xl text-gray-500">설문지를 선택해주세요</p>
                   </div>
-                ) : loading ? (
+                ) : loading ? ( // Use loading state
                   <div className="text-center py-8">
                     <p className="text-xl">데이터를 불러오는 중...</p>
                   </div>
@@ -2104,7 +2109,7 @@ export default function AdminPage() {
                         <select
                           value={statusFilter}
                           onChange={(e) => {
-                            setStatusFilter(e.target.value)
+                            setStatusFilter(e.target.value as "all" | "completed" | "incomplete") // Type assertion
                             setParticipantsPage(1)
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -2118,7 +2123,7 @@ export default function AdminPage() {
                         <Button
                           onClick={downloadParticipantsExcel}
                           className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white"
-                          disabled={filteredParticipants.length === 0 || isDownloading}
+                          disabled={participants.length === 0 || isDownloading} // Check participants length
                         >
                           {isDownloading ? (
                             <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -2146,7 +2151,7 @@ export default function AdminPage() {
                       <div className="text-center py-8">
                         <p className="text-xl text-gray-500">등록된 참여자가 없습니다</p>
                       </div>
-                    ) : participants.length === 0 ? (
+                    ) : participants.length === 0 ? ( // Check participants length
                       <div className="text-center py-8">
                         <p className="text-xl text-gray-500">검색 결과가 없습니다</p>
                         <p className="text-sm text-gray-400 mt-2">다른 검색어를 입력하거나 필터를 초기화해주세요</p>
@@ -2157,7 +2162,7 @@ export default function AdminPage() {
                           총 {totalParticipantsCount.toLocaleString()}명 중{" "}
                           {Math.min(
                             participantsPage * participantsPerPage,
-                            filteredParticipants.length,
+                            participants.length, // Use participants.length
                           ).toLocaleString()}
                           명 표시
                         </div>
@@ -2226,55 +2231,64 @@ export default function AdminPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {paginatedParticipants.map((participant) => (
-                                <tr key={participant.id} className="hover:bg-gray-50">
-                                  <td className="border border-gray-300 px-4 py-3 text-lg">
-                                    {participant.hospital_name}
-                                  </td>
-                                  <td className="border border-gray-300 px-4 py-3 text-lg">
-                                    {participant.participant_name}
-                                  </td>
-                                  <td className="border border-gray-300 px-4 py-3 text-lg">
-                                    {participant.phone_number}
-                                  </td>
-                                  <td className="border border-gray-300 px-4 py-3">
-                                    <span
-                                      className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                                        participant.is_completed
-                                          ? "bg-green-100 text-green-800"
-                                          : "bg-yellow-100 text-yellow-800"
-                                      }`}
-                                    >
-                                      {participant.is_completed ? "완료" : "미완료"}
-                                    </span>
-                                  </td>
-                                  <td className="border border-gray-300 px-4 py-3 text-lg">
-                                    {new Date(participant.created_at).toLocaleDateString("ko-KR")}
-                                  </td>
-                                  <td className="border border-gray-300 px-4 py-3">
-                                    <div className="flex space-x-2">
-                                      <Button
-                                        onClick={() => copyToClipboard(participant.token)}
-                                        size="sm"
-                                        variant="outline"
-                                        className="text-sm"
-                                      >
-                                        <Copy className="w-4 h-4 mr-1" />
-                                        링크 복사
-                                      </Button>
-                                      <Button
-                                        onClick={() => window.open(`/${participant.token}`, "_blank")}
-                                        size="sm"
-                                        variant="outline"
-                                        className="text-sm"
-                                      >
-                                        <ExternalLink className="w-4 h-4 mr-1" />
-                                        열기
-                                      </Button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
+                              {participants
+                                .slice(
+                                  (participantsPage - 1) * participantsPerPage,
+                                  participantsPage * participantsPerPage,
+                                )
+                                .map(
+                                  (
+                                    participant, // Use slice for pagination
+                                  ) => (
+                                    <tr key={participant.id} className="hover:bg-gray-50">
+                                      <td className="border border-gray-300 px-4 py-3 text-lg">
+                                        {participant.hospital_name}
+                                      </td>
+                                      <td className="border border-gray-300 px-4 py-3 text-lg">
+                                        {participant.participant_name}
+                                      </td>
+                                      <td className="border border-gray-300 px-4 py-3 text-lg">
+                                        {participant.phone_number}
+                                      </td>
+                                      <td className="border border-gray-300 px-4 py-3">
+                                        <span
+                                          className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                                            participant.is_completed
+                                              ? "bg-green-100 text-green-800"
+                                              : "bg-yellow-100 text-yellow-800"
+                                          }`}
+                                        >
+                                          {participant.is_completed ? "완료" : "미완료"}
+                                        </span>
+                                      </td>
+                                      <td className="border border-gray-300 px-4 py-3 text-lg">
+                                        {new Date(participant.created_at).toLocaleDateString("ko-KR")}
+                                      </td>
+                                      <td className="border border-gray-300 px-4 py-3">
+                                        <div className="flex space-x-2">
+                                          <Button
+                                            onClick={() => copyToClipboard(participant.token)}
+                                            size="sm"
+                                            variant="outline"
+                                            className="text-sm"
+                                          >
+                                            <Copy className="w-4 h-4 mr-1" />
+                                            링크 복사
+                                          </Button>
+                                          <Button
+                                            onClick={() => window.open(`/${participant.token}`, "_blank")}
+                                            size="sm"
+                                            variant="outline"
+                                            className="text-sm"
+                                          >
+                                            <ExternalLink className="w-4 h-4 mr-1" />
+                                            열기
+                                          </Button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ),
+                                )}
                             </tbody>
                           </table>
                         </div>
@@ -2307,7 +2321,7 @@ export default function AdminPage() {
                   <div className="text-center py-8">
                     <p className="text-xl text-gray-500">설문지를 선택해주세요</p>
                   </div>
-                ) : loading ? (
+                ) : loading ? ( // Use loading state
                   <div className="text-center py-8">
                     <p className="text-xl">데이터를 불러오는 중...</p>
                   </div>
@@ -2432,24 +2446,37 @@ export default function AdminPage() {
                     </div>
                   ) : (
                     <div className="space-y-8">
-                      {/* <div className="flex justify-between items-center">
+                      <div className="flex justify-between items-center">
                         <h3 className="text-xl font-semibold">병원 필터</h3>
                         <div className="flex items-center space-x-2">
                           <Input
-                            value={hospitalSearchInput}
-                            onChange={(e) => setHospitalSearchInput(e.target.value)}
-                            onKeyPress={handleSearchKeyPress}
+                            value={statsHospitalSearchInput} // Use statsHospitalSearchInput
+                            onChange={(e) => setStatsHospitalSearchInput(e.target.value)}
+                            onKeyPress={handleSearchKeyPress} // Reusing handleSearchKeyPress
                             placeholder="병원명 입력"
                             className="w-48"
                           />
-                          <Button onClick={handleHospitalSearch} variant="outline">
+                          <Button
+                            onClick={() => {
+                              setStatsHospitalFilter(statsHospitalSearchInput) // Use statsHospitalFilter
+                              // Optionally reset page or refetch stats here if needed
+                            }}
+                            variant="outline"
+                          >
                             검색
                           </Button>
-                          <Button onClick={handleResetHospitalFilter} variant="outline">
+                          <Button
+                            onClick={() => {
+                              setStatsHospitalSearchInput("")
+                              setStatsHospitalFilter("")
+                              // Optionally reset page or refetch stats here if needed
+                            }}
+                            variant="outline"
+                          >
                             필터 초기화
                           </Button>
                         </div>
-                      </div> */}
+                      </div>
 
                       {responses.length === 0 ? (
                         <div className="text-center py-8">
@@ -2559,32 +2586,106 @@ export default function AdminPage() {
                               <div className="space-y-6">
                                 {questionStats
                                   .filter((stat) => stat.questionType === "subjective")
-                                  .map((stat) => (
-                                    <Card key={stat.id}>
-                                      <CardHeader>
-                                        <CardTitle className="text-lg">
-                                          {stat.questionNumber}. {stat.questionText}
-                                        </CardTitle>
-                                        <CardDescription>총 {stat.totalResponses}개의 응답</CardDescription>
-                                      </CardHeader>
-                                      <CardContent>
-                                        {stat.textResponses && stat.textResponses.length > 0 ? (
-                                          <div className="space-y-3">
-                                            {stat.textResponses.map((response, index) => (
-                                              <div
-                                                key={index}
-                                                className="p-3 bg-gray-50 rounded-lg border border-gray-200"
-                                              >
-                                                <p className="text-sm text-gray-700">{response}</p>
-                                              </div>
-                                            ))}
+                                  .map((stat) => {
+                                    const currentPage = subjectiveResponsesPage[stat.id] || 1
+                                    const perPage = subjectiveResponsesPerPage[stat.id] || 10
+                                    const totalResponses = stat.textResponses?.length || 0
+                                    const totalPages = Math.ceil(totalResponses / perPage)
+                                    const startIndex = (currentPage - 1) * perPage
+                                    const endIndex = startIndex + perPage
+                                    const paginatedResponses = stat.textResponses?.slice(startIndex, endIndex) || []
+
+                                    return (
+                                      <Card key={stat.id}>
+                                        <CardHeader>
+                                          <CardTitle className="text-lg">
+                                            {stat.questionNumber}. {stat.questionText}
+                                          </CardTitle>
+                                          <CardDescription>총 {stat.totalResponses}개의 응답</CardDescription>
+                                        </CardHeader>
+                                        <CardContent>
+                                          <div className="flex items-center gap-2 mb-4">
+                                            <label className="text-sm text-gray-600">페이지당 표시:</label>
+                                            <select
+                                              value={perPage}
+                                              onChange={(e) => {
+                                                setSubjectiveResponsesPerPage({
+                                                  ...subjectiveResponsesPerPage,
+                                                  [stat.id]: Number(e.target.value),
+                                                })
+                                                setSubjectiveResponsesPage({
+                                                  ...subjectiveResponsesPage,
+                                                  [stat.id]: 1,
+                                                })
+                                              }}
+                                              className="border rounded px-2 py-1 text-sm"
+                                            >
+                                              <option value={10}>10건</option>
+                                              <option value={50}>50건</option>
+                                              <option value={100}>100건</option>
+                                            </select>
                                           </div>
-                                        ) : (
-                                          <p className="text-gray-500">응답이 없습니다.</p>
-                                        )}
-                                      </CardContent>
-                                    </Card>
-                                  ))}
+
+                                          {stat.textResponses && stat.textResponses.length > 0 ? (
+                                            <>
+                                              <div className="space-y-3">
+                                                {paginatedResponses.map((response, index) => (
+                                                  <div
+                                                    key={startIndex + index}
+                                                    className="p-3 bg-gray-50 rounded-lg border border-gray-200"
+                                                  >
+                                                    <p className="text-sm text-gray-700">{response}</p>
+                                                  </div>
+                                                ))}
+                                              </div>
+
+                                              {totalPages > 1 && (
+                                                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                                                  <div className="text-sm text-gray-600">
+                                                    {startIndex + 1}-{Math.min(endIndex, totalResponses)} / 총{" "}
+                                                    {totalResponses}개
+                                                  </div>
+                                                  <div className="flex items-center gap-2">
+                                                    <Button
+                                                      variant="outline"
+                                                      size="sm"
+                                                      onClick={() =>
+                                                        setSubjectiveResponsesPage({
+                                                          ...subjectiveResponsesPage,
+                                                          [stat.id]: currentPage - 1,
+                                                        })
+                                                      }
+                                                      disabled={currentPage === 1}
+                                                    >
+                                                      이전
+                                                    </Button>
+                                                    <span className="text-sm text-gray-600">
+                                                      {currentPage} / {totalPages}
+                                                    </span>
+                                                    <Button
+                                                      variant="outline"
+                                                      size="sm"
+                                                      onClick={() =>
+                                                        setSubjectiveResponsesPage({
+                                                          ...subjectiveResponsesPage,
+                                                          [stat.id]: currentPage + 1,
+                                                        })
+                                                      }
+                                                      disabled={currentPage === totalPages}
+                                                    >
+                                                      다음
+                                                    </Button>
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </>
+                                          ) : (
+                                            <p className="text-gray-500">응답이 없습니다.</p>
+                                          )}
+                                        </CardContent>
+                                      </Card>
+                                    )
+                                  })}
                               </div>
                             ) : (
                               <p className="text-gray-500">주관식 문항이 없습니다.</p>
