@@ -2197,6 +2197,36 @@ export default function AdminPage() {
                           </div>
                         </div>
 
+                        {/* pagination */}
+                        <div className="flex justify-between items-center mt-4">
+                          <div className="text-sm text-gray-600">
+                            페이지 {participantsPage} /{" "}
+                            {Math.ceil(filteredParticipantsCount / participantsPerPage) || 1}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => setParticipantsPage((prev) => Math.max(1, prev - 1))}
+                              disabled={participantsPage === 1}
+                              variant="outline"
+                              size="sm"
+                            >
+                              이전
+                            </Button>
+                            <Button
+                              onClick={() =>
+                                setParticipantsPage((prev) =>
+                                  Math.min(Math.ceil(filteredParticipantsCount / participantsPerPage), prev + 1),
+                                )
+                              }
+                              disabled={participantsPage >= Math.ceil(filteredParticipantsCount / participantsPerPage)}
+                              variant="outline"
+                              size="sm"
+                            >
+                              다음
+                            </Button>
+                          </div>
+                        </div>
+
                         <div className="overflow-x-auto">
                           <table className="w-full border-collapse border border-gray-300">
                             <thead>
@@ -2274,35 +2304,7 @@ export default function AdminPage() {
                             </tbody>
                           </table>
                         </div>
-                        {/* pagination */}
-                        <div className="flex justify-between items-center mt-4">
-                          <div className="text-sm text-gray-600">
-                            페이지 {participantsPage} /{" "}
-                            {Math.ceil(filteredParticipantsCount / participantsPerPage) || 1}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={() => setParticipantsPage((prev) => Math.max(1, prev - 1))}
-                              disabled={participantsPage === 1}
-                              variant="outline"
-                              size="sm"
-                            >
-                              이전
-                            </Button>
-                            <Button
-                              onClick={() =>
-                                setParticipantsPage((prev) =>
-                                  Math.min(Math.ceil(filteredParticipantsCount / participantsPerPage), prev + 1),
-                                )
-                              }
-                              disabled={participantsPage >= Math.ceil(filteredParticipantsCount / participantsPerPage)}
-                              variant="outline"
-                              size="sm"
-                            >
-                              다음
-                            </Button>
-                          </div>
-                        </div>
+                        
                       </>
                     )}
                   </div>
