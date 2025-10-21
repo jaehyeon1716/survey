@@ -734,7 +734,7 @@ export default function AdminPage() {
       setResponses(data || [])
 
       if (surveyId) {
-        await fetchQuestionStats(surveyId, statsHospitalFilter)
+        await fetchQuestionStats(surveyId)
       }
     } catch (err) {
       console.error("Error fetching responses:", err)
@@ -743,7 +743,8 @@ export default function AdminPage() {
     }
   }
 
-  const fetchQuestionStats = async (surveyId: number, hospitalName?: string) => {
+  // This is the modified fetchQuestionStats function
+  const fetchQuestionStats = async (surveyId: number) => {
     if (!supabase) return
 
     try {
@@ -769,6 +770,7 @@ export default function AdminPage() {
           "question_id",
           questionsData.map((q) => q.id),
         )
+        .limit(1000000)
 
       console.log("[v0] Responses data:", responsesData)
       if (responsesError) {
@@ -777,30 +779,10 @@ export default function AdminPage() {
       }
       if (!responsesData) return
 
-      let filteredResponses = responsesData
-
-      if (hospitalName && hospitalName.trim() !== "") {
-        // Fetch all participants for this survey to filter by hospital
-        const { data: allParticipants, error: participantsError } = await supabase
-          .from("survey_participants")
-          .select("token, hospital_name")
-          .eq("survey_id", surveyId)
-          .ilike("hospital_name", `%${hospitalName.trim()}%`)
-
-        console.log("[v0] Filtered participants data:", allParticipants)
-        if (participantsError) {
-          console.error("[v0] Participants error:", participantsError)
-          return
-        }
-
-        const participantTokenSet = new Set(allParticipants?.map((p) => p.token) || [])
-        filteredResponses = responsesData.filter((r) => participantTokenSet.has(r.participant_token))
-      }
-
-      console.log("[v0] Filtered responses:", filteredResponses.length)
+      console.log("[v0] Total responses:", responsesData.length)
 
       const questionStatsMap = questionsData.map((question) => {
-        const questionResponses = filteredResponses.filter((r) => r.question_id === question.id)
+        const questionResponses = responsesData.filter((r) => r.question_id === question.id)
 
         // For objective questions, calculate average score
         const objectiveResponses = questionResponses.filter((r) => r.response_value !== null)
@@ -1554,7 +1536,7 @@ export default function AdminPage() {
         fetchSurveys(),
         fetchParticipants(selectedSurvey.id, participantsPage, participantsPerPage),
         fetchResponses(selectedSurvey.id, hospitalFilter),
-        fetchQuestionStats(selectedSurvey.id, hospitalFilter),
+        fetchQuestionStats(selectedSurvey.id),
       ])
     } catch (err) {
       // Consider adding a general error state for refresh if needed
@@ -1580,9 +1562,9 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (selectedSurvey) {
-      fetchQuestionStats(selectedSurvey.id, hospitalFilter)
+      fetchQuestionStats(selectedSurvey.id)
     }
-  }, [selectedSurvey, hospitalFilter])
+  }, [selectedSurvey])
 
   useEffect(() => {
     // This effect is now tied to the fetchParticipants call, which is in the main useEffect.
