@@ -734,7 +734,7 @@ export default function AdminPage() {
       setResponses(data || [])
 
       if (surveyId) {
-        await fetchQuestionStats(surveyId, hospitalFilter)
+        await fetchQuestionStats(surveyId, statsHospitalFilter)
       }
     } catch (err) {
       console.error("Error fetching responses:", err)
