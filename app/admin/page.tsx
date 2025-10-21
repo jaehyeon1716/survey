@@ -134,9 +134,9 @@ export default function AdminPage() {
   const [responsesPerPage, setResponsesPerPage] = useState(10)
   const [hospitalFilter, setHospitalFilter] = useState("")
   const [hospitalSearchInput, setHospitalSearchInput] = useState("")
-  const [statsHospitalFilter, setStatsHospitalFilter] = useState("") // Moved from original
-  const [statsHospitalSearchInput, setStatsHospitalSearchInput] = useState("") // Moved from original
   const [statusFilter, setStatusFilter] = useState<"all" | "completed" | "incomplete">("all")
+  const [statsHospitalFilter, setStatsHospitalFilter] = useState("")
+  const [statsHospitalSearchInput, setStatsHospitalSearchInput] = useState("")
   const [subjectiveResponsesPage, setSubjectiveResponsesPage] = useState<Record<number, number>>({})
   const [subjectiveResponsesPerPage, setSubjectiveResponsesPerPage] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(false) // Added loading state
@@ -162,16 +162,6 @@ export default function AdminPage() {
   const [detailedResponses, setDetailedResponses] = useState<DetailedQuestionResponse[]>([])
   const [loadingDetails, setLoadingDetails] = useState(false)
 
-  // Calculate filtered participants count
-  const filteredParticipantsCount = participants.filter((p) => {
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "completed" && p.is_completed) ||
-      (statusFilter === "incomplete" && !p.is_completed)
-    const matchesHospital = hospitalFilter ? p.hospital_name.toLowerCase().includes(hospitalFilter.toLowerCase()) : true
-    return matchesStatus && matchesHospital
-  }).length
-
   const handleHospitalSearch = () => {
     setHospitalFilter(hospitalSearchInput)
     setParticipantsPage(1)
@@ -195,8 +185,7 @@ export default function AdminPage() {
       return
     }
 
-    if (filteredParticipantsCount === 0) {
-      // Changed from totalParticipantsCount to filteredParticipantsCount
+    if (totalParticipantsCount === 0) {
       alert("다운로드할 참여자 데이터가 없습니다.")
       return
     }
@@ -209,19 +198,11 @@ export default function AdminPage() {
       const batchSize = 1000
       let offset = 0
 
-      // Fetch only those matching current filters
-      let fetchQuery = supabase.from("survey_participants").select("*").eq("survey_id", selectedSurvey.id)
-
-      if (hospitalFilter.trim()) {
-        fetchQuery = fetchQuery.ilike("hospital_name", `%${hospitalFilter}%`)
-      }
-      if (statusFilter !== "all") {
-        fetchQuery = fetchQuery.eq("is_completed", statusFilter === "completed")
-      }
-
-      while (offset < filteredParticipantsCount) {
-        // Changed from totalParticipantsCount to filteredParticipantsCount
-        const { data, error } = await fetchQuery
+      while (offset < totalParticipantsCount) {
+        const { data, error } = await supabase
+          .from("survey_participants")
+          .select("*")
+          .eq("survey_id", selectedSurvey.id)
           .range(offset, offset + batchSize - 1)
           .order("created_at", { ascending: true })
 
@@ -407,7 +388,7 @@ export default function AdminPage() {
             <div class="step-content">
               <ul>
                 <li>다운로드한 CSV 파일을 문자 발송 플랫폼에 업로드합니다</li>
-                <li>각 참여자에게 개별 문자가 포함된 문자를 발송합니다</li>
+                <li>각 참여자에게 개별 설문 링크가 포함된 문자를 발송합니다</li>
                 <li>문자 내용 예시:</li>
               </ul>
               <div class="code">
@@ -613,100 +594,130 @@ export default function AdminPage() {
   }
 
   const fetchParticipants = async (surveyId?: number, page = 1, perPage = 10) => {
-    if (!surveyId) return
+    if (!supabase) return
 
     setLoading(true)
     setParticipantError("") // Clear previous error
     setParticipantSuccess("") // Clear previous success
     try {
-      // Count participants matching current filters
-      let countQuery = supabase
-        .from("survey_participants")
-        .select("*", { count: "exact", head: true })
-        .eq("survey_id", surveyId)
+      // Get total count
+      let countQuery = supabase.from("survey_participants").select("*", { count: "exact", head: true })
+
+      if (surveyId) {
+        countQuery = countQuery.eq("survey_id", surveyId)
+      }
+
+      // Apply filters to count query
+      if (hospitalFilter.trim()) {
+        countQuery = countQuery.ilike("hospital_name", `%${hospitalFilter}%`)
+      }
       if (statusFilter !== "all") {
         countQuery = countQuery.eq("is_completed", statusFilter === "completed")
       }
-      if (hospitalFilter.trim()) {
-        countQuery = countQuery.ilike("hospital_name", `%${hospitalFilter.trim()}%`)
-      }
-      const { count: totalCount, error: totalCountError } = await countQuery
-      if (totalCountError) throw totalCountError
-      setTotalParticipantsCount(totalCount || 0)
+
+      const { count, error: countError } = await countQuery
+      if (countError) throw countError
+      setTotalParticipantsCount(count || 0)
+
+      // Fetch only the current page of data
+      const start = (page - 1) * perPage
+      const end = start + perPage - 1
 
       let query = supabase
         .from("survey_participants")
-        .select("*", { count: "exact" }) // Fetch count along with data
-        .eq("survey_id", surveyId)
+        .select("*")
+        .order("created_at", { ascending: false })
+        .range(start, end)
 
-      // Apply filters to the query
+      if (surveyId) {
+        query = query.eq("survey_id", surveyId)
+      }
+
+      // Apply filters to data query
+      if (hospitalFilter.trim()) {
+        query = query.ilike("hospital_name", `%${hospitalFilter}%`)
+      }
       if (statusFilter !== "all") {
         query = query.eq("is_completed", statusFilter === "completed")
       }
 
-      if (hospitalFilter.trim()) {
-        query = query.ilike("hospital_name", `%${hospitalFilter.trim()}%`)
-      }
-
-      const start = (page - 1) * perPage
-      const end = start + perPage - 1
-
-      // Execute the query with range and order
-      const { data, error, count } = await query.range(start, end).order("created_at", { ascending: false })
+      const { data, error } = await query
 
       if (error) throw error
-
       setParticipants(data || [])
-      // The count variable from the query already gives the number of filtered participants
+      // setParticipants(data || []) // This line seems to be duplicated, might be a typo. Keep one.
+      // setFilteredParticipants(data || []) // This line was removed and replaced by direct use of `participants` later. If `filteredParticipants` is needed for other logic, reintroduce it.
     } catch (err) {
-      console.error("Error fetching participants:", err) // Changed from setParticipantError to console.error for better debugging
       setParticipantError("참여자 데이터를 불러오는데 실패했습니다.")
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchResponses = async (surveyId?: number, hospitalFilter?: string) => {
-    if (!surveyId) return
+  const fetchResponses = async (surveyId?: number, hospitalName?: string) => {
+    if (!supabase) return
 
     setLoading(true)
     // No specific error/success state for this fetch, it's part of the overall loading
     try {
-      // Fetch total completed participants for count
-      let countQuery = supabase
-        .from("survey_participants")
-        .select("*", { count: "exact", head: true })
-        .eq("survey_id", surveyId)
-        .eq("is_completed", true)
-      if (hospitalFilter && hospitalFilter.trim()) {
-        countQuery = countQuery.ilike("hospital_name", `%${hospitalFilter}%`)
+      let countQuery = supabase.from("survey_response_summaries").select("*", { count: "exact", head: true })
+
+      if (surveyId) {
+        countQuery = countQuery.eq("survey_id", surveyId)
       }
-      const { count: totalCount, error: totalCountError } = await countQuery
-      if (totalCountError) throw totalCountError
-      setTotalResponsesCount(totalCount || 0)
 
-      // Fetch response data with hospital filter if provided
+      if (hospitalName && hospitalName.trim()) {
+        // Need to join with survey_participants to filter by hospital
+        const { data: participantTokens } = await supabase
+          .from("survey_participants")
+          .select("token")
+          .eq("survey_id", surveyId || 0)
+          .ilike("hospital_name", `%${hospitalName.trim()}%`)
+
+        if (participantTokens && participantTokens.length > 0) {
+          const tokens = participantTokens.map((p) => p.token)
+          countQuery = countQuery.in("participant_token", tokens)
+        } else {
+          // No participants match the filter, set count to 0
+          setTotalResponsesCount(0)
+          setResponses([])
+          setLoading(false)
+          return
+        }
+      }
+
+      const { count, error: countError } = await countQuery
+      if (countError) throw countError
+      setTotalResponsesCount(count || 0)
+
       let query = supabase
-        .from("survey_participants")
-        .select(
-          `
+        .from("survey_response_summaries")
+        .select(`
           *,
-          survey_responses (
-            question_id,
-            response_value,
-            response_text,
-            total_score,
-            max_possible_score
+          survey_participants (
+            hospital_name,
+            participant_name,
+            phone_number
           )
-        `,
-        )
-        .eq("survey_id", surveyId)
-        .eq("is_completed", true)
-        .order("completed_at", { ascending: false })
-        .limit(10000) // Fetch a larger initial set, UI pagination handles smaller chunks
+        `)
+        .order("created_at", { ascending: false })
+        .range(0, 9999) // Increased range for better initial fetch, pagination will handle smaller chunks
 
-      if (hospitalFilter && hospitalFilter.trim()) {
-        query = query.ilike("hospital_name", `%${hospitalFilter}%`)
+      if (surveyId) {
+        query = query.eq("survey_id", surveyId)
+      }
+
+      if (hospitalName && hospitalName.trim()) {
+        const { data: participantTokens } = await supabase
+          .from("survey_participants")
+          .select("token")
+          .eq("survey_id", surveyId || 0)
+          .ilike("hospital_name", `%${hospitalName.trim()}%`)
+
+        if (participantTokens && participantTokens.length > 0) {
+          const tokens = participantTokens.map((p) => p.token)
+          query = query.in("participant_token", tokens)
+        }
       }
 
       const { data, error } = await query
@@ -1561,22 +1572,20 @@ export default function AdminPage() {
     if (selectedSurvey) {
       fetchParticipants(selectedSurvey.id, participantsPage, participantsPerPage)
       fetchResponses(selectedSurvey.id, hospitalFilter)
-      // fetchQuestionStats is called within fetchResponses, so no need to call it here again
     }
-  }, [selectedSurvey, participantsPage, participantsPerPage, hospitalFilter])
+  }, [selectedSurvey, participantsPage, participantsPerPage, hospitalFilter, statusFilter])
 
   useEffect(() => {
     if (selectedSurvey) {
-      setParticipantsPage(1) // Reset page when filters change
-      fetchParticipants(selectedSurvey.id, 1, participantsPerPage) // Fetch with new filters
+      fetchQuestionStats(selectedSurvey.id, hospitalFilter)
     }
-  }, [statusFilter, hospitalSearchInput]) // Depend on hospitalSearchInput as well, as it's used in fetchParticipants
+  }, [selectedSurvey, hospitalFilter])
 
   useEffect(() => {
     // This effect is now tied to the fetchParticipants call, which is in the main useEffect.
     // We need to ensure pages reset correctly when filters change.
     setParticipantsPage(1)
-  }, [hospitalFilter, statusFilter, filteredParticipantsCount]) // Depend on filteredParticipantsCount to re-evaluate pages
+  }, [hospitalFilter, statusFilter, totalParticipantsCount]) // Depend on totalParticipantsCount to re-evaluate pages
 
   useEffect(() => {
     setResponsesPage(1)
@@ -1642,7 +1651,8 @@ export default function AdminPage() {
     )
   }
 
-  const totalParticipantsPages = Math.ceil(filteredParticipantsCount / participantsPerPage) // Changed from totalParticipantsCount to filteredParticipantsCount
+  // const paginatedParticipants = filteredParticipants // Removed filteredParticipants usage, directly using participants
+  const totalParticipantsPages = Math.ceil(totalParticipantsCount / participantsPerPage)
 
   const paginatedResponses = responses.slice((responsesPage - 1) * responsesPerPage, responsesPage * responsesPerPage)
   const totalResponsesPages = Math.ceil(responses.length / responsesPerPage)
@@ -2113,7 +2123,7 @@ export default function AdminPage() {
                         <Button
                           onClick={downloadParticipantsExcel}
                           className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white"
-                          disabled={filteredParticipantsCount === 0 || isDownloading} // Changed from participants.length to filteredParticipantsCount
+                          disabled={participants.length === 0 || isDownloading} // Check participants length
                         >
                           {isDownloading ? (
                             <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -2137,7 +2147,7 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {filteredParticipantsCount === 0 ? ( // Changed from totalParticipantsCount to filteredParticipantsCount
+                    {totalParticipantsCount === 0 ? (
                       <div className="text-center py-8">
                         <p className="text-xl text-gray-500">등록된 참여자가 없습니다</p>
                       </div>
@@ -2148,40 +2158,53 @@ export default function AdminPage() {
                       </div>
                     ) : (
                       <>
-                        <div className="mb-4 text-sm text-gray-600">
+                        <div className="text-sm text-gray-600 mb-2">
                           총 {totalParticipantsCount.toLocaleString()}명 중{" "}
                           {Math.min(
                             (participantsPage - 1) * participantsPerPage + 1,
-                            participants.length > 0 ? totalParticipantsCount : 0,
+                            totalParticipantsCount,
                           ).toLocaleString()}
-                          -
-                          {Math.min(
-                            participantsPage * participantsPerPage,
-                            participants.length > 0 ? totalParticipantsCount : 0,
-                          ).toLocaleString()}
-                          명 표시
+                          -{Math.min(participantsPage * participantsPerPage, totalParticipantsCount).toLocaleString()}명
+                          표시
                         </div>
 
-                        <div className="flex items-center justify-between mt-4">
-                          <Button
-                            onClick={() => setParticipantsPage((p) => Math.max(1, p - 1))}
-                            disabled={participantsPage === 1}
-                            variant="outline"
-                            size="sm"
-                          >
-                            이전
-                          </Button>
-                          <span className="text-sm text-gray-600">
-                            페이지 {participantsPage} / {totalParticipantsPages || 1}
-                          </span>
-                          <Button
-                            onClick={() => setParticipantsPage((p) => p + 1)}
-                            disabled={participantsPage >= totalParticipantsPages}
-                            variant="outline"
-                            size="sm"
-                          >
-                            다음
-                          </Button>
+                        <div className="flex justify-between items-center mb-4">
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm font-medium text-gray-700">페이지당 표시:</label>
+                            <select
+                              value={participantsPerPage}
+                              onChange={(e) => {
+                                setParticipantsPerPage(Number(e.target.value))
+                                setParticipantsPage(1)
+                              }}
+                              className="px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value={10}>10건</option>
+                              <option value={100}>100건</option>
+                              <option value={1000}>1000건</option>
+                            </select>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              onClick={() => setParticipantsPage((prev) => Math.max(1, prev - 1))}
+                              disabled={participantsPage === 1}
+                              variant="outline"
+                              size="sm"
+                            >
+                              이전
+                            </Button>
+                            <span className="text-sm text-gray-700">
+                              {participantsPage} / {totalParticipantsPages || 1}
+                            </span>
+                            <Button
+                              onClick={() => setParticipantsPage((prev) => Math.min(totalParticipantsPages, prev + 1))}
+                              disabled={participantsPage >= totalParticipantsPages}
+                              variant="outline"
+                              size="sm"
+                            >
+                              다음
+                            </Button>
+                          </div>
                         </div>
 
                         <div className="overflow-x-auto">
