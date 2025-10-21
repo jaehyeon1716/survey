@@ -2407,12 +2407,12 @@ export default function AdminPage() {
                       <CardTitle className="text-2xl">통계</CardTitle>
                       <CardDescription className="text-lg">설문 결과에 대한 상세 통계를 확인하세요</CardDescription>
                     </div>
-                    {selectedSurvey && responses.length > 0 && (
+                    {/* {selectedSurvey && responses.length > 0 && (
                       <Button onClick={downloadStatsExcel} className="bg-green-600 hover:bg-green-700">
                         <Download className="w-4 h-4 mr-2" />
                         통계 엑셀 다운로드
                       </Button>
-                    )}
+                    )} */}
                   </div>
                 </CardHeader>
                 <CardContent>
