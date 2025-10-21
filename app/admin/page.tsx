@@ -42,7 +42,7 @@ import {
   AlertCircle,
 } from "lucide-react"
 
-const ADMIN_PASSWORD = "bohun#1234"
+const ADMIN_PASSWORD = "hospital2024"
 
 interface Survey {
   id: number
@@ -467,7 +467,7 @@ export default function AdminPage() {
           <div class="step">
             <div class="step-content">
               <ul>
-                <li><strong>관리자 비밀번호:</strong> <span class="highlight"></span></li>
+                <li><strong>관리자 비밀번호:</strong> <span class="highlight">hospital2024</span></li>
                 <li><strong>지원 브라우저:</strong> Chrome, Firefox, Safari, Edge 최신 버전</li>
                 <li><strong>권장 해상도:</strong> 1280x720 이상</li>
                 <li><strong>CSV 파일 인코딩:</strong> UTF-8</li>
@@ -1262,114 +1262,165 @@ export default function AdminPage() {
         return
       }
 
-      // Query 1: 전체병원의 객관식 문항별 통계
-      const { data: objectiveStats, error: error1 } = await supabase.rpc("exec_sql", {
-        query: `
-          SELECT 
-            sq.question_number AS "문항번호",
-            sq.question_text AS "문항내용",
-            COUNT(sr.id) AS "응답수",
-            ROUND(AVG(sr.response_value)::numeric, 1) || '/5' AS "평균점수"
-          FROM survey_questions sq
-          LEFT JOIN survey_responses sr ON sq.id = sr.question_id
-          WHERE sq.survey_id = ${selectedSurvey.id}
-            AND sq.question_type = 'objective'
-          GROUP BY sq.id, sq.question_number, sq.question_text
-          ORDER BY sq.question_number
-        `,
-      })
+      // Fetch all questions
+      const { data: allQuestions, error: questionsError } = await supabase
+        .from("survey_questions")
+        .select("*")
+        .eq("survey_id", selectedSurvey.id)
+        .order("question_number")
 
-      // Query 2: 병원별 통계
-      const { data: hospitalStats, error: error2 } = await supabase.rpc("exec_sql", {
-        query: `
-          SELECT 
-            sp.hospital_name AS "병원명",
-            COUNT(DISTINCT sr.participant_token) AS "응답수",
-            ROUND(AVG(sr.response_value)::numeric, 1) || '/5' AS "평균점수"
-          FROM survey_participants sp
-          INNER JOIN survey_responses sr ON sp.token = sr.participant_token
-          INNER JOIN survey_questions sq ON sr.question_id = sq.id
-          WHERE sp.survey_id = ${selectedSurvey.id}
-            AND sq.question_type = 'objective'
-          GROUP BY sp.hospital_name
-          ORDER BY sp.hospital_name
-        `,
-      })
-
-      // Query 3: 주관식 문항별 통계
-      const { data: subjectiveStats, error: error3 } = await supabase.rpc("exec_sql", {
-        query: `
-          SELECT 
-            sq.question_number AS "문항번호",
-            sq.question_text AS "문항내용",
-            COUNT(sr.id) AS "응답수"
-          FROM survey_questions sq
-          LEFT JOIN survey_responses sr ON sq.id = sr.question_id
-          WHERE sq.survey_id = ${selectedSurvey.id}
-            AND sq.question_type = 'subjective'
-            AND sr.response_text IS NOT NULL
-            AND sr.response_text != ''
-          GROUP BY sq.id, sq.question_number, sq.question_text
-          ORDER BY sq.question_number
-        `,
-      })
-
-      // Query 5: 병원별 문항별 상세 통계
-      const { data: detailedStats, error: error5 } = await supabase.rpc("exec_sql", {
-        query: `
-          SELECT 
-            sp.hospital_name AS "병원명",
-            sq.question_number AS "문항번호",
-            sq.question_text AS "문항내용",
-            CASE 
-              WHEN sq.question_type = 'objective' THEN '객관식'
-              ELSE '주관식'
-            END AS "문항유형",
-            COUNT(sr.id) AS "응답수",
-            CASE 
-              WHEN sq.question_type = 'objective' 
-              THEN ROUND(AVG(sr.response_value)::numeric, 1) || '/5'
-              ELSE ''
-            END AS "평균점수",
-            CASE 
-              WHEN sq.question_type = 'subjective' 
-              THEN STRING_AGG(sr.response_text, '; ')
-              ELSE ''
-            END AS "응답내용"
-          FROM survey_participants sp
-          CROSS JOIN survey_questions sq
-          LEFT JOIN survey_responses sr ON sp.token = sr.participant_token AND sq.id = sr.question_id
-          WHERE sp.survey_id = ${selectedSurvey.id}
-            AND sq.survey_id = ${selectedSurvey.id}
-          GROUP BY sp.hospital_name, sq.question_number, sq.question_text, sq.question_type
-          ORDER BY sp.hospital_name, sq.question_number
-        `,
-      })
-
-      // Query 6: 주관식 응답내용
-      const { data: subjectiveResponses, error: error6 } = await supabase.rpc("exec_sql", {
-        query: `
-          SELECT 
-            sq.question_number AS "문항번호",
-            sp.hospital_name AS "병원명",
-            sr.response_text AS "응답내용"
-          FROM survey_responses sr
-          INNER JOIN survey_questions sq ON sr.question_id = sq.id
-          INNER JOIN survey_participants sp ON sr.participant_token = sp.token
-          WHERE sq.survey_id = ${selectedSurvey.id}
-            AND sq.question_type = 'subjective'
-            AND sr.response_text IS NOT NULL
-            AND sr.response_text != ''
-          ORDER BY sq.question_number, sp.hospital_name
-        `,
-      })
-
-      // Check for errors
-      if (error1 || error2 || error3 || error5 || error6) {
-        console.error("Query errors:", { error1, error2, error3, error5, error6 })
+      if (questionsError) {
+        console.error("Questions fetch error:", questionsError)
         alert("통계 데이터를 가져오는 중 오류가 발생했습니다.")
         return
       }
+
+      // Fetch all responses with participant info
+      const { data: allResponses, error: responsesError } = await supabase
+        .from("survey_responses")
+        .select("question_id, response_value, response_text, participant_token")
+        .in("question_id", allQuestions?.map((q) => q.id) || [])
+        .limit(1000000)
+
+      if (responsesError) {
+        console.error("Responses fetch error:", responsesError)
+        alert("통계 데이터를 가져오는 중 오류가 발생했습니다.")
+        return
+      }
+
+      // Fetch all participants
+      const participantTokens = [...new Set(allResponses?.map((r) => r.participant_token) || [])]
+      const { data: allParticipants, error: participantsError } = await supabase
+        .from("survey_participants")
+        .select("token, hospital_name")
+        .in("token", participantTokens)
+        .limit(1000000)
+
+      if (participantsError) {
+        console.error("Participants fetch error:", participantsError)
+        alert("통계 데이터를 가져오는 중 오류가 발생했습니다.")
+        return
+      }
+
+      // Create participant map
+      const participantMap = new Map(allParticipants?.map((p) => [p.token, p.hospital_name]) || [])
+
+      // Query 1: 객관식 문항별 통계
+      const objectiveQuestions = allQuestions?.filter((q) => q.question_type === "objective") || []
+      const objectiveStats = objectiveQuestions.map((q) => {
+        const questionResponses = allResponses?.filter((r) => r.question_id === q.id && r.response_value != null) || []
+        const avgScore =
+          questionResponses.length > 0
+            ? (
+                questionResponses.reduce((sum, r) => sum + (r.response_value || 0), 0) / questionResponses.length
+              ).toFixed(1)
+            : "0.0"
+        return {
+          문항번호: q.question_number,
+          문항내용: q.question_text,
+          응답수: questionResponses.length,
+          평균점수: `${avgScore}/5`,
+        }
+      })
+
+      // Query 2: 병원별 통계
+      const hospitalMap = new Map<string, { responses: number[]; count: number }>()
+      allResponses?.forEach((r) => {
+        const question = allQuestions?.find((q) => q.id === r.question_id)
+        if (question?.question_type === "objective" && r.response_value != null) {
+          const hospitalName = participantMap.get(r.participant_token) || "알 수 없음"
+          if (!hospitalMap.has(hospitalName)) {
+            hospitalMap.set(hospitalName, { responses: [], count: 0 })
+          }
+          const hospital = hospitalMap.get(hospitalName)!
+          hospital.responses.push(r.response_value)
+          hospital.count++
+        }
+      })
+
+      const hospitalStats = Array.from(hospitalMap.entries())
+        .map(([name, data]) => ({
+          병원명: name,
+          응답수: data.count,
+          평균점수:
+            data.responses.length > 0
+              ? `${(data.responses.reduce((a, b) => a + b, 0) / data.responses.length).toFixed(1)}/5`
+              : "0.0/5",
+        }))
+        .sort((a, b) => a.병원명.localeCompare(b.병원명))
+
+      // Query 3: 주관식 문항별 통계
+      const subjectiveQuestions = allQuestions?.filter((q) => q.question_type === "subjective") || []
+      const subjectiveStats = subjectiveQuestions.map((q) => {
+        const questionResponses =
+          allResponses?.filter((r) => r.question_id === q.id && r.response_text && r.response_text.trim() !== "") || []
+        return {
+          문항번호: q.question_number,
+          문항내용: q.question_text,
+          응답수: questionResponses.length,
+        }
+      })
+
+      // Query 5: 병원별 문항별 상세 통계
+      const detailedStatsMap = new Map<string, any>()
+      allQuestions?.forEach((q) => {
+        const questionResponses = allResponses?.filter((r) => r.question_id === q.id) || []
+
+        // Group by hospital
+        const hospitalResponseMap = new Map<string, any[]>()
+        questionResponses.forEach((r) => {
+          const hospitalName = participantMap.get(r.participant_token) || "알 수 없음"
+          if (!hospitalResponseMap.has(hospitalName)) {
+            hospitalResponseMap.set(hospitalName, [])
+          }
+          hospitalResponseMap.get(hospitalName)!.push(r)
+        })
+
+        hospitalResponseMap.forEach((responses, hospitalName) => {
+          const key = `${hospitalName}-${q.question_number}`
+          const objectiveResponses = responses.filter((r) => r.response_value != null)
+          const subjectiveResponses = responses.filter((r) => r.response_text && r.response_text.trim() !== "")
+
+          detailedStatsMap.set(key, {
+            병원명: hospitalName,
+            문항번호: q.question_number,
+            문항내용: q.question_text,
+            문항유형: q.question_type === "objective" ? "객관식" : "주관식",
+            응답수: responses.length,
+            평균점수:
+              q.question_type === "objective" && objectiveResponses.length > 0
+                ? `${(objectiveResponses.reduce((sum, r) => sum + (r.response_value || 0), 0) / objectiveResponses.length).toFixed(1)}/5`
+                : "",
+            응답내용:
+              q.question_type === "subjective" ? subjectiveResponses.map((r) => r.response_text).join("; ") : "",
+          })
+        })
+      })
+
+      const detailedStats = Array.from(detailedStatsMap.values()).sort((a, b) => {
+        const hospitalCompare = a.병원명.localeCompare(b.병원명)
+        return hospitalCompare !== 0 ? hospitalCompare : a.문항번호 - b.문항번호
+      })
+
+      // Query 6: 주관식 응답내용
+      const subjectiveResponses =
+        allResponses
+          ?.filter((r) => {
+            const question = allQuestions?.find((q) => q.id === r.question_id)
+            return question?.question_type === "subjective" && r.response_text && r.response_text.trim() !== ""
+          })
+          .map((r) => {
+            const question = allQuestions?.find((q) => q.id === r.question_id)
+            return {
+              문항번호: question?.question_number || 0,
+              병원명: participantMap.get(r.participant_token) || "알 수 없음",
+              응답내용: r.response_text || "",
+            }
+          })
+          .sort((a, b) => {
+            const questionCompare = a.문항번호 - b.문항번호
+            return questionCompare !== 0 ? questionCompare : a.병원명.localeCompare(b.병원명)
+          }) || []
 
       // Build Excel data
       const basicStats = [
@@ -1393,48 +1444,35 @@ export default function AdminPage() {
       const objectiveQuestionStatsData = [
         ["객관식 문항별 통계"],
         ["문항 번호", "문항 내용", "응답 수", "평균 점수"],
-        ...(objectiveStats || []).map((row: any) => [
-          row.문항번호?.toString() || "",
-          row.문항내용 || "",
-          row.응답수?.toString() || "0",
-          row.평균점수 || "0.0/5",
-        ]),
+        ...objectiveStats.map((row) => [row.문항번호.toString(), row.문항내용, row.응답수.toString(), row.평균점수]),
         [""],
       ]
 
       const hospitalStatsData = [
         ["병원별 통계"],
         ["병원명", "응답 수", "평균 점수"],
-        ...(hospitalStats || []).map((row: any) => [
-          row.병원명 || "",
-          row.응답수?.toString() || "0",
-          row.평균점수 || "0.0/5",
-        ]),
+        ...hospitalStats.map((row) => [row.병원명, row.응답수.toString(), row.평균점수]),
         [""],
       ]
 
       const subjectiveQuestionStatsData = [
         ["주관식 문항별 통계"],
         ["문항 번호", "문항 내용", "응답 수"],
-        ...(subjectiveStats || []).map((row: any) => [
-          row.문항번호?.toString() || "",
-          row.문항내용 || "",
-          row.응답수?.toString() || "0",
-        ]),
+        ...subjectiveStats.map((row) => [row.문항번호.toString(), row.문항내용, row.응답수.toString()]),
         [""],
       ]
 
       const hospitalQuestionStatsData = [
         ["병원별 문항별 상세 통계"],
         ["병원명", "문항 번호", "문항 내용", "문항 유형", "응답 수", "평균 점수", "응답 내용"],
-        ...(detailedStats || []).map((row: any) => [
-          row.병원명 || "",
-          row.문항번호?.toString() || "",
-          row.문항내용 || "",
-          row.문항유형 || "",
-          row.응답수?.toString() || "0",
-          row.평균점수 || "",
-          row.응답내용 || "",
+        ...detailedStats.map((row) => [
+          row.병원명,
+          row.문항번호.toString(),
+          row.문항내용,
+          row.문항유형,
+          row.응답수.toString(),
+          row.평균점수,
+          row.응답내용,
         ]),
         [""],
       ]
@@ -1442,11 +1480,7 @@ export default function AdminPage() {
       const subjectiveResponsesData = [
         ["주관식 응답내용"],
         ["문항번호", "병원명", "응답내용"],
-        ...(subjectiveResponses || []).map((row: any) => [
-          row.문항번호?.toString() || "",
-          row.병원명 || "",
-          row.응답내용 || "",
-        ]),
+        ...subjectiveResponses.map((row) => [row.문항번호.toString(), row.병원명, row.응답내용]),
         [""],
       ]
 
@@ -1653,7 +1687,7 @@ export default function AdminPage() {
                       value={newSurvey.title}
                       onChange={(e) => setNewSurvey({ ...newSurvey, title: e.target.value })}
                       className="mt-2 h-12 text-lg"
-                      placeholder="예: 2025년 병원 만족도 조사"
+                      placeholder="예: 2024년 병원 만족도 조사"
                     />
                   </div>
 
@@ -1810,7 +1844,7 @@ export default function AdminPage() {
                               >
                                 {survey.is_active ? "활성" : "비활성"}
                               </span>
-                              {/* <Button
+                              <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleEditSurvey(survey)
@@ -1821,7 +1855,7 @@ export default function AdminPage() {
                               >
                                 <Edit className="w-3 h-3 mr-1" />
                                 수정
-                              </Button> */}
+                              </Button>
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
