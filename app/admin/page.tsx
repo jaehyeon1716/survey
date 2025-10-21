@@ -126,8 +126,7 @@ export default function AdminPage() {
   const [isUploading, setIsUploading] = useState(false) // Renamed from loading for upload context
   const [uploadProgress, setUploadProgress] = useState(0) // Simplified upload progress
   const [isDownloading, setIsDownloading] = useState(false)
-  const [totalParticipantsCount, setTotalParticipantsCount] = useState(0) // For statistics tab (unfiltered)
-  const [filteredParticipantsCount, setFilteredParticipantsCount] = useState(0) // For participant list tab (filtered)
+  const [totalParticipantsCount, setTotalParticipantsCount] = useState(0)
   const [totalResponsesCount, setTotalResponsesCount] = useState(0)
   const [participantsPage, setParticipantsPage] = useState(1)
   const [participantsPerPage, setParticipantsPerPage] = useState(10)
@@ -135,9 +134,9 @@ export default function AdminPage() {
   const [responsesPerPage, setResponsesPerPage] = useState(10)
   const [hospitalFilter, setHospitalFilter] = useState("")
   const [hospitalSearchInput, setHospitalSearchInput] = useState("")
+  const [statsHospitalFilter, setStatsHospitalFilter] = useState("") // Moved from original
+  const [statsHospitalSearchInput, setStatsHospitalSearchInput] = useState("") // Moved from original
   const [statusFilter, setStatusFilter] = useState<"all" | "completed" | "incomplete">("all")
-  const [statsHospitalFilter, setStatsHospitalFilter] = useState("")
-  const [statsHospitalSearchInput, setStatsHospitalSearchInput] = useState("")
   const [subjectiveResponsesPage, setSubjectiveResponsesPage] = useState<Record<number, number>>({})
   const [subjectiveResponsesPerPage, setSubjectiveResponsesPerPage] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(false) // Added loading state
@@ -162,6 +161,16 @@ export default function AdminPage() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [detailedResponses, setDetailedResponses] = useState<DetailedQuestionResponse[]>([])
   const [loadingDetails, setLoadingDetails] = useState(false)
+
+  // Calculate filtered participants count
+  const filteredParticipantsCount = participants.filter((p) => {
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "completed" && p.is_completed) ||
+      (statusFilter === "incomplete" && !p.is_completed)
+    const matchesHospital = hospitalFilter ? p.hospital_name.toLowerCase().includes(hospitalFilter.toLowerCase()) : true
+    return matchesStatus && matchesHospital
+  }).length
 
   const handleHospitalSearch = () => {
     setHospitalFilter(hospitalSearchInput)
@@ -610,58 +619,47 @@ export default function AdminPage() {
     setParticipantError("") // Clear previous error
     setParticipantSuccess("") // Clear previous success
     try {
-      const { count: totalCount, error: totalCountError } = await supabase
-        .from("survey_participants")
-        .select("*", { count: "exact", head: true })
-        .eq("survey_id", surveyId)
-
-      if (totalCountError) throw totalCountError
-      setTotalParticipantsCount(totalCount || 0)
-
+      // Count participants matching current filters
       let countQuery = supabase
         .from("survey_participants")
         .select("*", { count: "exact", head: true })
         .eq("survey_id", surveyId)
-
-      // Apply filters to count query
-      if (hospitalFilter.trim()) {
-        countQuery = countQuery.ilike("hospital_name", `%${hospitalFilter}%`)
-      }
       if (statusFilter !== "all") {
         countQuery = countQuery.eq("is_completed", statusFilter === "completed")
       }
-
-      const { count, error: countError } = await countQuery
-      if (countError) throw countError
-      setFilteredParticipantsCount(count || 0)
-
-      // Fetch only the current page of data
-      const start = (page - 1) * perPage
-      const end = start + perPage - 1
+      if (hospitalFilter.trim()) {
+        countQuery = countQuery.ilike("hospital_name", `%${hospitalFilter.trim()}%`)
+      }
+      const { count: totalCount, error: totalCountError } = await countQuery
+      if (totalCountError) throw totalCountError
+      setTotalParticipantsCount(totalCount || 0)
 
       let query = supabase
         .from("survey_participants")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .range(start, end)
+        .select("*", { count: "exact" }) // Fetch count along with data
+        .eq("survey_id", surveyId)
 
-      if (surveyId) {
-        query = query.eq("survey_id", surveyId)
-      }
-
-      // Apply filters to data query
-      if (hospitalFilter.trim()) {
-        query = query.ilike("hospital_name", `%${hospitalFilter}%`)
-      }
+      // Apply filters to the query
       if (statusFilter !== "all") {
         query = query.eq("is_completed", statusFilter === "completed")
       }
 
-      const { data, error } = await query
+      if (hospitalFilter.trim()) {
+        query = query.ilike("hospital_name", `%${hospitalFilter.trim()}%`)
+      }
+
+      const start = (page - 1) * perPage
+      const end = start + perPage - 1
+
+      // Execute the query with range and order
+      const { data, error, count } = await query.range(start, end).order("created_at", { ascending: false })
 
       if (error) throw error
+
       setParticipants(data || [])
+      // The count variable from the query already gives the number of filtered participants
     } catch (err) {
+      console.error("Error fetching participants:", err) // Changed from setParticipantError to console.error for better debugging
       setParticipantError("참여자 데이터를 불러오는데 실패했습니다.")
     } finally {
       setLoading(false)
@@ -674,12 +672,16 @@ export default function AdminPage() {
     setLoading(true)
     // No specific error/success state for this fetch, it's part of the overall loading
     try {
-      const { count: totalCount, error: totalCountError } = await supabase
+      // Fetch total completed participants for count
+      let countQuery = supabase
         .from("survey_participants")
         .select("*", { count: "exact", head: true })
         .eq("survey_id", surveyId)
         .eq("is_completed", true)
-
+      if (hospitalFilter && hospitalFilter.trim()) {
+        countQuery = countQuery.ilike("hospital_name", `%${hospitalFilter}%`)
+      }
+      const { count: totalCount, error: totalCountError } = await countQuery
       if (totalCountError) throw totalCountError
       setTotalResponsesCount(totalCount || 0)
 
@@ -1558,20 +1560,17 @@ export default function AdminPage() {
   useEffect(() => {
     if (selectedSurvey) {
       fetchParticipants(selectedSurvey.id, participantsPage, participantsPerPage)
-    }
-  }, [selectedSurvey, participantsPage, participantsPerPage, statusFilter])
-
-  useEffect(() => {
-    if (selectedSurvey) {
       fetchResponses(selectedSurvey.id, hospitalFilter)
+      // fetchQuestionStats is called within fetchResponses, so no need to call it here again
     }
-  }, [selectedSurvey, hospitalFilter])
+  }, [selectedSurvey, participantsPage, participantsPerPage, hospitalFilter])
 
   useEffect(() => {
     if (selectedSurvey) {
-      fetchQuestionStats(selectedSurvey.id, hospitalFilter)
+      setParticipantsPage(1) // Reset page when filters change
+      fetchParticipants(selectedSurvey.id, 1, participantsPerPage) // Fetch with new filters
     }
-  }, [selectedSurvey, hospitalFilter])
+  }, [statusFilter, hospitalSearchInput]) // Depend on hospitalSearchInput as well, as it's used in fetchParticipants
 
   useEffect(() => {
     // This effect is now tied to the fetchParticipants call, which is in the main useEffect.
@@ -2150,34 +2149,39 @@ export default function AdminPage() {
                     ) : (
                       <>
                         <div className="mb-4 text-sm text-gray-600">
-                          총 {filteredParticipantsCount.toLocaleString()}명 중{" "}
+                          총 {totalParticipantsCount.toLocaleString()}명 중{" "}
                           {Math.min(
                             (participantsPage - 1) * participantsPerPage + 1,
-                            filteredParticipantsCount,
+                            participants.length > 0 ? totalParticipantsCount : 0,
                           ).toLocaleString()}
                           -
-                          {Math.min(participantsPage * participantsPerPage, filteredParticipantsCount).toLocaleString()}
+                          {Math.min(
+                            participantsPage * participantsPerPage,
+                            participants.length > 0 ? totalParticipantsCount : 0,
+                          ).toLocaleString()}
                           명 표시
                         </div>
 
                         <div className="flex items-center justify-between mt-4">
-                          <button
+                          <Button
                             onClick={() => setParticipantsPage((p) => Math.max(1, p - 1))}
                             disabled={participantsPage === 1}
-                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded disabled:opacity-50"
+                            variant="outline"
+                            size="sm"
                           >
                             이전
-                          </button>
+                          </Button>
                           <span className="text-sm text-gray-600">
                             페이지 {participantsPage} / {totalParticipantsPages || 1}
                           </span>
-                          <button
+                          <Button
                             onClick={() => setParticipantsPage((p) => p + 1)}
                             disabled={participantsPage >= totalParticipantsPages}
-                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded disabled:opacity-50"
+                            variant="outline"
+                            size="sm"
                           >
                             다음
-                          </button>
+                          </Button>
                         </div>
 
                         <div className="overflow-x-auto">
