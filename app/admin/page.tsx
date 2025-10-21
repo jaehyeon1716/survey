@@ -42,7 +42,7 @@ import {
   AlertCircle,
 } from "lucide-react"
 
-const ADMIN_PASSWORD = "bohun#1234"
+const ADMIN_PASSWORD = "hospital2024"
 
 interface Survey {
   id: number
@@ -127,6 +127,7 @@ export default function AdminPage() {
   const [uploadProgress, setUploadProgress] = useState(0) // Simplified upload progress
   const [isDownloading, setIsDownloading] = useState(false)
   const [totalParticipantsCount, setTotalParticipantsCount] = useState(0)
+  const [filteredParticipantsCount, setFilteredParticipantsCount] = useState(0)
   const [totalResponsesCount, setTotalResponsesCount] = useState(0)
   const [participantsPage, setParticipantsPage] = useState(1)
   const [participantsPerPage, setParticipantsPerPage] = useState(10)
@@ -466,7 +467,7 @@ export default function AdminPage() {
           <div class="step">
             <div class="step-content">
               <ul>
-                <li><strong>관리자 비밀번호:</strong> <span class="highlight"></span></li>
+                <li><strong>관리자 비밀번호:</strong> <span class="highlight">hospital2024</span></li>
                 <li><strong>지원 브라우저:</strong> Chrome, Firefox, Safari, Edge 최신 버전</li>
                 <li><strong>권장 해상도:</strong> 1280x720 이상</li>
                 <li><strong>CSV 파일 인코딩:</strong> UTF-8</li>
@@ -600,7 +601,14 @@ export default function AdminPage() {
     setParticipantError("") // Clear previous error
     setParticipantSuccess("") // Clear previous success
     try {
-      // Get total count
+      let unfilteredCountQuery = supabase.from("survey_participants").select("*", { count: "exact", head: true })
+      if (surveyId) {
+        unfilteredCountQuery = unfilteredCountQuery.eq("survey_id", surveyId)
+      }
+      const { count: unfilteredCount, error: unfilteredCountError } = await unfilteredCountQuery
+      if (unfilteredCountError) throw unfilteredCountError
+      setTotalParticipantsCount(unfilteredCount || 0)
+
       let countQuery = supabase.from("survey_participants").select("*", { count: "exact", head: true })
 
       if (surveyId) {
@@ -617,7 +625,7 @@ export default function AdminPage() {
 
       const { count, error: countError } = await countQuery
       if (countError) throw countError
-      setTotalParticipantsCount(count || 0)
+      setFilteredParticipantsCount(count || 0)
 
       // Fetch only the current page of data
       const start = (page - 1) * perPage
@@ -1585,7 +1593,7 @@ export default function AdminPage() {
     // This effect is now tied to the fetchParticipants call, which is in the main useEffect.
     // We need to ensure pages reset correctly when filters change.
     setParticipantsPage(1)
-  }, [hospitalFilter, statusFilter, totalParticipantsCount]) // Depend on totalParticipantsCount to re-evaluate pages
+  }, [hospitalFilter, statusFilter, filteredParticipantsCount]) // Depend on filteredParticipantsCount to re-evaluate pages
 
   useEffect(() => {
     setResponsesPage(1)
@@ -1716,7 +1724,7 @@ export default function AdminPage() {
                       value={newSurvey.title}
                       onChange={(e) => setNewSurvey({ ...newSurvey, title: e.target.value })}
                       className="mt-2 h-12 text-lg"
-                      placeholder="예: 2025년 병원 만족도 조사"
+                      placeholder="예: 2024년 병원 만족도 조사"
                     />
                   </div>
 
@@ -1873,7 +1881,7 @@ export default function AdminPage() {
                               >
                                 {survey.is_active ? "활성" : "비활성"}
                               </span>
-                              {/* <Button
+                              <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleEditSurvey(survey)
@@ -1884,7 +1892,7 @@ export default function AdminPage() {
                               >
                                 <Edit className="w-3 h-3 mr-1" />
                                 수정
-                              </Button> */}
+                              </Button>
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -2147,7 +2155,7 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {totalParticipantsCount === 0 ? (
+                    {filteredParticipantsCount === 0 ? ( // Use filteredParticipantsCount for check
                       <div className="text-center py-8">
                         <p className="text-xl text-gray-500">등록된 참여자가 없습니다</p>
                       </div>
@@ -2158,52 +2166,34 @@ export default function AdminPage() {
                       </div>
                     ) : (
                       <>
-                        <div className="text-sm text-gray-600 mb-2">
-                          총 {totalParticipantsCount.toLocaleString()}명 중{" "}
-                          {Math.min(
-                            (participantsPage - 1) * participantsPerPage + 1,
-                            totalParticipantsCount,
-                          ).toLocaleString()}
-                          -{Math.min(participantsPage * participantsPerPage, totalParticipantsCount).toLocaleString()}명
-                          표시
-                        </div>
-
                         <div className="flex justify-between items-center mb-4">
+                          <div className="text-sm text-gray-600">
+                            총 {filteredParticipantsCount.toLocaleString()}명 중{" "}
+                            {Math.min(
+                              (participantsPage - 1) * participantsPerPage + 1,
+                              filteredParticipantsCount,
+                            ).toLocaleString()}
+                            -
+                            {Math.min(
+                              participantsPage * participantsPerPage,
+                              filteredParticipantsCount,
+                            ).toLocaleString()}
+                            명 표시
+                          </div>
                           <div className="flex items-center gap-2">
-                            <label className="text-sm font-medium text-gray-700">페이지당 표시:</label>
+                            <span className="text-sm text-gray-600">페이지당 표시:</span>
                             <select
                               value={participantsPerPage}
                               onChange={(e) => {
                                 setParticipantsPerPage(Number(e.target.value))
                                 setParticipantsPage(1)
                               }}
-                              className="px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="px-2 py-1 border border-gray-300 rounded-md text-sm"
                             >
-                              <option value={10}>10건</option>
-                              <option value={100}>100건</option>
-                              <option value={1000}>1000건</option>
+                              <option value={10}>10개</option>
+                              <option value={50}>50개</option>
+                              <option value={100}>100개</option>
                             </select>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              onClick={() => setParticipantsPage((prev) => Math.max(1, prev - 1))}
-                              disabled={participantsPage === 1}
-                              variant="outline"
-                              size="sm"
-                            >
-                              이전
-                            </Button>
-                            <span className="text-sm text-gray-700">
-                              {participantsPage} / {totalParticipantsPages || 1}
-                            </span>
-                            <Button
-                              onClick={() => setParticipantsPage((prev) => Math.min(totalParticipantsPages, prev + 1))}
-                              disabled={participantsPage >= totalParticipantsPages}
-                              variant="outline"
-                              size="sm"
-                            >
-                              다음
-                            </Button>
                           </div>
                         </div>
 
@@ -2283,6 +2273,35 @@ export default function AdminPage() {
                               ))}
                             </tbody>
                           </table>
+                        </div>
+                        {/* pagination */}
+                        <div className="flex justify-between items-center mt-4">
+                          <div className="text-sm text-gray-600">
+                            페이지 {participantsPage} /{" "}
+                            {Math.ceil(filteredParticipantsCount / participantsPerPage) || 1}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => setParticipantsPage((prev) => Math.max(1, prev - 1))}
+                              disabled={participantsPage === 1}
+                              variant="outline"
+                              size="sm"
+                            >
+                              이전
+                            </Button>
+                            <Button
+                              onClick={() =>
+                                setParticipantsPage((prev) =>
+                                  Math.min(Math.ceil(filteredParticipantsCount / participantsPerPage), prev + 1),
+                                )
+                              }
+                              disabled={participantsPage >= Math.ceil(filteredParticipantsCount / participantsPerPage)}
+                              variant="outline"
+                              size="sm"
+                            >
+                              다음
+                            </Button>
+                          </div>
                         </div>
                       </>
                     )}
@@ -2438,7 +2457,7 @@ export default function AdminPage() {
                     </div>
                   ) : (
                     <div className="space-y-8">
-                      {/* <div className="flex justify-between items-center">
+                      <div className="flex justify-between items-center">
                         <h3 className="text-xl font-semibold">병원 필터</h3>
                         <div className="flex items-center space-x-2">
                           <Input
@@ -2468,7 +2487,7 @@ export default function AdminPage() {
                             필터 초기화
                           </Button>
                         </div>
-                      </div> */}
+                      </div>
 
                       {responses.length === 0 ? (
                         <div className="text-center py-8">
