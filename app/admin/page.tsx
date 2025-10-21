@@ -783,6 +783,7 @@ export default function AdminPage() {
         .from("survey_participants")
         .select("token, hospital_name")
         .in("token", participantTokens)
+        .limit(1000000) // Added explicit limit to fetch all participants
 
       if (hospitalName && hospitalName.trim() !== "") {
         participantsQuery = participantsQuery.ilike("hospital_name", `%${hospitalName.trim()}%`)
