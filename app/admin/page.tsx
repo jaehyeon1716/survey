@@ -769,7 +769,6 @@ export default function AdminPage() {
           "question_id",
           questionsData.map((q) => q.id),
         )
-        .limit(1000000)
 
       console.log("[v0] Responses data:", responsesData)
       if (responsesError) {
@@ -778,31 +777,25 @@ export default function AdminPage() {
       }
       if (!responsesData) return
 
-      const participantTokens = [...new Set(responsesData.map((r) => r.participant_token))]
-      let participantsQuery = supabase
-        .from("survey_participants")
-        .select("token, hospital_name")
-        .in("token", participantTokens)
-        .limit(1000000) // Added explicit limit to fetch all participants
+      let filteredResponses = responsesData
 
       if (hospitalName && hospitalName.trim() !== "") {
-        participantsQuery = participantsQuery.ilike("hospital_name", `%${hospitalName.trim()}%`)
+        // Fetch all participants for this survey to filter by hospital
+        const { data: allParticipants, error: participantsError } = await supabase
+          .from("survey_participants")
+          .select("token, hospital_name")
+          .eq("survey_id", surveyId)
+          .ilike("hospital_name", `%${hospitalName.trim()}%`)
+
+        console.log("[v0] Filtered participants data:", allParticipants)
+        if (participantsError) {
+          console.error("[v0] Participants error:", participantsError)
+          return
+        }
+
+        const participantTokenSet = new Set(allParticipants?.map((p) => p.token) || [])
+        filteredResponses = responsesData.filter((r) => participantTokenSet.has(r.participant_token))
       }
-
-      const { data: participantsData, error: participantsError } = await participantsQuery
-
-      console.log("[v0] Participants data:", participantsData)
-      if (participantsError) {
-        console.error("[v0] Participants error:", participantsError)
-        return
-      }
-
-      const participantMap = new Map(participantsData?.map((p) => [p.token, p.hospital_name]) || [])
-
-      const filteredResponses =
-        hospitalName && hospitalName.trim() !== ""
-          ? responsesData.filter((r) => participantMap.has(r.participant_token))
-          : responsesData
 
       console.log("[v0] Filtered responses:", filteredResponses.length)
 
