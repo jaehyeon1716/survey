@@ -2434,255 +2434,65 @@ export default function AdminPage() {
                     <div className="text-center py-8">
                       <p className="text-xl text-gray-500">설문지를 선택해주세요</p>
                     </div>
+                  ) : responses.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-xl text-gray-500">통계를 표시할 데이터가 없습니다</p>
+                    </div>
                   ) : (
                     <div className="space-y-8">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-xl font-semibold">병원 필터</h3>
-                        <div className="flex items-center space-x-2">
-                          <Input
-                            value={statsHospitalSearchInput} // Use statsHospitalSearchInput
-                            onChange={(e) => setStatsHospitalSearchInput(e.target.value)}
-                            onKeyPress={handleSearchKeyPress} // Reusing handleSearchKeyPress
-                            placeholder="병원명 입력"
-                            className="w-48"
-                          />
-                          <Button
-                            onClick={() => {
-                              setStatsHospitalFilter(statsHospitalSearchInput) // Use statsHospitalFilter
-                              // Optionally reset page or refetch stats here if needed
-                            }}
-                            variant="outline"
-                          >
-                            검색
-                          </Button>
-                          <Button
-                            onClick={() => {
-                              setStatsHospitalSearchInput("")
-                              setStatsHospitalFilter("")
-                              // Optionally reset page or refetch stats here if needed
-                            }}
-                            variant="outline"
-                          >
-                            필터 초기화
-                          </Button>
+                      <div className="mb-4">
+                        <h3 className="text-xl font-semibold mb-2">설문 통계</h3>
+                        <div className="grid grid-cols-4 gap-4">
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm font-medium text-muted-foreground">총 참여자</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-2xl font-bold">{totalParticipantsCount.toLocaleString()}명</div>
+                            </CardContent>
+                          </Card>
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm font-medium text-muted-foreground">완료</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-2xl font-bold text-green-600">
+                                {totalResponsesCount.toLocaleString()}명
+                              </div>
+                            </CardContent>
+                          </Card>
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm font-medium text-muted-foreground">완료율</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-2xl font-bold text-blue-600">
+                                {totalParticipantsCount > 0
+                                  ? ((totalResponsesCount / totalParticipantsCount) * 100).toFixed(1)
+                                  : "0.0"}
+                                %
+                              </div>
+                            </CardContent>
+                          </Card>
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm font-medium text-muted-foreground">평균 점수</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-2xl font-bold text-purple-600">
+                                {responses.length > 0
+                                  ? (
+                                      responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length
+                                    ).toFixed(2)
+                                  : "0.00"}
+                                {responses.length > 0 && responses[0]?.max_possible_score
+                                  ? ` / ${responses[0].max_possible_score}`
+                                  : ""}
+                              </div>
+                            </CardContent>
+                          </Card>
                         </div>
                       </div>
-
-                      {responses.length === 0 ? (
-                        <div className="text-center py-8">
-                          <p className="text-xl text-gray-500">통계를 표시할 데이터가 없습니다</p>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="mb-4">
-                            <h3 className="text-xl font-semibold mb-2">설문 통계</h3>
-                            <div className="grid grid-cols-4 gap-4">
-                              <Card>
-                                <CardHeader className="pb-2">
-                                  <CardTitle className="text-sm font-medium text-muted-foreground">총 참여자</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                  <div className="text-2xl font-bold">{totalParticipantsCount.toLocaleString()}명</div>
-                                </CardContent>
-                              </Card>
-                              <Card>
-                                <CardHeader className="pb-2">
-                                  <CardTitle className="text-sm font-medium text-muted-foreground">완료</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                  <div className="text-2xl font-bold text-green-600">
-                                    {totalResponsesCount.toLocaleString()}명
-                                  </div>
-                                </CardContent>
-                              </Card>
-                              <Card>
-                                <CardHeader className="pb-2">
-                                  <CardTitle className="text-sm font-medium text-muted-foreground">완료율</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                  <div className="text-2xl font-bold text-blue-600">
-                                    {totalParticipantsCount > 0
-                                      ? ((totalResponsesCount / totalParticipantsCount) * 100).toFixed(1)
-                                      : "0.0"}
-                                    %
-                                  </div>
-                                </CardContent>
-                              </Card>
-                              <Card>
-                                <CardHeader className="pb-2">
-                                  <CardTitle className="text-sm font-medium text-muted-foreground">평균 점수</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                  <div className="text-2xl font-bold text-purple-600">
-                                    {responses.length > 0
-                                      ? (
-                                          responses.reduce((sum, r) => sum + (r.total_score || 0), 0) / responses.length
-                                        ).toFixed(2)
-                                      : "0.00"}
-                                    {responses.length > 0 && responses[0]?.max_possible_score
-                                      ? ` / ${responses[0].max_possible_score}`
-                                      : ""}
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            </div>
-                          </div>
-
-                          <div>
-                            <h3 className="text-xl font-semibold mb-4">객관식 문항 평균점수</h3>
-                            {questionStats.filter((stat) => stat.questionType === "objective").length > 0 ? (
-                              <div className="overflow-x-auto">
-                                <table className="w-full border-collapse border border-gray-300">
-                                  <thead>
-                                    <tr className="bg-gray-100">
-                                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
-                                        문항 번호
-                                      </th>
-                                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
-                                        문항 내용
-                                      </th>
-                                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
-                                        응답 수
-                                      </th>
-                                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
-                                        평균 점수
-                                      </th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {questionStats
-                                      .filter((stat) => stat.questionType === "objective")
-                                      .map((stat) => (
-                                        <tr key={stat.id} className="hover:bg-gray-50">
-                                          <td className="border border-gray-300 px-4 py-3">{stat.questionNumber}</td>
-                                          <td className="border border-gray-300 px-4 py-3">{stat.questionText}</td>
-                                          <td className="border border-gray-300 px-4 py-3">{stat.totalResponses}</td>
-                                          <td className="border border-gray-300 px-4 py-3">
-                                            {stat.averageScore}/{stat.maxScore}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : (
-                              <p className="text-gray-500">객관식 문항이 없습니다.</p>
-                            )}
-                          </div>
-
-                          <div>
-                            <h3 className="text-xl font-semibold mb-4">주관식 문항 응답</h3>
-                            {questionStats.filter((stat) => stat.questionType === "subjective").length > 0 ? (
-                              <div className="space-y-6">
-                                {questionStats
-                                  .filter((stat) => stat.questionType === "subjective")
-                                  .map((stat) => {
-                                    const currentPage = subjectiveResponsesPage[stat.id] || 1
-                                    const perPage = subjectiveResponsesPerPage[stat.id] || 10
-                                    const totalResponses = stat.textResponses?.length || 0
-                                    const totalPages = Math.ceil(totalResponses / perPage)
-                                    const startIndex = (currentPage - 1) * perPage
-                                    const endIndex = startIndex + perPage
-                                    const paginatedResponses = stat.textResponses?.slice(startIndex, endIndex) || []
-
-                                    return (
-                                      <Card key={stat.id}>
-                                        <CardHeader>
-                                          <CardTitle className="text-lg">
-                                            {stat.questionNumber}. {stat.questionText}
-                                          </CardTitle>
-                                          <CardDescription>총 {stat.totalResponses}개의 응답</CardDescription>
-                                        </CardHeader>
-                                        <CardContent>
-                                          <div className="flex items-center gap-2 mb-4">
-                                            <label className="text-sm text-gray-600">페이지당 표시:</label>
-                                            <select
-                                              value={perPage}
-                                              onChange={(e) => {
-                                                setSubjectiveResponsesPerPage({
-                                                  ...subjectiveResponsesPerPage,
-                                                  [stat.id]: Number(e.target.value),
-                                                })
-                                                setSubjectiveResponsesPage({
-                                                  ...subjectiveResponsesPage,
-                                                  [stat.id]: 1,
-                                                })
-                                              }}
-                                              className="border rounded px-2 py-1 text-sm"
-                                            >
-                                              <option value={10}>10건</option>
-                                              <option value={50}>50건</option>
-                                              <option value={100}>100건</option>
-                                            </select>
-                                          </div>
-
-                                          {stat.textResponses && stat.textResponses.length > 0 ? (
-                                            <>
-                                              <div className="space-y-3">
-                                                {paginatedResponses.map((response, index) => (
-                                                  <div
-                                                    key={startIndex + index}
-                                                    className="p-3 bg-gray-50 rounded-lg border border-gray-200"
-                                                  >
-                                                    <p className="text-sm text-gray-700">{response}</p>
-                                                  </div>
-                                                ))}
-                                              </div>
-
-                                              {totalPages > 1 && (
-                                                <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                                                  <div className="text-sm text-gray-600">
-                                                    {startIndex + 1}-{Math.min(endIndex, totalResponses)} / 총{" "}
-                                                    {totalResponses}개
-                                                  </div>
-                                                  <div className="flex items-center gap-2">
-                                                    <Button
-                                                      variant="outline"
-                                                      size="sm"
-                                                      onClick={() =>
-                                                        setSubjectiveResponsesPage({
-                                                          ...subjectiveResponsesPage,
-                                                          [stat.id]: currentPage - 1,
-                                                        })
-                                                      }
-                                                      disabled={currentPage === 1}
-                                                    >
-                                                      이전
-                                                    </Button>
-                                                    <span className="text-sm text-gray-600">
-                                                      {currentPage} / {totalPages}
-                                                    </span>
-                                                    <Button
-                                                      variant="outline"
-                                                      size="sm"
-                                                      onClick={() =>
-                                                        setSubjectiveResponsesPage({
-                                                          ...subjectiveResponsesPage,
-                                                          [stat.id]: currentPage + 1,
-                                                        })
-                                                      }
-                                                      disabled={currentPage === totalPages}
-                                                    >
-                                                      다음
-                                                    </Button>
-                                                  </div>
-                                                </div>
-                                              )}
-                                            </>
-                                          ) : (
-                                            <p className="text-gray-500">응답이 없습니다.</p>
-                                          )}
-                                        </CardContent>
-                                      </Card>
-                                    )
-                                  })}
-                              </div>
-                            ) : (
-                              <p className="text-gray-500">주관식 문항이 없습니다.</p>
-                            )}
-                          </div>
-                        </>
-                      )}
                     </div>
                   )}
                 </CardContent>
