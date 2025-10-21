@@ -42,7 +42,7 @@ import {
   AlertCircle,
 } from "lucide-react"
 
-const ADMIN_PASSWORD = "bohun#1234"
+const ADMIN_PASSWORD = "hospital2024"
 
 interface Survey {
   id: number
@@ -466,7 +466,7 @@ export default function AdminPage() {
           <div class="step">
             <div class="step-content">
               <ul>
-                <li><strong>관리자 비밀번호:</strong> <span class="highlight"></span></li>
+                <li><strong>관리자 비밀번호:</strong> <span class="highlight">hospital2024</span></li>
                 <li><strong>지원 브라우저:</strong> Chrome, Firefox, Safari, Edge 최신 버전</li>
                 <li><strong>권장 해상도:</strong> 1280x720 이상</li>
                 <li><strong>CSV 파일 인코딩:</strong> UTF-8</li>
@@ -645,7 +645,7 @@ export default function AdminPage() {
 
       if (error) throw error
       setParticipants(data || [])
-      setParticipants(data || []) // This line seems to be duplicated, might be a typo. Keep one.
+      // setParticipants(data || []) // This line seems to be duplicated, might be a typo. Keep one.
       // setFilteredParticipants(data || []) // This line was removed and replaced by direct use of `participants` later. If `filteredParticipants` is needed for other logic, reintroduce it.
     } catch (err) {
       setParticipantError("참여자 데이터를 불러오는데 실패했습니다.")
@@ -1716,7 +1716,7 @@ export default function AdminPage() {
                       value={newSurvey.title}
                       onChange={(e) => setNewSurvey({ ...newSurvey, title: e.target.value })}
                       className="mt-2 h-12 text-lg"
-                      placeholder="예: 2025년 병원 만족도 조사"
+                      placeholder="예: 2024년 병원 만족도 조사"
                     />
                   </div>
 
@@ -1873,7 +1873,7 @@ export default function AdminPage() {
                               >
                                 {survey.is_active ? "활성" : "비활성"}
                               </span>
-                              {/* <Button
+                              <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleEditSurvey(survey)
@@ -1884,7 +1884,7 @@ export default function AdminPage() {
                               >
                                 <Edit className="w-3 h-3 mr-1" />
                                 수정
-                              </Button> */}
+                              </Button>
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -2161,10 +2161,11 @@ export default function AdminPage() {
                         <div className="text-sm text-gray-600 mb-2">
                           총 {totalParticipantsCount.toLocaleString()}명 중{" "}
                           {Math.min(
-                            participantsPage * participantsPerPage,
-                            participants.length, // Use participants.length
+                            (participantsPage - 1) * participantsPerPage + 1,
+                            totalParticipantsCount,
                           ).toLocaleString()}
-                          명 표시
+                          -{Math.min(participantsPage * participantsPerPage, totalParticipantsCount).toLocaleString()}명
+                          표시
                         </div>
 
                         <div className="flex justify-between items-center mb-4">
@@ -2231,64 +2232,55 @@ export default function AdminPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {participants
-                                .slice(
-                                  (participantsPage - 1) * participantsPerPage,
-                                  participantsPage * participantsPerPage,
-                                )
-                                .map(
-                                  (
-                                    participant, // Use slice for pagination
-                                  ) => (
-                                    <tr key={participant.id} className="hover:bg-gray-50">
-                                      <td className="border border-gray-300 px-4 py-3 text-lg">
-                                        {participant.hospital_name}
-                                      </td>
-                                      <td className="border border-gray-300 px-4 py-3 text-lg">
-                                        {participant.participant_name}
-                                      </td>
-                                      <td className="border border-gray-300 px-4 py-3 text-lg">
-                                        {participant.phone_number}
-                                      </td>
-                                      <td className="border border-gray-300 px-4 py-3">
-                                        <span
-                                          className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                                            participant.is_completed
-                                              ? "bg-green-100 text-green-800"
-                                              : "bg-yellow-100 text-yellow-800"
-                                          }`}
-                                        >
-                                          {participant.is_completed ? "완료" : "미완료"}
-                                        </span>
-                                      </td>
-                                      <td className="border border-gray-300 px-4 py-3 text-lg">
-                                        {new Date(participant.created_at).toLocaleDateString("ko-KR")}
-                                      </td>
-                                      <td className="border border-gray-300 px-4 py-3">
-                                        <div className="flex space-x-2">
-                                          <Button
-                                            onClick={() => copyToClipboard(participant.token)}
-                                            size="sm"
-                                            variant="outline"
-                                            className="text-sm"
-                                          >
-                                            <Copy className="w-4 h-4 mr-1" />
-                                            링크 복사
-                                          </Button>
-                                          <Button
-                                            onClick={() => window.open(`/${participant.token}`, "_blank")}
-                                            size="sm"
-                                            variant="outline"
-                                            className="text-sm"
-                                          >
-                                            <ExternalLink className="w-4 h-4 mr-1" />
-                                            열기
-                                          </Button>
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  ),
-                                )}
+                              {participants.map((participant) => (
+                                <tr key={participant.id} className="hover:bg-gray-50">
+                                  <td className="border border-gray-300 px-4 py-3 text-lg">
+                                    {participant.hospital_name}
+                                  </td>
+                                  <td className="border border-gray-300 px-4 py-3 text-lg">
+                                    {participant.participant_name}
+                                  </td>
+                                  <td className="border border-gray-300 px-4 py-3 text-lg">
+                                    {participant.phone_number}
+                                  </td>
+                                  <td className="border border-gray-300 px-4 py-3">
+                                    <span
+                                      className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                                        participant.is_completed
+                                          ? "bg-green-100 text-green-800"
+                                          : "bg-yellow-100 text-yellow-800"
+                                      }`}
+                                    >
+                                      {participant.is_completed ? "완료" : "미완료"}
+                                    </span>
+                                  </td>
+                                  <td className="border border-gray-300 px-4 py-3 text-lg">
+                                    {new Date(participant.created_at).toLocaleDateString("ko-KR")}
+                                  </td>
+                                  <td className="border border-gray-300 px-4 py-3">
+                                    <div className="flex space-x-2">
+                                      <Button
+                                        onClick={() => copyToClipboard(participant.token)}
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-sm"
+                                      >
+                                        <Copy className="w-4 h-4 mr-1" />
+                                        링크 복사
+                                      </Button>
+                                      <Button
+                                        onClick={() => window.open(`/${participant.token}`, "_blank")}
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-sm"
+                                      >
+                                        <ExternalLink className="w-4 h-4 mr-1" />
+                                        열기
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
                             </tbody>
                           </table>
                         </div>
@@ -2446,7 +2438,7 @@ export default function AdminPage() {
                     </div>
                   ) : (
                     <div className="space-y-8">
-                      {/* <div className="flex justify-between items-center">
+                      <div className="flex justify-between items-center">
                         <h3 className="text-xl font-semibold">병원 필터</h3>
                         <div className="flex items-center space-x-2">
                           <Input
@@ -2476,7 +2468,7 @@ export default function AdminPage() {
                             필터 초기화
                           </Button>
                         </div>
-                      </div> */}
+                      </div>
 
                       {responses.length === 0 ? (
                         <div className="text-center py-8">

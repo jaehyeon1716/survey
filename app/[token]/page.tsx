@@ -20,8 +20,8 @@ const scaleLabels_satisfaction = [
   { value: 5, label: "매우 만족한다", color: "bg-green-500" },
   { value: 4, label: "만족한다", color: "bg-green-400" },
   { value: 3, label: "보통이다", color: "bg-yellow-400" },
-  { value: 2, label: "불만족한다", color: "bg-orange-400" },
-  { value: 1, label: "매우 불만족한다", color: "bg-red-400" },
+  { value: 2, label: "만족하지 않는다", color: "bg-orange-400" },
+  { value: 1, label: "매우 만족하지 않는다", color: "bg-red-400" },
 ]
 
 type Participant = {
