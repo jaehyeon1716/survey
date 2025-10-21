@@ -1258,6 +1258,7 @@ export default function AdminPage() {
 
     const hospitalQuestionStats: Record<string, Record<number, any>> = {}
     const allSubjectiveResponses: Array<{ questionNumber: number; hospitalName: string; responseText: string }> = []
+    const freshQuestionStats: Record<number, any> = {}
 
     try {
       if (supabase) {
@@ -1274,6 +1275,19 @@ export default function AdminPage() {
           alert("문항 정보를 가져오는 중 오류가 발생했습니다.")
           return
         }
+
+        allQuestions.forEach((q) => {
+          freshQuestionStats[q.id] = {
+            questionNumber: q.question_number,
+            questionText: q.question_text,
+            questionType: q.question_type || "objective",
+            responseScaleType: q.response_scale_type || "agreement",
+            responses: [],
+            textResponses: [],
+            total: 0,
+            count: 0,
+          }
+        })
 
         const { data: detailedResponses, error } = await supabase
           .from("survey_responses")
@@ -1326,6 +1340,19 @@ export default function AdminPage() {
             const questionType = question.question_type || "objective"
             const responseScaleType = question.response_scale_type || "agreement"
 
+            if (questionType === "objective") {
+              if (response.response_value !== null) {
+                freshQuestionStats[questionId].responses.push(response.response_value)
+                freshQuestionStats[questionId].total += response.response_value
+                freshQuestionStats[questionId].count += 1
+              }
+            } else {
+              if (response.response_text !== null && response.response_text.trim() !== "") {
+                freshQuestionStats[questionId].textResponses.push(response.response_text)
+                freshQuestionStats[questionId].count += 1
+              }
+            }
+
             if (!hospitalQuestionStats[hospital]) {
               hospitalQuestionStats[hospital] = {}
             }
@@ -1369,6 +1396,7 @@ export default function AdminPage() {
     }
 
     console.log("[v0] Hospital question stats:", hospitalQuestionStats)
+    console.log("[v0] Fresh question stats:", freshQuestionStats)
 
     const basicStats = [
       ["통계 항목", "값"],
@@ -1393,23 +1421,23 @@ export default function AdminPage() {
     const objectiveQuestionStatsData = [
       ["객관식 문항별 통계"],
       ["문항 번호", "문항 내용", "응답 수", "평균 점수"],
-      ...questionStats
-        .filter((stat) => stat.questionType === "objective")
-        .map((stat) => [
-          stat.questionNumber.toString(),
-          stat.questionText,
-          stat.totalResponses.toString(),
-          `${stat.averageScore}/${stat.maxScore}`,
-        ]),
+      ...Object.values(freshQuestionStats)
+        .filter((stat: any) => stat.questionType === "objective")
+        .sort((a: any, b: any) => a.questionNumber - b.questionNumber)
+        .map((stat: any) => {
+          const average = stat.count > 0 ? (stat.total / stat.count).toFixed(1) : "0.0"
+          return [stat.questionNumber.toString(), stat.questionText, stat.count.toString(), `${average}/5`]
+        }),
       [""],
     ]
 
     const subjectiveQuestionStatsData = [
       ["주관식 문항별 통계"],
       ["문항 번호", "문항 내용", "응답 수"],
-      ...questionStats
-        .filter((stat) => stat.questionType === "subjective")
-        .map((stat) => [stat.questionNumber.toString(), stat.questionText, stat.totalResponses.toString()]),
+      ...Object.values(freshQuestionStats)
+        .filter((stat: any) => stat.questionType === "subjective")
+        .sort((a: any, b: any) => a.questionNumber - b.questionNumber)
+        .map((stat: any) => [stat.questionNumber.toString(), stat.questionText, stat.count.toString()]),
       [""],
     ]
 
