@@ -1287,6 +1287,7 @@ export default function AdminPage() {
             "question_id",
             allQuestions.map((q) => q.id),
           )
+          .limit(1000000)
 
         console.log("[v0] Detailed responses query result:", { detailedResponses, error })
 
@@ -1300,6 +1301,7 @@ export default function AdminPage() {
             .from("survey_participants")
             .select("token, hospital_name")
             .in("token", tokens)
+            .limit(1000000)
 
           console.log("[v0] Participants data:", { participantsData, participantsError })
 
