@@ -41,7 +41,19 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react"
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts"
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Legend,
+  Tooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+} from "recharts"
 
 const ADMIN_PASSWORD = "bohun#1234"
 
@@ -925,8 +937,14 @@ export default function AdminPage() {
               acc["40대"] = (acc["40대"] || 0) + 1
             } else if (age < 60) {
               acc["50대"] = (acc["50대"] || 0) + 1
+            } else if (age < 70) {
+              acc["60대"] = (acc["60대"] || 0) + 1
+            } else if (age < 80) {
+              acc["70대"] = (acc["70대"] || 0) + 1
+            } else if (age < 90) {
+              acc["80대"] = (acc["80대"] || 0) + 1
             } else {
-              acc["60대 이상"] = (acc["60대 이상"] || 0) + 1
+              acc["90대 이상"] = (acc["90대 이상"] || 0) + 1
             }
             return acc
           },
@@ -2751,31 +2769,19 @@ export default function AdminPage() {
                       </CardHeader>
                       <CardContent>
                         <ResponsiveContainer width="100%" height={300}>
-                          <PieChart>
-                            <Pie
-                              data={analysisData.age}
-                              dataKey="value"
-                              nameKey="name"
-                              cx="50%"
-                              cy="50%"
-                              outerRadius={80}
-                              label={(entry) => `${entry.name}: ${entry.percentage}%`}
-                            >
-                              {analysisData.age.map((entry, index) => (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={["#10b981", "#f59e0b", "#ef4444", "#6366f1", "#8b5cf6", "#ec4899"][index % 6]}
-                                />
-                              ))}
-                            </Pie>
+                          <BarChart data={analysisData.age}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis />
                             <Tooltip
                               formatter={(value: number, name: string, props: any) => [
                                 `${value}명 (${props.payload.percentage}%)`,
-                                name,
+                                "응답자 수",
                               ]}
                             />
                             <Legend />
-                          </PieChart>
+                            <Bar dataKey="value" fill="#3b82f6" name="응답자 수" />
+                          </BarChart>
                         </ResponsiveContainer>
                       </CardContent>
                     </Card>
@@ -2789,42 +2795,19 @@ export default function AdminPage() {
                       </CardHeader>
                       <CardContent>
                         <ResponsiveContainer width="100%" height={300}>
-                          <PieChart>
-                            <Pie
-                              data={analysisData.jurisdiction}
-                              dataKey="value"
-                              nameKey="name"
-                              cx="50%"
-                              cy="50%"
-                              outerRadius={80}
-                              label={({ name, percentage }) => `${name}: ${percentage}%`}
-                            >
-                              {analysisData.jurisdiction.map((entry, index) => (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={
-                                    [
-                                      "#3b82f6",
-                                      "#10b981",
-                                      "#f59e0b",
-                                      "#ef4444",
-                                      "#8b5cf6",
-                                      "#ec4899",
-                                      "#06b6d4",
-                                      "#84cc16",
-                                    ][index % 8]
-                                  }
-                                />
-                              ))}
-                            </Pie>
+                          <BarChart data={analysisData.jurisdiction}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis />
                             <Tooltip
                               formatter={(value: number, name: string, props: any) => [
                                 `${value}명 (${props.payload.percentage}%)`,
-                                name,
+                                "응답자 수",
                               ]}
                             />
                             <Legend />
-                          </PieChart>
+                            <Bar dataKey="value" fill="#10b981" name="응답자 수" />
+                          </BarChart>
                         </ResponsiveContainer>
                       </CardContent>
                     </Card>
@@ -2960,31 +2943,19 @@ export default function AdminPage() {
                       </CardHeader>
                       <CardContent>
                         <ResponsiveContainer width="100%" height={300}>
-                          <PieChart>
-                            <Pie
-                              data={analysisData.qualificationType}
-                              dataKey="value"
-                              nameKey="name"
-                              cx="50%"
-                              cy="50%"
-                              outerRadius={80}
-                              label={({ name, percentage }) => `${name}: ${percentage}%`}
-                            >
-                              {analysisData.qualificationType.map((entry, index) => (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={["#3b82f6", "#10b981", "#f59e0b", "#ef4444"][index % 4]}
-                                />
-                              ))}
-                            </Pie>
+                          <BarChart data={analysisData.qualificationType}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis />
                             <Tooltip
                               formatter={(value: number, name: string, props: any) => [
                                 `${value}명 (${props.payload.percentage}%)`,
-                                name,
+                                "응답자 수",
                               ]}
                             />
                             <Legend />
-                          </PieChart>
+                            <Bar dataKey="value" fill="#f59e0b" name="응답자 수" />
+                          </BarChart>
                         </ResponsiveContainer>
                       </CardContent>
                     </Card>
