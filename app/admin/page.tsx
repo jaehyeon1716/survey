@@ -186,13 +186,13 @@ export default function AdminPage() {
   const [loadingDetails, setLoadingDetails] = useState(false)
 
   const [analysisData, setAnalysisData] = useState<{
-    gender: Array<{ name: string; value: number; responseRate: number }>
-    age: Array<{ name: string; value: number; responseRate: number }>
-    jurisdiction: Array<{ name: string; value: number; responseRate: number }>
-    institution: Array<{ name: string; value: number; responseRate: number }>
-    category: Array<{ name: string; value: number; responseRate: number }>
-    inpatientOutpatient: Array<{ name: string; value: number; responseRate: number }>
-    qualificationType: Array<{ name: string; value: number; responseRate: number }>
+    gender: Array<{ name: string; value: number; percentage: number }>
+    age: Array<{ name: string; value: number; percentage: number }>
+    jurisdiction: Array<{ name: string; value: number; percentage: number }>
+    institution: Array<{ name: string; value: number; percentage: number }>
+    category: Array<{ name: string; value: number; percentage: number }>
+    inpatientOutpatient: Array<{ name: string; value: number; percentage: number }>
+    qualificationType: Array<{ name: string; value: number; percentage: number }>
   }>({
     gender: [],
     age: [],
@@ -876,6 +876,7 @@ export default function AdminPage() {
           "gender, age, jurisdiction, institution_name, category, inpatient_outpatient, qualification_type, is_completed",
         )
         .eq("survey_id", surveyId)
+        .eq("is_completed", true)
         .limit(1000000)
 
       console.log("[v0] Participants data:", participantsData)
@@ -888,36 +889,65 @@ export default function AdminPage() {
         return
       }
 
-      // Helper function to calculate response rates by field
-      const calculateResponseRates = (field: keyof (typeof participantsData)[0]) => {
+      const calculateCompletedCounts = (field: keyof (typeof participantsData)[0]) => {
         const groups = participantsData.reduce(
           (acc, p) => {
             const key = (p[field] as string) || "미입력"
             if (!acc[key]) {
-              acc[key] = { total: 0, completed: 0 }
+              acc[key] = 0
             }
-            acc[key].total++
-            if (p.is_completed) acc[key].completed++
+            acc[key]++
             return acc
           },
-          {} as Record<string, { total: number; completed: number }>,
+          {} as Record<string, number>,
         )
 
-        return Object.entries(groups).map(([name, stats]) => ({
+        return Object.entries(groups).map(([name, count]) => ({
           name,
-          value: stats.total,
-          responseRate: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0,
+          value: count,
+          percentage: Math.round((count / participantsData.length) * 100),
+        }))
+      }
+
+      const calculateAgeGroups = () => {
+        const ageGroups = participantsData.reduce(
+          (acc, p) => {
+            const age = Number.parseInt(p.age as string)
+            if (isNaN(age)) {
+              acc["미입력"] = (acc["미입력"] || 0) + 1
+            } else if (age < 20) {
+              acc["10대"] = (acc["10대"] || 0) + 1
+            } else if (age < 30) {
+              acc["20대"] = (acc["20대"] || 0) + 1
+            } else if (age < 40) {
+              acc["30대"] = (acc["30대"] || 0) + 1
+            } else if (age < 50) {
+              acc["40대"] = (acc["40대"] || 0) + 1
+            } else if (age < 60) {
+              acc["50대"] = (acc["50대"] || 0) + 1
+            } else {
+              acc["60대 이상"] = (acc["60대 이상"] || 0) + 1
+            }
+            return acc
+          },
+          {} as Record<string, number>,
+        )
+
+        return Object.entries(ageGroups).map(([name, count]) => ({
+          name,
+          value: count,
+          percentage: Math.round((count / participantsData.length) * 100),
         }))
       }
 
       const analysisResult = {
-        gender: calculateResponseRates("gender"),
-        age: calculateResponseRates("age"),
-        jurisdiction: calculateResponseRates("jurisdiction"),
-        institution: calculateResponseRates("institution_name"),
-        category: calculateResponseRates("category"),
-        inpatientOutpatient: calculateResponseRates("inpatient_outpatient"),
-        qualificationType: calculateResponseRates("qualification_type"),
+        gender: calculateCompletedCounts("gender"),
+        age: calculateAgeGroups(),
+        jurisdiction: calculateCompletedCounts("jurisdiction"),
+        institution: calculateCompletedCounts("institution_name"),
+        category: calculateCompletedCounts("category"),
+        inpatientOutpatient: calculateCompletedCounts("inpatient_outpatient"),
+        qualificationType: calculateCompletedCounts("qualification_type"),
       }
 
       console.log("[v0] Analysis result:", analysisResult)
@@ -2694,7 +2724,7 @@ export default function AdminPage() {
                               cx="50%"
                               cy="50%"
                               outerRadius={80}
-                              label={(entry) => `${entry.name}: ${entry.responseRate}%`}
+                              label={({ name, percentage }) => `${name}: ${percentage}%`}
                             >
                               {analysisData.gender.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={["#3b82f6", "#ec4899", "#8b5cf6"][index % 3]} />
@@ -2702,7 +2732,7 @@ export default function AdminPage() {
                             </Pie>
                             <Tooltip
                               formatter={(value: number, name: string, props: any) => [
-                                `${value}명 (응답률: ${props.payload.responseRate}%)`,
+                                `${value}명 (${props.payload.percentage}%)`,
                                 name,
                               ]}
                             />
@@ -2717,7 +2747,7 @@ export default function AdminPage() {
                   {analysisData.age.length > 0 && (
                     <Card>
                       <CardHeader>
-                        <CardTitle>나이대별 응답률</CardTitle>
+                        <CardTitle>나이대별 응답 분포</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <ResponsiveContainer width="100%" height={300}>
@@ -2729,18 +2759,18 @@ export default function AdminPage() {
                               cx="50%"
                               cy="50%"
                               outerRadius={80}
-                              label={(entry) => `${entry.name}: ${entry.responseRate}%`}
+                              label={(entry) => `${entry.name}: ${entry.percentage}%`}
                             >
                               {analysisData.age.map((entry, index) => (
                                 <Cell
                                   key={`cell-${index}`}
-                                  fill={["#10b981", "#f59e0b", "#ef4444", "#6366f1", "#8b5cf6"][index % 5]}
+                                  fill={["#10b981", "#f59e0b", "#ef4444", "#6366f1", "#8b5cf6", "#ec4899"][index % 6]}
                                 />
                               ))}
                             </Pie>
                             <Tooltip
                               formatter={(value: number, name: string, props: any) => [
-                                `${value}명 (응답률: ${props.payload.responseRate}%)`,
+                                `${value}명 (${props.payload.percentage}%)`,
                                 name,
                               ]}
                             />
@@ -2767,7 +2797,7 @@ export default function AdminPage() {
                               cx="50%"
                               cy="50%"
                               outerRadius={80}
-                              label={(entry) => `${entry.name}: ${entry.responseRate}%`}
+                              label={({ name, percentage }) => `${name}: ${percentage}%`}
                             >
                               {analysisData.jurisdiction.map((entry, index) => (
                                 <Cell
@@ -2789,7 +2819,7 @@ export default function AdminPage() {
                             </Pie>
                             <Tooltip
                               formatter={(value: number, name: string, props: any) => [
-                                `${value}명 (응답률: ${props.payload.responseRate}%)`,
+                                `${value}명 (${props.payload.percentage}%)`,
                                 name,
                               ]}
                             />
@@ -2816,7 +2846,7 @@ export default function AdminPage() {
                               cx="50%"
                               cy="50%"
                               outerRadius={80}
-                              label={(entry) => `${entry.responseRate}%`}
+                              label={({ percentage }) => `${percentage}%`}
                             >
                               {analysisData.institution.map((entry, index) => (
                                 <Cell
@@ -2838,7 +2868,7 @@ export default function AdminPage() {
                             </Pie>
                             <Tooltip
                               formatter={(value: number, name: string, props: any) => [
-                                `${value}명 (응답률: ${props.payload.responseRate}%)`,
+                                `${value}명 (${props.payload.percentage}%)`,
                                 name,
                               ]}
                             />
@@ -2865,7 +2895,7 @@ export default function AdminPage() {
                               cx="50%"
                               cy="50%"
                               outerRadius={80}
-                              label={(entry) => `${entry.name}: ${entry.responseRate}%`}
+                              label={({ name, percentage }) => `${name}: ${percentage}%`}
                             >
                               {analysisData.category.map((entry, index) => (
                                 <Cell
@@ -2876,7 +2906,7 @@ export default function AdminPage() {
                             </Pie>
                             <Tooltip
                               formatter={(value: number, name: string, props: any) => [
-                                `${value}명 (응답률: ${props.payload.responseRate}%)`,
+                                `${value}명 (${props.payload.percentage}%)`,
                                 name,
                               ]}
                             />
@@ -2903,7 +2933,7 @@ export default function AdminPage() {
                               cx="50%"
                               cy="50%"
                               outerRadius={80}
-                              label={(entry) => `${entry.name}: ${entry.responseRate}%`}
+                              label={({ name, percentage }) => `${name}: ${percentage}%`}
                             >
                               {analysisData.inpatientOutpatient.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={["#3b82f6", "#10b981"][index % 2]} />
@@ -2911,7 +2941,7 @@ export default function AdminPage() {
                             </Pie>
                             <Tooltip
                               formatter={(value: number, name: string, props: any) => [
-                                `${value}명 (응답률: ${props.payload.responseRate}%)`,
+                                `${value}명 (${props.payload.percentage}%)`,
                                 name,
                               ]}
                             />
@@ -2938,7 +2968,7 @@ export default function AdminPage() {
                               cx="50%"
                               cy="50%"
                               outerRadius={80}
-                              label={(entry) => `${entry.name}: ${entry.responseRate}%`}
+                              label={({ name, percentage }) => `${name}: ${percentage}%`}
                             >
                               {analysisData.qualificationType.map((entry, index) => (
                                 <Cell
@@ -2949,7 +2979,7 @@ export default function AdminPage() {
                             </Pie>
                             <Tooltip
                               formatter={(value: number, name: string, props: any) => [
-                                `${value}명 (응답률: ${props.payload.responseRate}%)`,
+                                `${value}명 (${props.payload.percentage}%)`,
                                 name,
                               ]}
                             />
