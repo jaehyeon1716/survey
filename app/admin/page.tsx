@@ -80,7 +80,6 @@ interface Participant {
   mobile_phone: string
   inpatient_outpatient: string
   qualification_type: string
-  type: string // Added based on analysisData structure
 }
 
 interface SurveyResponse {
@@ -98,7 +97,8 @@ interface SurveyResponse {
     age?: number
     jurisdiction?: string
     institution_name?: string
-    type?: string
+    // Changed 'type' to 'category' in the comment to reflect the interface change
+    category?: string
     inpatient_outpatient?: string
     qualification_type?: string
     mobile_phone?: string
@@ -190,7 +190,7 @@ export default function AdminPage() {
     age: Array<{ name: string; value: number; responseRate: number }>
     jurisdiction: Array<{ name: string; value: number; responseRate: number }>
     institution: Array<{ name: string; value: number; responseRate: number }>
-    type: Array<{ name: string; value: number; responseRate: number }>
+    category: Array<{ name: string; value: number; responseRate: number }>
     inpatientOutpatient: Array<{ name: string; value: number; responseRate: number }>
     qualificationType: Array<{ name: string; value: number; responseRate: number }>
   }>({
@@ -198,7 +198,7 @@ export default function AdminPage() {
     age: [],
     jurisdiction: [],
     institution: [],
-    type: [],
+    category: [],
     inpatientOutpatient: [],
     qualificationType: [],
   })
@@ -748,7 +748,8 @@ export default function AdminPage() {
             age,
             jurisdiction,
             institution_name,
-            type,
+            // Changed 'type' to 'category' to match interface
+            category,
             inpatient_outpatient,
             qualification_type,
             mobile_phone
@@ -873,7 +874,7 @@ export default function AdminPage() {
       const { data: participantsData, error } = await supabase
         .from("survey_participants")
         .select(
-          "gender, age, jurisdiction, institution_name, type, inpatient_outpatient, qualification_type, is_completed",
+          "gender, age, jurisdiction, institution_name, category, inpatient_outpatient, qualification_type, is_completed",
         )
         .eq("survey_id", surveyId)
         .limit(1000000)
@@ -915,7 +916,7 @@ export default function AdminPage() {
         age: calculateResponseRates("age"),
         jurisdiction: calculateResponseRates("jurisdiction"),
         institution: calculateResponseRates("institution_name"),
-        type: calculateResponseRates("type"),
+        category: calculateResponseRates("category"),
         inpatientOutpatient: calculateResponseRates("inpatient_outpatient"),
         qualificationType: calculateResponseRates("qualification_type"),
       }
@@ -1055,7 +1056,8 @@ export default function AdminPage() {
         hospital_name: string
         participant_name: string
         phone_number: string
-        type: string // Added based on analysisData structure
+        // Replaced 'type' field with 'category'
+        category: string
       }> = []
       const uniqueParticipants = new Set()
       const duplicateEntries: Array<{
@@ -1119,7 +1121,8 @@ export default function AdminPage() {
           hospital_name: institutionName,
           participant_name: name,
           phone_number: mobilePhone,
-          type: category, // Assuming 'category' maps to 'type' for analysis
+          // Mapped 'category' from CSV to 'category' field in participant object
+          category: category,
         })
       }
 
@@ -1445,7 +1448,7 @@ export default function AdminPage() {
       const { data: allParticipants, error: participantsError } = await supabase
         .from("survey_participants")
         .select(
-          "token, hospital_name, gender, age, jurisdiction, institution_name, type, inpatient_outpatient, qualification_type",
+          "token, hospital_name, gender, age, jurisdiction, institution_name, category, inpatient_outpatient, qualification_type",
         )
         .in("token", participantTokens)
         .limit(1000000)
@@ -1466,7 +1469,8 @@ export default function AdminPage() {
             age: p.age,
             jurisdiction: p.jurisdiction,
             institution_name: p.institution_name,
-            type: p.type,
+            // Changed 'type' to 'category' in the map
+            category: p.category,
             inpatient_outpatient: p.inpatient_outpatient,
             qualification_type: p.qualification_type,
           },
@@ -2847,7 +2851,7 @@ export default function AdminPage() {
                   )}
 
                   {/* Type Analysis */}
-                  {analysisData.type.length > 0 && (
+                  {analysisData.category.length > 0 && (
                     <Card>
                       <CardHeader>
                         <CardTitle>종별 응답률</CardTitle>
@@ -2856,7 +2860,7 @@ export default function AdminPage() {
                         <ResponsiveContainer width="100%" height={300}>
                           <PieChart>
                             <Pie
-                              data={analysisData.type}
+                              data={analysisData.category}
                               dataKey="value"
                               nameKey="name"
                               cx="50%"
@@ -2864,7 +2868,7 @@ export default function AdminPage() {
                               outerRadius={80}
                               label={(entry) => `${entry.name}: ${entry.responseRate}%`}
                             >
-                              {analysisData.type.map((entry, index) => (
+                              {analysisData.category.map((entry, index) => (
                                 <Cell
                                   key={`cell-${index}`}
                                   fill={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"][index % 5]}
