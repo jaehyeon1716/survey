@@ -983,6 +983,61 @@ export default function AdminPage() {
     }
   }
 
+  // Add downloadAnalysisExcel function here
+  const downloadAnalysisExcel = async () => {
+    if (!selectedSurvey || !analysisData) {
+      alert("다운로드할 분석 데이터가 없습니다.")
+      return
+    }
+
+    try {
+      const allData = [
+        ["분석 항목", "값"],
+        ["설문지 제목", selectedSurvey.title],
+        ["분석 기준일", new Date().toLocaleDateString("ko-KR")],
+        [""],
+        ["성별 응답 분포"],
+        ["성별", "응답자 수", "비율"],
+        ...analysisData.gender.map((item) => [item.name, item.value.toString(), `${item.percentage}%`]),
+        [""],
+        ["나이대별 응답 분포"],
+        ["나이대", "응답자 수", "비율"],
+        ...analysisData.age.map((item) => [item.name, item.value.toString(), `${item.percentage}%`]),
+        [""],
+        ["관할별 응답 분포"],
+        ["관할", "응답자 수", "비율"],
+        ...analysisData.jurisdiction.map((item) => [item.name, item.value.toString(), `${item.percentage}%`]),
+        [""],
+        ["종별 응답 분포"],
+        ["종별", "응답자 수", "비율"],
+        ...analysisData.category.map((item) => [item.name, item.value.toString(), `${item.percentage}%`]),
+        [""],
+        ["입원/외래별 응답 분포"],
+        ["구분", "응답자 수", "비율"],
+        ...analysisData.inpatientOutpatient.map((item) => [item.name, item.value.toString(), `${item.percentage}%`]),
+        [""],
+        ["자격유형별 응답 분포"],
+        ["자격유형", "응답자 수", "비율"],
+        ...analysisData.qualificationType.map((item) => [item.name, item.value.toString(), `${item.percentage}%`]),
+      ]
+
+      const csvContent = allData.map((row) => row.map((field) => `"${field}"`).join(",")).join("\n")
+
+      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" })
+      const link = document.createElement("a")
+      const url = URL.createObjectURL(blob)
+      link.setAttribute("href", url)
+      link.setAttribute("download", `${selectedSurvey.title}_분석_${new Date().toISOString().split("T")[0]}.csv`)
+      link.style.visibility = "hidden"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (err) {
+      console.error("Analysis Excel download error:", err)
+      alert("엑셀 다운로드 중 오류가 발생했습니다.")
+    }
+  }
+
   const handleCreateSurvey = async () => {
     if (!newSurvey.title.trim()) {
       setSurveyError("설문지 제목을 입력해주세요.")
@@ -2727,8 +2782,16 @@ export default function AdminPage() {
               <div className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-2xl">응답자 분석</CardTitle>
-                    <CardDescription>참여자 특성별 응답률을 확인하세요</CardDescription>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-2xl">응답자 분석</CardTitle>
+                        <CardDescription>참여자 특성별 응답률을 확인하세요</CardDescription>
+                      </div>
+                      <Button onClick={downloadAnalysisExcel} variant="outline">
+                        <Download className="mr-2 h-4 w-4" />
+                        분석 엑셀 다운로드
+                      </Button>
+                    </div>
                   </CardHeader>
                 </Card>
 
@@ -2896,55 +2959,6 @@ export default function AdminPage() {
                             </div>
                           ))}
                         </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Institution Analysis */}
-                  {analysisData.institution.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>기관명별 응답률</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <PieChart>
-                            <Pie
-                              data={analysisData.institution}
-                              dataKey="value"
-                              nameKey="name"
-                              cx="50%"
-                              cy="50%"
-                              outerRadius={80}
-                              label={({ percentage }) => `${percentage}%`}
-                            >
-                              {analysisData.institution.map((entry, index) => (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={
-                                    [
-                                      "#3b82f6",
-                                      "#10b981",
-                                      "#f59e0b",
-                                      "#ef4444",
-                                      "#8b5cf6",
-                                      "#ec4899",
-                                      "#06b6d4",
-                                      "#84cc16",
-                                    ][index % 8]
-                                  }
-                                />
-                              ))}
-                            </Pie>
-                            <Tooltip
-                              formatter={(value: number, name: string, props: any) => [
-                                `${value}명 (${props.payload.percentage}%)`,
-                                name,
-                              ]}
-                            />
-                            <Legend />
-                          </PieChart>
-                        </ResponsiveContainer>
                       </CardContent>
                     </Card>
                   )}
