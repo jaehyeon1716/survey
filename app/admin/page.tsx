@@ -951,17 +951,24 @@ export default function AdminPage() {
           {} as Record<string, number>,
         )
 
-        return Object.entries(ageGroups).map(([name, count]) => ({
-          name,
-          value: count,
-          percentage: Math.round((count / participantsData.length) * 100),
-        }))
+        const ageOrder = ["10대", "20대", "30대", "40대", "50대", "60대", "70대", "80대", "90대 이상", "미입력"]
+        return Object.entries(ageGroups)
+          .map(([name, count]) => ({
+            name,
+            value: count,
+            percentage: Math.round((count / participantsData.length) * 100),
+          }))
+          .sort((a, b) => {
+            const indexA = ageOrder.indexOf(a.name)
+            const indexB = ageOrder.indexOf(b.name)
+            return indexA - indexB
+          })
       }
 
       const analysisResult = {
         gender: calculateCompletedCounts("gender"),
         age: calculateAgeGroups(),
-        jurisdiction: calculateCompletedCounts("jurisdiction"),
+        jurisdiction: calculateCompletedCounts("jurisdiction").sort((a, b) => b.value - a.value),
         institution: calculateCompletedCounts("institution_name"),
         category: calculateCompletedCounts("category"),
         inpatientOutpatient: calculateCompletedCounts("inpatient_outpatient"),
@@ -2943,10 +2950,10 @@ export default function AdminPage() {
                       </CardHeader>
                       <CardContent>
                         <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={analysisData.qualificationType}>
+                          <BarChart data={analysisData.qualificationType} layout="horizontal">
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
+                            <XAxis type="number" />
+                            <YAxis dataKey="name" type="category" width={100} />
                             <Tooltip
                               formatter={(value: number, name: string, props: any) => [
                                 `${value}명 (${props.payload.percentage}%)`,
