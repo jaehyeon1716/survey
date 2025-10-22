@@ -2786,7 +2786,6 @@ export default function AdminPage() {
                                 props.payload.name,
                               ]}
                             />
-                            <Legend />
                             <Bar dataKey="value">
                               {analysisData.age.map((entry, index) => (
                                 <Cell
@@ -2809,6 +2808,29 @@ export default function AdminPage() {
                             </Bar>
                           </BarChart>
                         </ResponsiveContainer>
+                        <div className="mt-4 flex flex-wrap gap-4 justify-center">
+                          {analysisData.age.map((entry, index) => (
+                            <div key={entry.name} className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{
+                                  backgroundColor: [
+                                    "#3b82f6",
+                                    "#10b981",
+                                    "#f59e0b",
+                                    "#ef4444",
+                                    "#8b5cf6",
+                                    "#ec4899",
+                                    "#06b6d4",
+                                    "#84cc16",
+                                    "#f97316",
+                                  ][index % 9],
+                                }}
+                              />
+                              <span className="text-sm">{entry.name}</span>
+                            </div>
+                          ))}
+                        </div>
                       </CardContent>
                     </Card>
                   )}
@@ -2831,7 +2853,6 @@ export default function AdminPage() {
                                 props.payload.name,
                               ]}
                             />
-                            <Legend />
                             <Bar dataKey="value">
                               {analysisData.jurisdiction.map((entry, index) => (
                                 <Cell
@@ -2853,6 +2874,28 @@ export default function AdminPage() {
                             </Bar>
                           </BarChart>
                         </ResponsiveContainer>
+                        <div className="mt-4 flex flex-wrap gap-4 justify-center">
+                          {analysisData.jurisdiction.map((entry, index) => (
+                            <div key={entry.name} className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{
+                                  backgroundColor: [
+                                    "#3b82f6",
+                                    "#10b981",
+                                    "#f59e0b",
+                                    "#ef4444",
+                                    "#8b5cf6",
+                                    "#ec4899",
+                                    "#06b6d4",
+                                    "#84cc16",
+                                  ][index % 8],
+                                }}
+                              />
+                              <span className="text-sm">{entry.name}</span>
+                            </div>
+                          ))}
+                        </div>
                       </CardContent>
                     </Card>
                   )}
