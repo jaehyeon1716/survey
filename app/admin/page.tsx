@@ -43,7 +43,7 @@ import {
 } from "lucide-react"
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts"
 
-const ADMIN_PASSWORD = "hospital2024"
+const ADMIN_PASSWORD = "bohun#1234"
 
 interface Survey {
   id: number
@@ -748,7 +748,6 @@ export default function AdminPage() {
             age,
             jurisdiction,
             institution_name,
-            // Changed 'type' to 'category' to match interface
             category,
             inpatient_outpatient,
             qualification_type,
