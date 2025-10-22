@@ -41,8 +41,9 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react"
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts"
 
-const ADMIN_PASSWORD = "hospital2024"
+const ADMIN_PASSWORD = "bohun#1234"
 
 interface Survey {
   id: number
@@ -79,6 +80,7 @@ interface Participant {
   mobile_phone: string
   inpatient_outpatient: string
   qualification_type: string
+  type: string // Added based on analysisData structure
 }
 
 interface SurveyResponse {
@@ -91,6 +93,15 @@ interface SurveyResponse {
     hospital_name: string
     participant_name: string
     phone_number: string
+    // Added fields from Participant interface for completeness if available
+    gender?: string
+    age?: number
+    jurisdiction?: string
+    institution_name?: string
+    type?: string
+    inpatient_outpatient?: string
+    qualification_type?: string
+    mobile_phone?: string
   }
   total_score: number
   max_possible_score: number
@@ -173,6 +184,24 @@ export default function AdminPage() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [detailedResponses, setDetailedResponses] = useState<DetailedQuestionResponse[]>([])
   const [loadingDetails, setLoadingDetails] = useState(false)
+
+  const [analysisData, setAnalysisData] = useState<{
+    gender: Array<{ name: string; value: number; responseRate: number }>
+    age: Array<{ name: string; value: number; responseRate: number }>
+    jurisdiction: Array<{ name: string; value: number; responseRate: number }>
+    institution: Array<{ name: string; value: number; responseRate: number }>
+    type: Array<{ name: string; value: number; responseRate: number }>
+    inpatientOutpatient: Array<{ name: string; value: number; responseRate: number }>
+    qualificationType: Array<{ name: string; value: number; responseRate: number }>
+  }>({
+    gender: [],
+    age: [],
+    jurisdiction: [],
+    institution: [],
+    type: [],
+    inpatientOutpatient: [],
+    qualificationType: [],
+  })
 
   const handleHospitalSearch = () => {
     setHospitalFilter(hospitalSearchInput)
@@ -476,7 +505,7 @@ export default function AdminPage() {
           <div class="step">
             <div class="step-content">
               <ul>
-                <li><strong>관리자 비밀번호:</strong> <span class="highlight">hospital2024</span></li>
+                <li><strong>관리자 비밀번호:</strong> <span class="highlight"></span></li>
                 <li><strong>지원 브라우저:</strong> Chrome, Firefox, Safari, Edge 최신 버전</li>
                 <li><strong>권장 해상도:</strong> 1280x720 이상</li>
                 <li><strong>CSV 파일 인코딩:</strong> UTF-8</li>
@@ -714,7 +743,15 @@ export default function AdminPage() {
           survey_participants (
             hospital_name,
             participant_name,
-            phone_number
+            phone_number,
+            gender,
+            age,
+            jurisdiction,
+            institution_name,
+            type,
+            inpatient_outpatient,
+            qualification_type,
+            mobile_phone
           )
         `)
         .order("created_at", { ascending: false })
@@ -825,6 +862,56 @@ export default function AdminPage() {
     } catch (err) {
       console.error("[v0] Error in fetchQuestionStats:", err)
       setSurveyError("문항별 통계 조회 중 오류가 발생했습니다.")
+    }
+  }
+
+  const fetchAnalysisData = async (surveyId: string) => {
+    try {
+      const { data: participantsData, error } = await supabase
+        .from("survey_participants")
+        .select(
+          "gender, age, jurisdiction, institution_name, type, inpatient_outpatient, qualification_type, is_completed",
+        )
+        .eq("survey_id", surveyId)
+        .limit(1000000)
+
+      if (error) throw error
+
+      if (!participantsData) return
+
+      // Helper function to calculate response rates by field
+      const calculateResponseRates = (field: keyof (typeof participantsData)[0]) => {
+        const groups = participantsData.reduce(
+          (acc, p) => {
+            const key = (p[field] as string) || "미입력"
+            if (!acc[key]) {
+              acc[key] = { total: 0, completed: 0 }
+            }
+            acc[key].total++
+            if (p.is_completed) acc[key].completed++
+            return acc
+          },
+          {} as Record<string, { total: number; completed: number }>,
+        )
+
+        return Object.entries(groups).map(([name, stats]) => ({
+          name,
+          value: stats.total,
+          responseRate: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0,
+        }))
+      }
+
+      setAnalysisData({
+        gender: calculateResponseRates("gender"),
+        age: calculateResponseRates("age"),
+        jurisdiction: calculateResponseRates("jurisdiction"),
+        institution: calculateResponseRates("institution_name"),
+        type: calculateResponseRates("type"),
+        inpatientOutpatient: calculateResponseRates("inpatient_outpatient"),
+        qualificationType: calculateResponseRates("qualification_type"),
+      })
+    } catch (error) {
+      console.error("분석 데이터 조회 오류:", error)
     }
   }
 
@@ -955,6 +1042,7 @@ export default function AdminPage() {
         hospital_name: string
         participant_name: string
         phone_number: string
+        type: string // Added based on analysisData structure
       }> = []
       const uniqueParticipants = new Set()
       const duplicateEntries: Array<{
@@ -1018,6 +1106,7 @@ export default function AdminPage() {
           hospital_name: institutionName,
           participant_name: name,
           phone_number: mobilePhone,
+          type: category, // Assuming 'category' maps to 'type' for analysis
         })
       }
 
@@ -1342,7 +1431,9 @@ export default function AdminPage() {
       const participantTokens = [...new Set(allResponses?.map((r) => r.participant_token) || [])]
       const { data: allParticipants, error: participantsError } = await supabase
         .from("survey_participants")
-        .select("token, hospital_name")
+        .select(
+          "token, hospital_name, gender, age, jurisdiction, institution_name, type, inpatient_outpatient, qualification_type",
+        )
         .in("token", participantTokens)
         .limit(1000000)
 
@@ -1353,7 +1444,21 @@ export default function AdminPage() {
       }
 
       // Create participant map
-      const participantMap = new Map(allParticipants?.map((p) => [p.token, p.hospital_name]) || [])
+      const participantMap = new Map(
+        allParticipants?.map((p) => [
+          p.token,
+          {
+            hospital_name: p.hospital_name,
+            gender: p.gender,
+            age: p.age,
+            jurisdiction: p.jurisdiction,
+            institution_name: p.institution_name,
+            type: p.type,
+            inpatient_outpatient: p.inpatient_outpatient,
+            qualification_type: p.qualification_type,
+          },
+        ]) || [],
+      )
 
       // Query 1: 객관식 문항별 통계
       const objectiveQuestions = allQuestions?.filter((q) => q.question_type === "objective") || []
@@ -1378,7 +1483,7 @@ export default function AdminPage() {
       allResponses?.forEach((r) => {
         const question = allQuestions?.find((q) => q.id === r.question_id)
         if (question?.question_type === "objective" && r.response_value != null) {
-          const hospitalName = participantMap.get(r.participant_token) || "알 수 없음"
+          const hospitalName = participantMap.get(r.participant_token)?.hospital_name || "알 수 없음"
           if (!hospitalMap.has(hospitalName)) {
             hospitalMap.set(hospitalName, { responses: [], count: 0 })
           }
@@ -1419,7 +1524,7 @@ export default function AdminPage() {
         // Group by hospital
         const hospitalResponseMap = new Map<string, any[]>()
         questionResponses.forEach((r) => {
-          const hospitalName = participantMap.get(r.participant_token) || "알 수 없음"
+          const hospitalName = participantMap.get(r.participant_token)?.hospital_name || "알 수 없음"
           if (!hospitalResponseMap.has(hospitalName)) {
             hospitalResponseMap.set(hospitalName, [])
           }
@@ -1463,7 +1568,7 @@ export default function AdminPage() {
             const question = allQuestions?.find((q) => q.id === r.question_id)
             return {
               문항번호: question?.question_number || 0,
-              병원명: participantMap.get(r.participant_token) || "알 수 없음",
+              병원명: participantMap.get(r.participant_token)?.hospital_name || "알 수 없음",
               응답내용: r.response_text || "",
             }
           })
@@ -1573,6 +1678,7 @@ export default function AdminPage() {
         fetchParticipants(selectedSurvey.id, participantsPage, participantsPerPage),
         fetchResponses(selectedSurvey.id, hospitalFilter),
         fetchQuestionStats(selectedSurvey.id),
+        fetchAnalysisData(selectedSurvey.id),
       ])
     } catch (err) {
       // Consider adding a general error state for refresh if needed
@@ -1593,6 +1699,7 @@ export default function AdminPage() {
     if (selectedSurvey) {
       fetchParticipants(selectedSurvey.id, participantsPage, participantsPerPage)
       fetchResponses(selectedSurvey.id, hospitalFilter)
+      fetchAnalysisData(selectedSurvey.id)
     }
   }, [selectedSurvey, participantsPage, participantsPerPage, hospitalFilter, statusFilter])
 
@@ -1700,7 +1807,7 @@ export default function AdminPage() {
         </div>
 
         <Tabs defaultValue="surveys" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 h-12">
+          <TabsList className="grid w-full grid-cols-6 h-12">
             <TabsTrigger value="surveys" className="text-lg">
               설문지 관리
             </TabsTrigger>
@@ -1715,6 +1822,9 @@ export default function AdminPage() {
             </TabsTrigger>
             <TabsTrigger value="stats" className="text-lg">
               통계
+            </TabsTrigger>
+            <TabsTrigger value="analysis" className="text-lg">
+              분석
             </TabsTrigger>
           </TabsList>
 
@@ -2533,6 +2643,309 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="analysis">
+            {!selectedSurvey ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-center text-muted-foreground">분석할 설문지를 선택해주세요</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-2xl">응답자 분석</CardTitle>
+                    <CardDescription>참여자 특성별 응답률을 확인하세요</CardDescription>
+                  </CardHeader>
+                </Card>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Gender Analysis */}
+                  {analysisData.gender.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>성별 응답률</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={analysisData.gender}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              label={(entry) => `${entry.name}: ${entry.responseRate}%`}
+                            >
+                              {analysisData.gender.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={["#3b82f6", "#ec4899", "#8b5cf6"][index % 3]} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              formatter={(value: number, name: string, props: any) => [
+                                `${value}명 (응답률: ${props.payload.responseRate}%)`,
+                                name,
+                              ]}
+                            />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Age Analysis */}
+                  {analysisData.age.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>나이대별 응답률</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={analysisData.age}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              label={(entry) => `${entry.name}: ${entry.responseRate}%`}
+                            >
+                              {analysisData.age.map((entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={["#10b981", "#f59e0b", "#ef4444", "#6366f1", "#8b5cf6"][index % 5]}
+                                />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              formatter={(value: number, name: string, props: any) => [
+                                `${value}명 (응답률: ${props.payload.responseRate}%)`,
+                                name,
+                              ]}
+                            />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Jurisdiction Analysis */}
+                  {analysisData.jurisdiction.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>관할별 응답률</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={analysisData.jurisdiction}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              label={(entry) => `${entry.name}: ${entry.responseRate}%`}
+                            >
+                              {analysisData.jurisdiction.map((entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={
+                                    [
+                                      "#3b82f6",
+                                      "#10b981",
+                                      "#f59e0b",
+                                      "#ef4444",
+                                      "#8b5cf6",
+                                      "#ec4899",
+                                      "#06b6d4",
+                                      "#84cc16",
+                                    ][index % 8]
+                                  }
+                                />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              formatter={(value: number, name: string, props: any) => [
+                                `${value}명 (응답률: ${props.payload.responseRate}%)`,
+                                name,
+                              ]}
+                            />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Institution Analysis */}
+                  {analysisData.institution.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>기관명별 응답률</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={analysisData.institution}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              label={(entry) => `${entry.responseRate}%`}
+                            >
+                              {analysisData.institution.map((entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={
+                                    [
+                                      "#3b82f6",
+                                      "#10b981",
+                                      "#f59e0b",
+                                      "#ef4444",
+                                      "#8b5cf6",
+                                      "#ec4899",
+                                      "#06b6d4",
+                                      "#84cc16",
+                                    ][index % 8]
+                                  }
+                                />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              formatter={(value: number, name: string, props: any) => [
+                                `${value}명 (응답률: ${props.payload.responseRate}%)`,
+                                name,
+                              ]}
+                            />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Type Analysis */}
+                  {analysisData.type.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>종별 응답률</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={analysisData.type}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              label={(entry) => `${entry.name}: ${entry.responseRate}%`}
+                            >
+                              {analysisData.type.map((entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"][index % 5]}
+                                />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              formatter={(value: number, name: string, props: any) => [
+                                `${value}명 (응답률: ${props.payload.responseRate}%)`,
+                                name,
+                              ]}
+                            />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Inpatient/Outpatient Analysis */}
+                  {analysisData.inpatientOutpatient.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>입원/외래별 응답률</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={analysisData.inpatientOutpatient}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              label={(entry) => `${entry.name}: ${entry.responseRate}%`}
+                            >
+                              {analysisData.inpatientOutpatient.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={["#3b82f6", "#10b981"][index % 2]} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              formatter={(value: number, name: string, props: any) => [
+                                `${value}명 (응답률: ${props.payload.responseRate}%)`,
+                                name,
+                              ]}
+                            />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Qualification Type Analysis */}
+                  {analysisData.qualificationType.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>자격유형별 응답률</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={analysisData.qualificationType}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              label={(entry) => `${entry.name}: ${entry.responseRate}%`}
+                            >
+                              {analysisData.qualificationType.map((entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={["#3b82f6", "#10b981", "#f59e0b", "#ef4444"][index % 4]}
+                                />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              formatter={(value: number, name: string, props: any) => [
+                                `${value}명 (응답률: ${props.payload.responseRate}%)`,
+                                name,
+                              ]}
+                            />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
 
