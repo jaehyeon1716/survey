@@ -2783,11 +2783,30 @@ export default function AdminPage() {
                             <Tooltip
                               formatter={(value: number, name: string, props: any) => [
                                 `${value}명 (${props.payload.percentage}%)`,
-                                "응답자 수",
+                                props.payload.name,
                               ]}
                             />
                             <Legend />
-                            <Bar dataKey="value" fill="#3b82f6" name="응답자 수" />
+                            <Bar dataKey="value">
+                              {analysisData.age.map((entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={
+                                    [
+                                      "#3b82f6",
+                                      "#10b981",
+                                      "#f59e0b",
+                                      "#ef4444",
+                                      "#8b5cf6",
+                                      "#ec4899",
+                                      "#06b6d4",
+                                      "#84cc16",
+                                      "#f97316",
+                                    ][index % 9]
+                                  }
+                                />
+                              ))}
+                            </Bar>
                           </BarChart>
                         </ResponsiveContainer>
                       </CardContent>
@@ -2809,11 +2828,29 @@ export default function AdminPage() {
                             <Tooltip
                               formatter={(value: number, name: string, props: any) => [
                                 `${value}명 (${props.payload.percentage}%)`,
-                                "응답자 수",
+                                props.payload.name,
                               ]}
                             />
                             <Legend />
-                            <Bar dataKey="value" fill="#10b981" name="응답자 수" />
+                            <Bar dataKey="value">
+                              {analysisData.jurisdiction.map((entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={
+                                    [
+                                      "#3b82f6",
+                                      "#10b981",
+                                      "#f59e0b",
+                                      "#ef4444",
+                                      "#8b5cf6",
+                                      "#ec4899",
+                                      "#06b6d4",
+                                      "#84cc16",
+                                    ][index % 8]
+                                  }
+                                />
+                              ))}
+                            </Bar>
                           </BarChart>
                         </ResponsiveContainer>
                       </CardContent>
@@ -2950,19 +2987,31 @@ export default function AdminPage() {
                       </CardHeader>
                       <CardContent>
                         <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={analysisData.qualificationType} layout="horizontal">
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis type="number" />
-                            <YAxis dataKey="name" type="category" width={100} />
+                          <PieChart>
+                            <Pie
+                              data={analysisData.qualificationType}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              label={({ name, percentage }) => `${name}: ${percentage}%`}
+                            >
+                              {analysisData.qualificationType.map((entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"][index % 6]}
+                                />
+                              ))}
+                            </Pie>
                             <Tooltip
                               formatter={(value: number, name: string, props: any) => [
                                 `${value}명 (${props.payload.percentage}%)`,
-                                "응답자 수",
+                                name,
                               ]}
                             />
                             <Legend />
-                            <Bar dataKey="value" fill="#f59e0b" name="응답자 수" />
-                          </BarChart>
+                          </PieChart>
                         </ResponsiveContainer>
                       </CardContent>
                     </Card>
