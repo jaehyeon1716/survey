@@ -68,6 +68,17 @@ interface Participant {
   phone_number: string
   is_completed: boolean
   created_at: string
+  // New fields from CSV update
+  jurisdiction: string
+  institution_code: string
+  institution_name: string
+  category: string
+  name: string
+  age: number
+  gender: string
+  mobile_phone: string
+  inpatient_outpatient: string
+  qualification_type: string
 }
 
 interface SurveyResponse {
@@ -122,7 +133,7 @@ export default function AdminPage() {
   const [surveySuccess, setSurveySuccess] = useState("")
   const [participantError, setParticipantError] = useState("")
   const [participantSuccess, setParticipantSuccess] = useState("")
-  const [duplicates, setDuplicates] = useState<Array<{ hospital: string; name: string; phone: string }>>([]) // Renamed from duplicateParticipants
+  const [duplicates, setDuplicates] = useState<Array<{ institution: string; name: string; phone: string }>>([]) // Renamed from duplicateParticipants
   const [isUploading, setIsUploading] = useState(false) // Renamed from loading for upload context
   const [uploadProgress, setUploadProgress] = useState(0) // Simplified upload progress
   const [isDownloading, setIsDownloading] = useState(false)
@@ -341,9 +352,7 @@ export default function AdminPage() {
               </ul>
               <div class="code">
                 CSV 파일 형식 예시:<br>
-                서울대병원|김철수|010-1234-5678<br>
-                연세대병원|이영희|010-9876-5432<br>
-                고려대병원|박민수|010-5555-1234
+                서울대병원|김철수|010-1234-5678
               </div>
               <div class="info">
                 💡 <strong>중요:</strong> 새로운 CSV 파일을 업로드하면 기존 참여자 목록은 초기화됩니다. 중복된 참여자(병원명, 이름, 전화번호가 모두 동일)는 자동으로 제거됩니다.
@@ -893,13 +902,13 @@ export default function AdminPage() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file && file.type === "text/csv") {
-      setFile(file) // Use setFile
-      setParticipantError("") // Clear previous error
-      setParticipantSuccess("") // Clear previous success
+      setFile(file)
+      setParticipantError("")
+      setParticipantSuccess("")
     } else {
       setParticipantError("CSV 파일만 업로드 가능합니다.")
-      setFile(null) // Use setFile
-      setParticipantSuccess("") // Clear previous success
+      setFile(null)
+      setParticipantSuccess("")
     }
   }
 
@@ -914,7 +923,7 @@ export default function AdminPage() {
       return
     }
 
-    setIsUploading(true) // Use isUploading
+    setIsUploading(true)
     setParticipantError("")
     setParticipantSuccess("")
     setUploadProgress(0)
@@ -931,42 +940,84 @@ export default function AdminPage() {
         return
       }
 
-      // Parse all participants
       const participants: Array<{
+        jurisdiction: string
+        institution_code: string
+        institution_name: string
+        category: string
+        name: string
+        age: number
+        gender: string
+        mobile_phone: string
+        inpatient_outpatient: string
+        qualification_type: string
+        // Keep old fields for backward compatibility
         hospital_name: string
         participant_name: string
         phone_number: string
       }> = []
       const uniqueParticipants = new Set()
       const duplicateEntries: Array<{
-        hospital: string
+        institution: string
         name: string
         phone: string
-      }> = [] // Use duplicateEntries
+      }> = []
 
       for (const line of lines) {
-        const [hospitalName, participantName, phoneNumber] = line.split("|").map((item) => item.trim())
+        const [
+          jurisdiction,
+          institutionCode,
+          institutionName,
+          category,
+          name,
+          age,
+          gender,
+          mobilePhone,
+          inpatientOutpatient,
+          qualificationType,
+        ] = line.split("|").map((item) => item.trim())
 
-        if (!hospitalName || !participantName || !phoneNumber) {
+        if (
+          !jurisdiction ||
+          !institutionCode ||
+          !institutionName ||
+          !category ||
+          !name ||
+          !age ||
+          !gender ||
+          !mobilePhone ||
+          !inpatientOutpatient ||
+          !qualificationType
+        ) {
           continue
         }
 
-        const participantKey = `${hospitalName}|${participantName}|${phoneNumber}`
+        const participantKey = `${institutionName}|${name}|${mobilePhone}`
         if (uniqueParticipants.has(participantKey)) {
           duplicateEntries.push({
-            // Use duplicateEntries
-            hospital: hospitalName,
-            name: participantName,
-            phone: phoneNumber,
+            institution: institutionName,
+            name: name,
+            phone: mobilePhone,
           })
           continue
         }
         uniqueParticipants.add(participantKey)
 
         participants.push({
-          hospital_name: hospitalName,
-          participant_name: participantName,
-          phone_number: phoneNumber,
+          jurisdiction,
+          institution_code: institutionCode,
+          institution_name: institutionName,
+          category,
+          name,
+          age: Number.parseInt(age) || 0,
+          gender,
+          mobile_phone: mobilePhone,
+          inpatient_outpatient: inpatientOutpatient,
+          qualification_type: qualificationType,
+          // Keep old fields for backward compatibility
+          hospital_name: institutionName,
+          participant_name: name,
+          phone_number: mobilePhone,
         })
       }
 
@@ -989,7 +1040,7 @@ export default function AdminPage() {
       let totalUploaded = 0
       for (let i = 0; i < chunks.length; i++) {
         const progress = Math.round(((i + 1) / chunks.length) * 100)
-        setUploadProgress(progress) // Use setUploadProgress
+        setUploadProgress(progress)
 
         const response = await fetch(`/api/admin/surveys/${selectedSurvey.id}/participants`, {
           method: "POST",
@@ -1014,13 +1065,12 @@ export default function AdminPage() {
 
       let successMessage = `${totalUploaded}명의 참여자가 성공적으로 등록되었습니다.`
       if (duplicateEntries.length > 0) {
-        // Use duplicateEntries
         successMessage += ` (중복 ${duplicateEntries.length}건 제외)`
-        setDuplicates(duplicateEntries) // Use setDuplicates
+        setDuplicates(duplicateEntries)
       }
 
       setParticipantSuccess(successMessage)
-      setFile(null) // Use setFile
+      setFile(null)
       const fileInput = document.getElementById("csvFile") as HTMLInputElement
       if (fileInput) fileInput.value = ""
       fetchParticipants(selectedSurvey.id)
@@ -1028,7 +1078,7 @@ export default function AdminPage() {
       setParticipantError(err instanceof Error ? err.message : "업로드 중 오류가 발생했습니다.")
       console.error("[v0] Upload error:", err)
     } finally {
-      setIsUploading(false) // Use isUploading
+      setIsUploading(false)
     }
   }
 
@@ -1687,7 +1737,7 @@ export default function AdminPage() {
                       value={newSurvey.title}
                       onChange={(e) => setNewSurvey({ ...newSurvey, title: e.target.value })}
                       className="mt-2 h-12 text-lg"
-                      placeholder="예: 2025년 병원 만족도 조사"
+                      placeholder="예: 2024년 병원 만족도 조사"
                     />
                   </div>
 
@@ -1844,7 +1894,7 @@ export default function AdminPage() {
                               >
                                 {survey.is_active ? "활성" : "비활성"}
                               </span>
-                              {/* <Button
+                              <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleEditSurvey(survey)
@@ -1855,7 +1905,7 @@ export default function AdminPage() {
                               >
                                 <Edit className="w-3 h-3 mr-1" />
                                 수정
-                              </Button> */}
+                              </Button>
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -1884,7 +1934,8 @@ export default function AdminPage() {
               <CardHeader>
                 <CardTitle className="text-2xl">참여자 CSV 업로드</CardTitle>
                 <CardDescription className="text-lg">
-                  선택한 설문지에 참여자를 등록합니다. 병원명|대상자이름|휴대폰번호 형식의 CSV 파일을 업로드하세요
+                  선택한 설문지에 참여자를 등록합니다.
+                  관할|기관기호|기관명|종별|성명|나이|성별|휴대전화|입원외래|자격유형 형식의 CSV 파일을 업로드하세요
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1973,9 +2024,9 @@ export default function AdminPage() {
                                 <table className="w-full text-sm">
                                   <thead className="bg-yellow-100 sticky top-0">
                                     <tr>
-                                      <th className="px-2 py-1 text-left">병원명</th>
-                                      <th className="px-2 py-1 text-left">참여자명</th>
-                                      <th className="px-2 py-1 text-left">휴대폰번호</th>
+                                      <th className="px-2 py-1 text-left">기관명</th>
+                                      <th className="px-2 py-1 text-left">성명</th>
+                                      <th className="px-2 py-1 text-left">휴대전화</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -1985,7 +2036,7 @@ export default function AdminPage() {
                                         index, // Use duplicates map
                                       ) => (
                                         <tr key={index} className="border-t border-yellow-200">
-                                          <td className="px-2 py-1">{dup.hospital}</td>
+                                          <td className="px-2 py-1">{dup.institution}</td>
                                           <td className="px-2 py-1">{dup.name}</td>
                                           <td className="px-2 py-1">{dup.phone}</td>
                                         </tr>
@@ -2013,17 +2064,17 @@ export default function AdminPage() {
                       <h3 className="text-xl font-semibold mb-4">CSV 파일 형식 안내</h3>
                       <div className="space-y-3">
                         <p className="text-lg">
-                          <strong>형식:</strong> 병원명|대상자이름|휴대폰번호
+                          <strong>형식:</strong> 관할|기관기호|기관명|종별|성명|나이|성별|휴대전화|입원외래|자격유형
                         </p>
                         <p className="text-lg">
                           <strong>예시:</strong>
                         </p>
                         <div className="bg-white p-4 rounded border font-mono text-sm">
-                          서울대학교병원|김철수|010-1234-5678
+                          서울|A001|서울대학교병원|상급종합|김철수|45|남|010-1234-5678|외래|건강보험
                           <br />
-                          연세대학교병원|이영희|010-9876-5432
+                          경기|B002|분당서울대병원|종합병원|이영희|38|여|010-9876-5432|입원|의료급여
                           <br />
-                          고려대학교병원|박민수|010-5555-6666
+                          부산|C003|부산대학교병원|상급종합|박민수|52|남|010-5555-6666|외래|건강보험
                         </div>
                         <p className="text-lg text-red-600">
                           <strong>주의:</strong> 기존 참여자는 초기화되고 새로운 참여자로 교체됩니다.
@@ -2160,48 +2211,18 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        {/* pagination */}
-                        <div className="flex justify-between items-center mt-4">
-                          <div className="text-sm text-gray-600">
-                            페이지 {participantsPage} /{" "}
-                            {Math.ceil(filteredParticipantsCount / participantsPerPage) || 1}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={() => setParticipantsPage((prev) => Math.max(1, prev - 1))}
-                              disabled={participantsPage === 1}
-                              variant="outline"
-                              size="sm"
-                            >
-                              이전
-                            </Button>
-                            <Button
-                              onClick={() =>
-                                setParticipantsPage((prev) =>
-                                  Math.min(Math.ceil(filteredParticipantsCount / participantsPerPage), prev + 1),
-                                )
-                              }
-                              disabled={participantsPage >= Math.ceil(filteredParticipantsCount / participantsPerPage)}
-                              variant="outline"
-                              size="sm"
-                            >
-                              다음
-                            </Button>
-                          </div>
-                        </div>
-
                         <div className="overflow-x-auto">
                           <table className="w-full border-collapse border border-gray-300">
                             <thead>
                               <tr className="bg-gray-100">
                                 <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
-                                  병원명
+                                  기관명
                                 </th>
                                 <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
-                                  참여자명
+                                  성명
                                 </th>
                                 <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
-                                  휴대폰번호
+                                  휴대전화
                                 </th>
                                 <th className="border border-gray-300 px-4 py-3 text-left text-lg font-semibold">
                                   상태
@@ -2218,13 +2239,13 @@ export default function AdminPage() {
                               {participants.map((participant) => (
                                 <tr key={participant.id} className="hover:bg-gray-50">
                                   <td className="border border-gray-300 px-4 py-3 text-lg">
-                                    {participant.hospital_name}
+                                    {participant.institution_name || participant.hospital_name}
                                   </td>
                                   <td className="border border-gray-300 px-4 py-3 text-lg">
-                                    {participant.participant_name}
+                                    {participant.name || participant.participant_name}
                                   </td>
                                   <td className="border border-gray-300 px-4 py-3 text-lg">
-                                    {participant.phone_number}
+                                    {participant.mobile_phone || participant.phone_number}
                                   </td>
                                   <td className="border border-gray-300 px-4 py-3">
                                     <span
@@ -2267,7 +2288,35 @@ export default function AdminPage() {
                             </tbody>
                           </table>
                         </div>
-                        
+                        {/* pagination */}
+                        <div className="flex justify-between items-center mt-4">
+                          <div className="text-sm text-gray-600">
+                            페이지 {participantsPage} /{" "}
+                            {Math.ceil(filteredParticipantsCount / participantsPerPage) || 1}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => setParticipantsPage((prev) => Math.max(1, prev - 1))}
+                              disabled={participantsPage === 1}
+                              variant="outline"
+                              size="sm"
+                            >
+                              이전
+                            </Button>
+                            <Button
+                              onClick={() =>
+                                setParticipantsPage((prev) =>
+                                  Math.min(Math.ceil(filteredParticipantsCount / participantsPerPage), prev + 1),
+                                )
+                              }
+                              disabled={participantsPage >= Math.ceil(filteredParticipantsCount / participantsPerPage)}
+                              variant="outline"
+                              size="sm"
+                            >
+                              다음
+                            </Button>
+                          </div>
+                        </div>
                       </>
                     )}
                   </div>
@@ -2407,12 +2456,12 @@ export default function AdminPage() {
                       <CardTitle className="text-2xl">통계</CardTitle>
                       <CardDescription className="text-lg">설문 결과에 대한 상세 통계를 확인하세요</CardDescription>
                     </div>
-                    {/* {selectedSurvey && responses.length > 0 && (
+                    {selectedSurvey && responses.length > 0 && (
                       <Button onClick={downloadStatsExcel} className="bg-green-600 hover:bg-green-700">
                         <Download className="w-4 h-4 mr-2" />
                         통계 엑셀 다운로드
                       </Button>
-                    )} */}
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -2642,18 +2691,28 @@ export default function AdminPage() {
               <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
                   <div>
-                    <Label className="text-sm text-gray-600">병원명</Label>
-                    <p className="text-lg font-medium">{selectedResponse.survey_participants?.hospital_name || ""}</p>
+                    <Label className="text-sm text-gray-600">기관명</Label>
+                    <p className="text-lg font-medium">
+                      {(selectedResponse.survey_participants?.institution_name ||
+                        selectedResponse.survey_participants?.hospital_name) ??
+                        ""}
+                    </p>
                   </div>
                   <div>
-                    <Label className="text-sm text-gray-600">참여자명</Label>
+                    <Label className="text-sm text-gray-600">성명</Label>
                     <p className="text-lg font-medium">
-                      {selectedResponse.survey_participants?.participant_name || ""}
+                      {(selectedResponse.survey_participants?.name ||
+                        selectedResponse.survey_participants?.participant_name) ??
+                        ""}
                     </p>
                   </div>
                   <div>
                     <Label className="text-sm text-gray-600">휴대폰번호</Label>
-                    <p className="text-lg font-medium">{selectedResponse.survey_participants?.phone_number || ""}</p>
+                    <p className="text-lg font-medium">
+                      {(selectedResponse.survey_participants?.mobile_phone ||
+                        selectedResponse.survey_participants?.phone_number) ??
+                        ""}
+                    </p>
                   </div>
                   <div>
                     <Label className="text-sm text-gray-600">완료일시</Label>
