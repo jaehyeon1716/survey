@@ -43,7 +43,7 @@ import {
 } from "lucide-react"
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts"
 
-const ADMIN_PASSWORD = "bohun#1234"
+const ADMIN_PASSWORD = "hospital2024"
 
 interface Survey {
   id: number
@@ -505,7 +505,7 @@ export default function AdminPage() {
           <div class="step">
             <div class="step-content">
               <ul>
-                <li><strong>관리자 비밀번호:</strong> <span class="highlight"></span></li>
+                <li><strong>관리자 비밀번호:</strong> <span class="highlight">hospital2024</span></li>
                 <li><strong>지원 브라우저:</strong> Chrome, Firefox, Safari, Edge 최신 버전</li>
                 <li><strong>권장 해상도:</strong> 1280x720 이상</li>
                 <li><strong>CSV 파일 인코딩:</strong> UTF-8</li>
@@ -865,8 +865,11 @@ export default function AdminPage() {
     }
   }
 
+  // The fetchAnalysisData function is updated here.
   const fetchAnalysisData = async (surveyId: string) => {
     try {
+      console.log("[v0] Fetching analysis data for survey:", surveyId)
+
       const { data: participantsData, error } = await supabase
         .from("survey_participants")
         .select(
@@ -875,9 +878,15 @@ export default function AdminPage() {
         .eq("survey_id", surveyId)
         .limit(1000000)
 
+      console.log("[v0] Participants data:", participantsData)
+      console.log("[v0] Error:", error)
+
       if (error) throw error
 
-      if (!participantsData) return
+      if (!participantsData || participantsData.length === 0) {
+        console.log("[v0] No participants data found")
+        return
+      }
 
       // Helper function to calculate response rates by field
       const calculateResponseRates = (field: keyof (typeof participantsData)[0]) => {
@@ -901,7 +910,7 @@ export default function AdminPage() {
         }))
       }
 
-      setAnalysisData({
+      const analysisResult = {
         gender: calculateResponseRates("gender"),
         age: calculateResponseRates("age"),
         jurisdiction: calculateResponseRates("jurisdiction"),
@@ -909,9 +918,13 @@ export default function AdminPage() {
         type: calculateResponseRates("type"),
         inpatientOutpatient: calculateResponseRates("inpatient_outpatient"),
         qualificationType: calculateResponseRates("qualification_type"),
-      })
+      }
+
+      console.log("[v0] Analysis result:", analysisResult)
+
+      setAnalysisData(analysisResult)
     } catch (error) {
-      console.error("분석 데이터 조회 오류:", error)
+      console.error("[v0] 분석 데이터 조회 오류:", error)
     }
   }
 
