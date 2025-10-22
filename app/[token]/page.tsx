@@ -20,8 +20,8 @@ const scaleLabels_satisfaction = [
   { value: 5, label: "매우 만족한다", color: "bg-green-500" },
   { value: 4, label: "만족한다", color: "bg-green-400" },
   { value: 3, label: "보통이다", color: "bg-yellow-400" },
-  { value: 2, label: "불만족한다", color: "bg-orange-400" },
-  { value: 1, label: "매우 불만족한다", color: "bg-red-400" },
+  { value: 2, label: "만족하지 않는다", color: "bg-orange-400" },
+  { value: 1, label: "매우 만족하지 않는다", color: "bg-red-400" },
 ]
 
 type Participant = {
@@ -215,9 +215,11 @@ export default function HospitalSurvey() {
 
       console.log("[v0] Responses to submit:", responses)
 
-      await supabase.from("survey_responses").delete().eq("participant_token", participant.token)
-
-      const { error: insertError } = await supabase.from("survey_responses").insert(responses)
+      // This reduces 2 operations to 1 operation
+      const { error: insertError } = await supabase.from("survey_responses").upsert(responses, {
+        onConflict: "participant_token,question_id",
+        ignoreDuplicates: false,
+      })
 
       if (insertError) {
         console.error("[v0] Error submitting survey:", insertError)
