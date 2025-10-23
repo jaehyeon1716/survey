@@ -1973,7 +1973,7 @@ export default function AdminPage() {
                       value={newSurvey.title}
                       onChange={(e) => setNewSurvey({ ...newSurvey, title: e.target.value })}
                       className="mt-2 h-12 text-lg"
-                      placeholder="예: 2024년 병원 만족도 조사"
+                      placeholder="예: 2025년 병원 만족도 조사"
                     />
                   </div>
 
@@ -2130,7 +2130,7 @@ export default function AdminPage() {
                               >
                                 {survey.is_active ? "활성" : "비활성"}
                               </span>
-                              <Button
+                              {/* <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleEditSurvey(survey)
@@ -2141,7 +2141,7 @@ export default function AdminPage() {
                               >
                                 <Edit className="w-3 h-3 mr-1" />
                                 수정
-                              </Button>
+                              </Button> */}
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -2446,6 +2446,36 @@ export default function AdminPage() {
                             </select>
                           </div>
                         </div>
+                        
+                        {/* pagination */}
+                        <div className="flex justify-between items-center mt-4">
+                          <div className="text-sm text-gray-600">
+                            페이지 {participantsPage} /{" "}
+                            {Math.ceil(filteredParticipantsCount / participantsPerPage) || 1}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => setParticipantsPage((prev) => Math.max(1, prev - 1))}
+                              disabled={participantsPage === 1}
+                              variant="outline"
+                              size="sm"
+                            >
+                              이전
+                            </Button>
+                            <Button
+                              onClick={() =>
+                                setParticipantsPage((prev) =>
+                                  Math.min(Math.ceil(filteredParticipantsCount / participantsPerPage), prev + 1),
+                                )
+                              }
+                              disabled={participantsPage >= Math.ceil(filteredParticipantsCount / participantsPerPage)}
+                              variant="outline"
+                              size="sm"
+                            >
+                              다음
+                            </Button>
+                          </div>
+                        </div>
 
                         <div className="overflow-x-auto">
                           <table className="w-full border-collapse border border-gray-300">
@@ -2523,35 +2553,6 @@ export default function AdminPage() {
                               ))}
                             </tbody>
                           </table>
-                        </div>
-                        {/* pagination */}
-                        <div className="flex justify-between items-center mt-4">
-                          <div className="text-sm text-gray-600">
-                            페이지 {participantsPage} /{" "}
-                            {Math.ceil(filteredParticipantsCount / participantsPerPage) || 1}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={() => setParticipantsPage((prev) => Math.max(1, prev - 1))}
-                              disabled={participantsPage === 1}
-                              variant="outline"
-                              size="sm"
-                            >
-                              이전
-                            </Button>
-                            <Button
-                              onClick={() =>
-                                setParticipantsPage((prev) =>
-                                  Math.min(Math.ceil(filteredParticipantsCount / participantsPerPage), prev + 1),
-                                )
-                              }
-                              disabled={participantsPage >= Math.ceil(filteredParticipantsCount / participantsPerPage)}
-                              variant="outline"
-                              size="sm"
-                            >
-                              다음
-                            </Button>
-                          </div>
                         </div>
                       </>
                     )}
@@ -2692,12 +2693,12 @@ export default function AdminPage() {
                       <CardTitle className="text-2xl">통계</CardTitle>
                       <CardDescription className="text-lg">설문 결과에 대한 상세 통계를 확인하세요</CardDescription>
                     </div>
-                    {selectedSurvey && responses.length > 0 && (
+                    {/* {selectedSurvey && responses.length > 0 && (
                       <Button onClick={downloadStatsExcel} className="bg-green-600 hover:bg-green-700">
                         <Download className="w-4 h-4 mr-2" />
                         통계 엑셀 다운로드
                       </Button>
-                    )}
+                    )} */}
                   </div>
                 </CardHeader>
                 <CardContent>
