@@ -55,7 +55,7 @@ import {
   CartesianGrid,
 } from "recharts"
 
-const ADMIN_PASSWORD = "hospital2024"
+const ADMIN_PASSWORD = "bohun#1234"
 
 interface Survey {
   id: number
@@ -533,7 +533,7 @@ export default function AdminPage() {
           <div class="step">
             <div class="step-content">
               <ul>
-                <li><strong>관리자 비밀번호:</strong> <span class="highlight">hospital2024</span></li>
+                <li><strong>관리자 비밀번호:</strong> <span class="highlight"></span></li>
                 <li><strong>지원 브라우저:</strong> Chrome, Firefox, Safari, Edge 최신 버전</li>
                 <li><strong>권장 해상도:</strong> 1280x720 이상</li>
                 <li><strong>CSV 파일 인코딩:</strong> UTF-8</li>
