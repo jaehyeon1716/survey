@@ -1002,6 +1002,31 @@ export default function AdminPage() {
     try {
       console.log("[v0] Fetching satisfaction data for survey:", surveyId)
 
+      const { data: questionsData, error: questionsError } = await supabase
+        .from("survey_questions")
+        .select("question_number, question_type")
+        .eq("survey_id", surveyId)
+        .gte("question_number", 1)
+        .lte("question_number", 9)
+        .order("question_number")
+
+      if (questionsError) throw questionsError
+
+      // Check if all questions 1-9 exist and are objective
+      const objectiveQuestions = questionsData?.filter((q) => q.question_type === "objective") || []
+      if (objectiveQuestions.length < 9) {
+        console.log("[v0] Not all questions 1-9 are objective, skipping satisfaction analysis")
+        setSatisfactionData({
+          gender: [],
+          age: [],
+          jurisdiction: [],
+          category: [],
+          inpatientOutpatient: [],
+          qualificationType: [],
+        })
+        return
+      }
+
       // Fetch participants with responses
       const { data: participantsData, error: participantsError } = await supabase
         .from("survey_participants")
@@ -1014,11 +1039,17 @@ export default function AdminPage() {
       if (participantsError) throw participantsError
       if (!participantsData || participantsData.length === 0) return
 
-      // Fetch all responses for these participants
       const tokens = participantsData.map((p) => p.token)
       const { data: responsesData, error: responsesError } = await supabase
         .from("survey_responses")
-        .select("participant_token, question_number, response_value")
+        .select(
+          `
+          participant_token,
+          response_value,
+          question_id,
+          survey_questions!inner(question_number)
+        `,
+        )
         .in("participant_token", tokens)
 
       if (responsesError) throw responsesError
@@ -1029,12 +1060,12 @@ export default function AdminPage() {
         const responses = responsesData.filter((r) => r.participant_token === participant.token)
 
         // Get responses by question number
-        const q9 = responses.find((r) => r.question_number === 9)?.response_value
+        const q9 = responses.find((r) => r.survey_questions.question_number === 9)?.response_value
         const q1to6 = responses
-          .filter((r) => r.question_number >= 1 && r.question_number <= 6)
+          .filter((r) => r.survey_questions.question_number >= 1 && r.survey_questions.question_number <= 6)
           .map((r) => r.response_value)
         const q7to8 = responses
-          .filter((r) => r.question_number >= 7 && r.question_number <= 8)
+          .filter((r) => r.survey_questions.question_number >= 7 && r.survey_questions.question_number <= 8)
           .map((r) => r.response_value)
 
         // Convert to 100-point scale and calculate weighted satisfaction
@@ -2822,65 +2853,89 @@ export default function AdminPage() {
                     </CardHeader>
                   </Card>
 
-                  {/* Gender Analysis */}
-                  {analysisData.gender.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>성별 응답률</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <PieChart>
-                            <Pie
-                              data={analysisData.gender}
-                              dataKey="value"
-                              nameKey="name"
-                              cx="50%"
-                              cy="50%"
-                              outerRadius={80}
-                              label={({ name, percentage }) => `${name}: ${percentage}%`}
-                            >
-                              {analysisData.gender.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={["#3b82f6", "#ec4899", "#8b5cf6"][index % 3]} />
-                              ))}
-                            </Pie>
-                            <Tooltip
-                              formatter={(value: number, name: string, props: any) => [
-                                `${value}명 (${props.payload.percentage}%)`,
-                                name,
-                              ]}
-                            />
-                            <Legend />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Gender Analysis */}
+                    {analysisData.gender.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>성별 응답률</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                              <Pie
+                                data={analysisData.gender}
+                                dataKey="value"
+                                nameKey="name"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={80}
+                                label={({ name, percentage }) => `${name}: ${percentage}%`}
+                              >
+                                {analysisData.gender.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={["#3b82f6", "#ec4899", "#8b5cf6"][index % 3]} />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: number, name: string, props: any) => [
+                                  `${value}명 (${props.payload.percentage}%)`,
+                                  name,
+                                ]}
+                              />
+                              <Legend />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    )}
 
-                  {/* Age Analysis */}
-                  {analysisData.age.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>나이대별 응답 분포</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={analysisData.age}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip
-                              formatter={(value: number, name: string, props: any) => [
-                                `${value}명 (${props.payload.percentage}%)`,
-                                props.payload.name,
-                              ]}
-                            />
-                            <Bar dataKey="value">
-                              {analysisData.age.map((entry, index) => (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={
-                                    [
+                    {/* Age Analysis */}
+                    {analysisData.age.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>나이대별 응답 분포</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={analysisData.age}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" />
+                              <YAxis />
+                              <Tooltip
+                                formatter={(value: number, name: string, props: any) => [
+                                  `${value}명 (${props.payload.percentage}%)`,
+                                  props.payload.name,
+                                ]}
+                              />
+                              <Bar dataKey="value">
+                                {analysisData.age.map((entry, index) => (
+                                  <Cell
+                                    key={`cell-${index}`}
+                                    fill={
+                                      [
+                                        "#3b82f6",
+                                        "#10b981",
+                                        "#f59e0b",
+                                        "#ef4444",
+                                        "#8b5cf6",
+                                        "#ec4899",
+                                        "#06b6d4",
+                                        "#84cc16",
+                                        "#f97316",
+                                      ][index % 9]
+                                    }
+                                  />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                          <div className="mt-4 flex flex-wrap gap-4 justify-center">
+                            {analysisData.age.map((entry, index) => (
+                              <div key={entry.name} className="flex items-center gap-2">
+                                <div
+                                  className="w-3 h-3 rounded-full"
+                                  style={{
+                                    backgroundColor: [
                                       "#3b82f6",
                                       "#10b981",
                                       "#f59e0b",
@@ -2890,64 +2945,63 @@ export default function AdminPage() {
                                       "#06b6d4",
                                       "#84cc16",
                                       "#f97316",
-                                    ][index % 9]
-                                  }
+                                    ][index % 9],
+                                  }}
                                 />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                        <div className="mt-4 flex flex-wrap gap-4 justify-center">
-                          {analysisData.age.map((entry, index) => (
-                            <div key={entry.name} className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{
-                                  backgroundColor: [
-                                    "#3b82f6",
-                                    "#10b981",
-                                    "#f59e0b",
-                                    "#ef4444",
-                                    "#8b5cf6",
-                                    "#ec4899",
-                                    "#06b6d4",
-                                    "#84cc16",
-                                    "#f97316",
-                                  ][index % 9],
-                                }}
-                              />
-                              <span className="text-sm">{entry.name}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
+                                <span className="text-sm">{entry.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
 
-                  {/* Jurisdiction Analysis */}
-                  {analysisData.jurisdiction.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>관할별 응답률</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={analysisData.jurisdiction}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip
-                              formatter={(value: number, name: string, props: any) => [
-                                `${value}명 (${props.payload.percentage}%)`,
-                                props.payload.name,
-                              ]}
-                            />
-                            <Bar dataKey="value">
-                              {analysisData.jurisdiction.map((entry, index) => (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={
-                                    [
+                    {/* Jurisdiction Analysis */}
+                    {analysisData.jurisdiction.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>관할별 응답률</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={analysisData.jurisdiction}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" />
+                              <YAxis />
+                              <Tooltip
+                                formatter={(value: number, name: string, props: any) => [
+                                  `${value}명 (${props.payload.percentage}%)`,
+                                  props.payload.name,
+                                ]}
+                              />
+                              <Bar dataKey="value">
+                                {analysisData.jurisdiction.map((entry, index) => (
+                                  <Cell
+                                    key={`cell-${index}`}
+                                    fill={
+                                      [
+                                        "#3b82f6",
+                                        "#10b981",
+                                        "#f59e0b",
+                                        "#ef4444",
+                                        "#8b5cf6",
+                                        "#ec4899",
+                                        "#06b6d4",
+                                        "#84cc16",
+                                      ][index % 8]
+                                    }
+                                  />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                          <div className="mt-4 flex flex-wrap gap-4 justify-center">
+                            {analysisData.jurisdiction.map((entry, index) => (
+                              <div key={entry.name} className="flex items-center gap-2">
+                                <div
+                                  className="w-3 h-3 rounded-full"
+                                  style={{
+                                    backgroundColor: [
                                       "#3b82f6",
                                       "#10b981",
                                       "#f59e0b",
@@ -2956,149 +3010,128 @@ export default function AdminPage() {
                                       "#ec4899",
                                       "#06b6d4",
                                       "#84cc16",
-                                    ][index % 8]
-                                  }
+                                    ][index % 8],
+                                  }}
                                 />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                        <div className="mt-4 flex flex-wrap gap-4 justify-center">
-                          {analysisData.jurisdiction.map((entry, index) => (
-                            <div key={entry.name} className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{
-                                  backgroundColor: [
-                                    "#3b82f6",
-                                    "#10b981",
-                                    "#f59e0b",
-                                    "#ef4444",
-                                    "#8b5cf6",
-                                    "#ec4899",
-                                    "#06b6d4",
-                                    "#84cc16",
-                                  ][index % 8],
-                                }}
+                                <span className="text-sm">{entry.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Type Analysis */}
+                    {analysisData.category.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>종별 응답률</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                              <Pie
+                                data={analysisData.category}
+                                dataKey="value"
+                                nameKey="name"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={80}
+                                label={({ name, percentage }) => `${name}: ${percentage}%`}
+                              >
+                                {analysisData.category.map((entry, index) => (
+                                  <Cell
+                                    key={`cell-${index}`}
+                                    fill={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"][index % 5]}
+                                  />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: number, name: string, props: any) => [
+                                  `${value}명 (${props.payload.percentage}%)`,
+                                  name,
+                                ]}
                               />
-                              <span className="text-sm">{entry.name}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
+                              <Legend />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    )}
 
-                  {/* Type Analysis */}
-                  {analysisData.category.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>종별 응답률</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <PieChart>
-                            <Pie
-                              data={analysisData.category}
-                              dataKey="value"
-                              nameKey="name"
-                              cx="50%"
-                              cy="50%"
-                              outerRadius={80}
-                              label={({ name, percentage }) => `${name}: ${percentage}%`}
-                            >
-                              {analysisData.category.map((entry, index) => (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"][index % 5]}
-                                />
-                              ))}
-                            </Pie>
-                            <Tooltip
-                              formatter={(value: number, name: string, props: any) => [
-                                `${value}명 (${props.payload.percentage}%)`,
-                                name,
-                              ]}
-                            />
-                            <Legend />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  )}
+                    {/* Inpatient/Outpatient Analysis */}
+                    {analysisData.inpatientOutpatient.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>입원/외래별 응답률</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                              <Pie
+                                data={analysisData.inpatientOutpatient}
+                                dataKey="value"
+                                nameKey="name"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={80}
+                                label={({ name, percentage }) => `${name}: ${percentage}%`}
+                              >
+                                {analysisData.inpatientOutpatient.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={["#3b82f6", "#10b981"][index % 2]} />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: number, name: string, props: any) => [
+                                  `${value}명 (${props.payload.percentage}%)`,
+                                  name,
+                                ]}
+                              />
+                              <Legend />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    )}
 
-                  {/* Inpatient/Outpatient Analysis */}
-                  {analysisData.inpatientOutpatient.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>입원/외래별 응답률</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <PieChart>
-                            <Pie
-                              data={analysisData.inpatientOutpatient}
-                              dataKey="value"
-                              nameKey="name"
-                              cx="50%"
-                              cy="50%"
-                              outerRadius={80}
-                              label={({ name, percentage }) => `${name}: ${percentage}%`}
-                            >
-                              {analysisData.inpatientOutpatient.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={["#3b82f6", "#10b981"][index % 2]} />
-                              ))}
-                            </Pie>
-                            <Tooltip
-                              formatter={(value: number, name: string, props: any) => [
-                                `${value}명 (${props.payload.percentage}%)`,
-                                name,
-                              ]}
-                            />
-                            <Legend />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Qualification Type Analysis */}
-                  {analysisData.qualificationType.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>자격유형별 응답률</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <PieChart>
-                            <Pie
-                              data={analysisData.qualificationType}
-                              dataKey="value"
-                              nameKey="name"
-                              cx="50%"
-                              cy="50%"
-                              outerRadius={80}
-                              label={({ name, percentage }) => `${name}: ${percentage}%`}
-                            >
-                              {analysisData.qualificationType.map((entry, index) => (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"][index % 6]}
-                                />
-                              ))}
-                            </Pie>
-                            <Tooltip
-                              formatter={(value: number, name: string, props: any) => [
-                                `${value}명 (${props.payload.percentage}%)`,
-                                name,
-                              ]}
-                            />
-                            <Legend />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  )}
+                    {/* Qualification Type Analysis */}
+                    {analysisData.qualificationType.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>자격유형별 응답률</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                              <Pie
+                                data={analysisData.qualificationType}
+                                dataKey="value"
+                                nameKey="name"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={80}
+                                label={({ name, percentage }) => `${name}: ${percentage}%`}
+                              >
+                                {analysisData.qualificationType.map((entry, index) => (
+                                  <Cell
+                                    key={`cell-${index}`}
+                                    fill={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"][index % 6]}
+                                  />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: number, name: string, props: any) => [
+                                  `${value}명 (${props.payload.percentage}%)`,
+                                  name,
+                                ]}
+                              />
+                              <Legend />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="satisfaction" className="space-y-6">
