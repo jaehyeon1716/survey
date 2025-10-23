@@ -1,6 +1,9 @@
 -- 5. 병원별 문항별 상세 통계
 -- (병원명, 문항번호, 문항내용, 문항유형, 응답수, 평균점수, 100점환산점수, 응답내용(주관식))
 
+-- Added survey_id parameter at the top for easy modification
+-- 사용법: 아래 survey_id 값을 실제 설문 ID로 변경하세요
+
 SELECT 
     p.hospital_name AS "병원명",
     q.question_number AS "문항번호",
@@ -15,7 +18,6 @@ SELECT
         WHEN q.question_type = 'objective' THEN ROUND(AVG(r.response_value), 2)::text
         ELSE '-'
     END AS "평균점수",
-    -- Added 100-point conversion for objective questions
     CASE 
         WHEN q.question_type = 'objective' THEN ROUND(AVG((r.response_value - 1) / 4.0 * 100), 2)::text
         ELSE '-'
@@ -37,9 +39,9 @@ FROM
     CROSS JOIN survey_questions q
     LEFT JOIN survey_responses r ON p.token = r.participant_token AND q.id = r.question_id
 WHERE 
-    -- 특정 설문지로 필터링하려면 아래 주석을 해제하고 survey_id를 입력하세요
-    -- p.survey_id = 1 AND q.survey_id = 1
-    true
+    -- Added survey_id filter to prevent data mixing
+    p.survey_id = 'YOUR_SURVEY_ID_HERE'  -- 이 값을 실제 설문 ID로 변경하세요
+    AND q.survey_id = 'YOUR_SURVEY_ID_HERE'  -- 이 값을 실제 설문 ID로 변경하세요
 GROUP BY 
     p.hospital_name, q.id, q.question_number, q.question_text, q.question_type
 ORDER BY 

@@ -1,6 +1,9 @@
 -- 3. 주관식 문항별 통계
 -- (문항번호, 문항내용, 응답수)
 
+-- Added survey_id parameter at the top for easy modification
+-- 사용법: 아래 survey_id 값을 실제 설문 ID로 변경하세요
+
 SELECT 
     q.question_number AS "문항번호",
     q.question_text AS "문항내용",
@@ -12,8 +15,8 @@ WHERE
     q.question_type = 'subjective'
     AND r.response_text IS NOT NULL
     AND r.response_text != ''
-    -- 특정 설문지로 필터링하려면 아래 주석을 해제하고 survey_id를 입력하세요
-    -- AND q.survey_id = 1
+    -- Added survey_id filter to prevent data mixing
+    AND q.survey_id = 'YOUR_SURVEY_ID_HERE'  -- 이 값을 실제 설문 ID로 변경하세요
 GROUP BY 
     q.id, q.question_number, q.question_text
 ORDER BY 

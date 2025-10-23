@@ -1,13 +1,15 @@
 -- 4. 병원별 통계 (상세)
 -- (병원명, 총참여자수, 완료수, 완료율, 평균점수, 100점환산점수, 편익성~공익성, 전반적만족도, 요소만족도, 사회적만족도, 종합만족도)
 
+-- Added survey_id parameter at the top for easy modification
+-- 사용법: 아래 survey_id 값을 실제 설문 ID로 변경하세요
+
 WITH question_scores AS (
     SELECT 
         p.hospital_name,
         p.token,
         q.question_number,
         r.response_value,
-        -- Convert to 100-point scale
         (r.response_value - 1) / 4.0 * 100 AS score_100
     FROM 
         survey_participants p
@@ -16,15 +18,15 @@ WITH question_scores AS (
     WHERE 
         q.question_type = 'objective'
         AND p.is_completed = true
-        -- 특정 설문지로 필터링하려면 아래 주석을 해제하고 survey_id를 입력하세요
-        -- AND p.survey_id = 1
+        -- Added survey_id filter to prevent data mixing
+        AND p.survey_id = 'YOUR_SURVEY_ID_HERE'  -- 이 값을 실제 설문 ID로 변경하세요
+        AND q.survey_id = 'YOUR_SURVEY_ID_HERE'  -- 이 값을 실제 설문 ID로 변경하세요
 ),
 participant_satisfaction AS (
     SELECT 
         hospital_name,
         token,
         AVG(score_100) AS avg_score_100,
-        -- Added individual question 100-point scores (Q1-Q8)
         MAX(CASE WHEN question_number = 1 THEN score_100 END) AS q1_convenience,
         MAX(CASE WHEN question_number = 2 THEN score_100 END) AS q2_responsiveness,
         MAX(CASE WHEN question_number = 3 THEN score_100 END) AS q3_professionalism,
@@ -33,9 +35,7 @@ participant_satisfaction AS (
         MAX(CASE WHEN question_number = 6 THEN score_100 END) AS q6_aesthetics,
         MAX(CASE WHEN question_number = 7 THEN score_100 END) AS q7_reliability,
         MAX(CASE WHEN question_number = 8 THEN score_100 END) AS q8_public_interest,
-        -- 전반적만족도 (Q9 100-point value)
         MAX(CASE WHEN question_number = 9 THEN score_100 END) AS overall_satisfaction_q9,
-        -- 요소만족도 (Q1-6 average 100-point value)
         (
             (COALESCE(MAX(CASE WHEN question_number = 1 THEN score_100 END), 0) +
              COALESCE(MAX(CASE WHEN question_number = 2 THEN score_100 END), 0) +
@@ -44,12 +44,10 @@ participant_satisfaction AS (
              COALESCE(MAX(CASE WHEN question_number = 5 THEN score_100 END), 0) +
              COALESCE(MAX(CASE WHEN question_number = 6 THEN score_100 END), 0)) / 6.0
         ) AS element_satisfaction,
-        -- 사회적만족도 (Q7-8 average 100-point value)
         (
             (COALESCE(MAX(CASE WHEN question_number = 7 THEN score_100 END), 0) +
              COALESCE(MAX(CASE WHEN question_number = 8 THEN score_100 END), 0)) / 2.0
         ) AS social_satisfaction,
-        -- Calculate overall satisfaction score (weighted)
         (
             MAX(CASE WHEN question_number = 9 THEN score_100 END) * 0.5 +
             (
@@ -77,7 +75,6 @@ SELECT
         NULLIF(COUNT(DISTINCT p.token), 0) * 100, 
         2
     ) AS "완료율(%)",
-    -- Updated column aliases to include descriptions
     ROUND(AVG(CASE WHEN q.question_type = 'objective' THEN r.response_value END), 2) AS "평균점수(1~9항목평균)",
     ROUND(COALESCE(AVG(ps.avg_score_100), 0), 2) AS "100점환산점수(평균점수의 100점환산값)",
     ROUND(COALESCE(AVG(ps.q1_convenience), 0), 2) AS "편익성(1번항목)",
@@ -98,9 +95,8 @@ FROM
     LEFT JOIN survey_questions q ON r.question_id = q.id
     LEFT JOIN participant_satisfaction ps ON p.hospital_name = ps.hospital_name AND p.token = ps.token
 WHERE 
-    -- 특정 설문지로 필터링하려면 아래 주석을 해제하고 survey_id를 입력하세요
-    -- p.survey_id = 1
-    true
+    -- Added survey_id filter to prevent data mixing
+    p.survey_id = 'YOUR_SURVEY_ID_HERE'  -- 이 값을 실제 설문 ID로 변경하세요
 GROUP BY 
     p.hospital_name
 ORDER BY 
