@@ -3190,125 +3190,127 @@ export default function AdminPage() {
                     </CardHeader>
                   </Card>
 
-                  {/* Gender Satisfaction */}
-                  {satisfactionData.gender.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>성별 종합만족도</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={satisfactionData.gender} layout="horizontal">
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis type="number" domain={[0, 100]} />
-                            <YAxis type="category" dataKey="name" />
-                            <Tooltip formatter={(value: number) => [`${value}점`, "종합만족도"]} />
-                            <Bar dataKey="score" fill="#3b82f6" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  )}
+                  <div className="grid grid-cols-2 gap-6">
+                    {/* Gender Satisfaction */}
+                    {satisfactionData.gender.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>성별 종합만족도</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={satisfactionData.gender}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" />
+                              <YAxis domain={[0, 100]} />
+                              <Tooltip formatter={(value: number) => [`${value.toFixed(1)}점`, "종합만족도"]} />
+                              <Bar dataKey="score" fill="#3b82f6" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    )}
 
-                  {/* Age Satisfaction */}
-                  {satisfactionData.age.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>나이대별 종합만족도</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={satisfactionData.age} layout="horizontal">
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis type="number" domain={[0, 100]} />
-                            <YAxis type="category" dataKey="name" width={80} />
-                            <Tooltip formatter={(value: number) => [`${value}점`, "종합만족도"]} />
-                            <Bar dataKey="score" fill="#10b981" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  )}
+                    {/* Age Satisfaction */}
+                    {satisfactionData.age.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>나이대별 종합만족도</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={satisfactionData.age}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" />
+                              <YAxis domain={[0, 100]} />
+                              <Tooltip formatter={(value: number) => [`${value.toFixed(1)}점`, "종합만족도"]} />
+                              <Bar dataKey="score" fill="#10b981" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    )}
 
-                  {/* Jurisdiction Satisfaction */}
-                  {satisfactionData.jurisdiction.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>관할별 종합만족도</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={400}>
-                          <BarChart data={satisfactionData.jurisdiction} layout="horizontal">
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis type="number" domain={[0, 100]} />
-                            <YAxis type="category" dataKey="name" width={100} />
-                            <Tooltip formatter={(value: number) => [`${value}점`, "종합만족도"]} />
-                            <Bar dataKey="score" fill="#f59e0b" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  )}
+                    {/* Jurisdiction Satisfaction */}
+                    {satisfactionData.jurisdiction.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>관할별 종합만족도</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={satisfactionData.jurisdiction}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                              <YAxis domain={[0, 100]} />
+                              <Tooltip formatter={(value: number) => [`${value.toFixed(1)}점`, "종합만족도"]} />
+                              <Bar dataKey="score" fill="#f59e0b" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    )}
 
-                  {/* Category Satisfaction */}
-                  {satisfactionData.category.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>종별 종합만족도</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={satisfactionData.category} layout="horizontal">
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis type="number" domain={[0, 100]} />
-                            <YAxis type="category" dataKey="name" width={100} />
-                            <Tooltip formatter={(value: number) => [`${value}점`, "종합만족도"]} />
-                            <Bar dataKey="score" fill="#ef4444" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  )}
+                    {/* Category Satisfaction */}
+                    {satisfactionData.category.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>종별 종합만족도</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={satisfactionData.category}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                              <YAxis domain={[0, 100]} />
+                              <Tooltip formatter={(value: number) => [`${value.toFixed(1)}점`, "종합만족도"]} />
+                              <Bar dataKey="score" fill="#ef4444" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    )}
 
-                  {/* Inpatient/Outpatient Satisfaction */}
-                  {satisfactionData.inpatientOutpatient.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>입원/외래별 종합만족도</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={satisfactionData.inpatientOutpatient} layout="horizontal">
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis type="number" domain={[0, 100]} />
-                            <YAxis type="category" dataKey="name" />
-                            <Tooltip formatter={(value: number) => [`${value}점`, "종합만족도"]} />
-                            <Bar dataKey="score" fill="#8b5cf6" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  )}
+                    {/* Inpatient/Outpatient Satisfaction */}
+                    {satisfactionData.inpatientOutpatient.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>입원/외래별 종합만족도</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={satisfactionData.inpatientOutpatient}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" />
+                              <YAxis domain={[0, 100]} />
+                              <Tooltip formatter={(value: number) => [`${value.toFixed(1)}점`, "종합만족도"]} />
+                              <Bar dataKey="score" fill="#8b5cf6" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    )}
 
-                  {/* Qualification Type Satisfaction */}
-                  {satisfactionData.qualificationType.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>자격유형별 종합만족도</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={satisfactionData.qualificationType} layout="horizontal">
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis type="number" domain={[0, 100]} />
-                            <YAxis type="category" dataKey="name" width={100} />
-                            <Tooltip formatter={(value: number) => [`${value}점`, "종합만족도"]} />
-                            <Bar dataKey="score" fill="#ec4899" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-                  )}
+                    {/* Qualification Type Satisfaction */}
+                    {satisfactionData.qualificationType.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>자격유형별 종합만족도</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={satisfactionData.qualificationType}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                              <YAxis domain={[0, 100]} />
+                              <Tooltip formatter={(value: number) => [`${value.toFixed(1)}점`, "종합만족도"]} />
+                              <Bar dataKey="score" fill="#ec4899" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
                 </TabsContent>
               </Tabs>
             )}
