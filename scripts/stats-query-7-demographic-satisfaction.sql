@@ -15,10 +15,16 @@ WITH participant_scores AS (
     AVG(sr.response_value) as avg_score,
     -- 9번 문항 점수
     AVG(CASE WHEN sq.question_number = 9 THEN sr.response_value END) as q9_score,
+    -- 9번 문항 100점 환산
+    AVG(CASE WHEN sq.question_number = 9 THEN (sr.response_value - 1) / 4.0 * 100 END) as q9_score_100,
     -- 1-6번 문항 평균
     AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN sr.response_value END) as q1_6_avg,
+    -- 1-6번 문항 100점 환산 평균
+    AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q1_6_avg_100,
     -- 7-8번 문항 평균
-    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg
+    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg,
+    -- 7-8번 문항 100점 환산 평균
+    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_8_avg_100
   FROM survey_participants sp
   JOIN survey_responses sr ON sp.token = sr.participant_token
   JOIN survey_questions sq ON sr.question_id = sq.id
@@ -33,6 +39,10 @@ SELECT
   COUNT(*) as 응답수,
   ROUND(AVG(avg_score)::numeric, 2) as 평균점수,
   ROUND(AVG((avg_score - 1) / 4.0 * 100)::numeric, 2) as "100점환산점수",
+  -- Added three new satisfaction columns
+  ROUND(AVG(q9_score_100)::numeric, 2) as 전반적만족도,
+  ROUND(AVG(q1_6_avg_100)::numeric, 2) as 요소만족도,
+  ROUND(AVG(q7_8_avg_100)::numeric, 2) as 사회적만족도,
   ROUND(AVG(
     (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
   )::numeric, 2) as 종합만족도
@@ -62,10 +72,16 @@ WITH participant_scores AS (
     AVG(sr.response_value) as avg_score,
     -- 9번 문항 점수
     AVG(CASE WHEN sq.question_number = 9 THEN sr.response_value END) as q9_score,
+    -- 9번 문항 100점 환산
+    AVG(CASE WHEN sq.question_number = 9 THEN (sr.response_value - 1) / 4.0 * 100 END) as q9_score_100,
     -- 1-6번 문항 평균
     AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN sr.response_value END) as q1_6_avg,
+    -- 1-6번 문항 100점 환산 평균
+    AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q1_6_avg_100,
     -- 7-8번 문항 평균
-    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg
+    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg,
+    -- 7-8번 문항 100점 환산 평균
+    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_8_avg_100
   FROM survey_participants sp
   JOIN survey_responses sr ON sp.token = sr.participant_token
   JOIN survey_questions sq ON sr.question_id = sq.id
@@ -80,6 +96,10 @@ SELECT
   COUNT(*) as 응답수,
   ROUND(AVG(avg_score)::numeric, 2) as 평균점수,
   ROUND(AVG((avg_score - 1) / 4.0 * 100)::numeric, 2) as "100점환산점수",
+  -- Added three new satisfaction columns
+  ROUND(AVG(q9_score_100)::numeric, 2) as 전반적만족도,
+  ROUND(AVG(q1_6_avg_100)::numeric, 2) as 요소만족도,
+  ROUND(AVG(q7_8_avg_100)::numeric, 2) as 사회적만족도,
   ROUND(AVG(
     (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
   )::numeric, 2) as 종합만족도
@@ -110,10 +130,16 @@ WITH participant_scores AS (
     AVG(sr.response_value) as avg_score,
     -- 9번 문항 점수
     AVG(CASE WHEN sq.question_number = 9 THEN sr.response_value END) as q9_score,
+    -- 9번 문항 100점 환산
+    AVG(CASE WHEN sq.question_number = 9 THEN (sr.response_value - 1) / 4.0 * 100 END) as q9_score_100,
     -- 1-6번 문항 평균
     AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN sr.response_value END) as q1_6_avg,
+    -- 1-6번 문항 100점 환산 평균
+    AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q1_6_avg_100,
     -- 7-8번 문항 평균
-    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg
+    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg,
+    -- 7-8번 문항 100점 환산 평균
+    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_8_avg_100
   FROM survey_participants sp
   JOIN survey_responses sr ON sp.token = sr.participant_token
   JOIN survey_questions sq ON sr.question_id = sq.id
@@ -128,6 +154,10 @@ SELECT
   COUNT(*) as 응답수,
   ROUND(AVG(avg_score)::numeric, 2) as 평균점수,
   ROUND(AVG((avg_score - 1) / 4.0 * 100)::numeric, 2) as "100점환산점수",
+  -- Added three new satisfaction columns
+  ROUND(AVG(q9_score_100)::numeric, 2) as 전반적만족도,
+  ROUND(AVG(q1_6_avg_100)::numeric, 2) as 요소만족도,
+  ROUND(AVG(q7_8_avg_100)::numeric, 2) as 사회적만족도,
   ROUND(AVG(
     (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
   )::numeric, 2) as 종합만족도
@@ -146,10 +176,16 @@ WITH participant_scores AS (
     AVG(sr.response_value) as avg_score,
     -- 9번 문항 점수
     AVG(CASE WHEN sq.question_number = 9 THEN sr.response_value END) as q9_score,
+    -- 9번 문항 100점 환산
+    AVG(CASE WHEN sq.question_number = 9 THEN (sr.response_value - 1) / 4.0 * 100 END) as q9_score_100,
     -- 1-6번 문항 평균
     AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN sr.response_value END) as q1_6_avg,
+    -- 1-6번 문항 100점 환산 평균
+    AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q1_6_avg_100,
     -- 7-8번 문항 평균
-    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg
+    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg,
+    -- 7-8번 문항 100점 환산 평균
+    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_8_avg_100
   FROM survey_participants sp
   JOIN survey_responses sr ON sp.token = sr.participant_token
   JOIN survey_questions sq ON sr.question_id = sq.id
@@ -164,6 +200,10 @@ SELECT
   COUNT(*) as 응답수,
   ROUND(AVG(avg_score)::numeric, 2) as 평균점수,
   ROUND(AVG((avg_score - 1) / 4.0 * 100)::numeric, 2) as "100점환산점수",
+  -- Added three new satisfaction columns
+  ROUND(AVG(q9_score_100)::numeric, 2) as 전반적만족도,
+  ROUND(AVG(q1_6_avg_100)::numeric, 2) as 요소만족도,
+  ROUND(AVG(q7_8_avg_100)::numeric, 2) as 사회적만족도,
   ROUND(AVG(
     (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
   )::numeric, 2) as 종합만족도
@@ -182,10 +222,16 @@ WITH participant_scores AS (
     AVG(sr.response_value) as avg_score,
     -- 9번 문항 점수
     AVG(CASE WHEN sq.question_number = 9 THEN sr.response_value END) as q9_score,
+    -- 9번 문항 100점 환산
+    AVG(CASE WHEN sq.question_number = 9 THEN (sr.response_value - 1) / 4.0 * 100 END) as q9_score_100,
     -- 1-6번 문항 평균
     AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN sr.response_value END) as q1_6_avg,
+    -- 1-6번 문항 100점 환산 평균
+    AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q1_6_avg_100,
     -- 7-8번 문항 평균
-    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg
+    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg,
+    -- 7-8번 문항 100점 환산 평균
+    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_8_avg_100
   FROM survey_participants sp
   JOIN survey_responses sr ON sp.token = sr.participant_token
   JOIN survey_questions sq ON sr.question_id = sq.id
@@ -200,6 +246,10 @@ SELECT
   COUNT(*) as 응답수,
   ROUND(AVG(avg_score)::numeric, 2) as 평균점수,
   ROUND(AVG((avg_score - 1) / 4.0 * 100)::numeric, 2) as "100점환산점수",
+  -- Added three new satisfaction columns
+  ROUND(AVG(q9_score_100)::numeric, 2) as 전반적만족도,
+  ROUND(AVG(q1_6_avg_100)::numeric, 2) as 요소만족도,
+  ROUND(AVG(q7_8_avg_100)::numeric, 2) as 사회적만족도,
   ROUND(AVG(
     (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
   )::numeric, 2) as 종합만족도
@@ -218,10 +268,16 @@ WITH participant_scores AS (
     AVG(sr.response_value) as avg_score,
     -- 9번 문항 점수
     AVG(CASE WHEN sq.question_number = 9 THEN sr.response_value END) as q9_score,
+    -- 9번 문항 100점 환산
+    AVG(CASE WHEN sq.question_number = 9 THEN (sr.response_value - 1) / 4.0 * 100 END) as q9_score_100,
     -- 1-6번 문항 평균
     AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN sr.response_value END) as q1_6_avg,
+    -- 1-6번 문항 100점 환산 평균
+    AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q1_6_avg_100,
     -- 7-8번 문항 평균
-    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg
+    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg,
+    -- 7-8번 문항 100점 환산 평균
+    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_8_avg_100
   FROM survey_participants sp
   JOIN survey_responses sr ON sp.token = sr.participant_token
   JOIN survey_questions sq ON sr.question_id = sq.id
@@ -236,6 +292,10 @@ SELECT
   COUNT(*) as 응답수,
   ROUND(AVG(avg_score)::numeric, 2) as 평균점수,
   ROUND(AVG((avg_score - 1) / 4.0 * 100)::numeric, 2) as "100점환산점수",
+  -- Added three new satisfaction columns
+  ROUND(AVG(q9_score_100)::numeric, 2) as 전반적만족도,
+  ROUND(AVG(q1_6_avg_100)::numeric, 2) as 요소만족도,
+  ROUND(AVG(q7_8_avg_100)::numeric, 2) as 사회적만족도,
   ROUND(AVG(
     (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
   )::numeric, 2) as 종합만족도

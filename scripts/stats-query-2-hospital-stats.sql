@@ -1,5 +1,5 @@
 -- 2. 병원별 통계
--- (병원명, 응답수, 평균점수, 100점환산점수, 종합만족도)
+-- (병원명, 응답수, 평균점수, 100점환산점수, 전반적만족도, 요소만족도, 사회적만족도, 종합만족도)
 
 WITH question_scores AS (
     SELECT 
@@ -22,7 +22,27 @@ participant_satisfaction AS (
     SELECT 
         hospital_name,
         token,
-        -- Calculate overall satisfaction score
+        -- Average score (1-5 scale)
+        AVG(response_value) AS avg_score,
+        -- 100-point converted score
+        AVG(score_100) AS avg_score_100,
+        -- Added 전반적만족도 (Q9 100-point value)
+        MAX(CASE WHEN question_number = 9 THEN score_100 END) AS overall_satisfaction_q9,
+        -- Added 요소만족도 (Q1-6 average 100-point value)
+        (
+            (COALESCE(MAX(CASE WHEN question_number = 1 THEN score_100 END), 0) +
+             COALESCE(MAX(CASE WHEN question_number = 2 THEN score_100 END), 0) +
+             COALESCE(MAX(CASE WHEN question_number = 3 THEN score_100 END), 0) +
+             COALESCE(MAX(CASE WHEN question_number = 4 THEN score_100 END), 0) +
+             COALESCE(MAX(CASE WHEN question_number = 5 THEN score_100 END), 0) +
+             COALESCE(MAX(CASE WHEN question_number = 6 THEN score_100 END), 0)) / 6.0
+        ) AS element_satisfaction,
+        -- Added 사회적만족도 (Q7-8 average 100-point value)
+        (
+            (COALESCE(MAX(CASE WHEN question_number = 7 THEN score_100 END), 0) +
+             COALESCE(MAX(CASE WHEN question_number = 8 THEN score_100 END), 0)) / 2.0
+        ) AS social_satisfaction,
+        -- Calculate overall satisfaction score (weighted)
         -- Question 9 (50%) + Average of Q1-6 (30%) + Average of Q7-8 (20%)
         (
             MAX(CASE WHEN question_number = 9 THEN score_100 END) * 0.5 +
@@ -38,14 +58,20 @@ participant_satisfaction AS (
                 (COALESCE(MAX(CASE WHEN question_number = 7 THEN score_100 END), 0) +
                  COALESCE(MAX(CASE WHEN question_number = 8 THEN score_100 END), 0)) / 2.0
             ) * 0.2
-        ) AS overall_satisfaction
+        ) AS comprehensive_satisfaction
     FROM question_scores
     GROUP BY hospital_name, token
 )
 SELECT 
     hospital_name AS "병원명",
     COUNT(DISTINCT token) AS "응답수",
-    ROUND(AVG(overall_satisfaction), 2) AS "종합만족도"
+    ROUND(AVG(avg_score), 2) AS "평균점수",
+    ROUND(AVG(avg_score_100), 2) AS "100점환산점수",
+    -- Added three new satisfaction columns in specified order
+    ROUND(AVG(overall_satisfaction_q9), 2) AS "전반적만족도",
+    ROUND(AVG(element_satisfaction), 2) AS "요소만족도",
+    ROUND(AVG(social_satisfaction), 2) AS "사회적만족도",
+    ROUND(AVG(comprehensive_satisfaction), 2) AS "종합만족도"
 FROM participant_satisfaction
 GROUP BY hospital_name
 ORDER BY "응답수" DESC;

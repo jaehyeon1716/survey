@@ -1,5 +1,5 @@
 -- 5. 병원별 문항별 상세 통계
--- (병원명, 문항번호, 문항내용, 문항유형, 응답수, 평균점수, 응답내용(주관식))
+-- (병원명, 문항번호, 문항내용, 문항유형, 응답수, 평균점수, 100점환산점수, 응답내용(주관식))
 
 SELECT 
     p.hospital_name AS "병원명",
@@ -15,6 +15,11 @@ SELECT
         WHEN q.question_type = 'objective' THEN ROUND(AVG(r.response_value), 2)::text
         ELSE '-'
     END AS "평균점수",
+    -- Added 100-point conversion for objective questions
+    CASE 
+        WHEN q.question_type = 'objective' THEN ROUND(AVG((r.response_value - 1) / 4.0 * 100), 2)::text
+        ELSE '-'
+    END AS "100점환산점수",
     CASE 
         WHEN q.question_type = 'subjective' THEN 
             STRING_AGG(
