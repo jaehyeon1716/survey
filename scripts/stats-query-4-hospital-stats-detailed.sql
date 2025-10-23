@@ -91,7 +91,7 @@ SELECT
     ROUND(COALESCE(AVG(ps.overall_satisfaction_q9), 0), 2) AS "전반적만족도(9번항목)",
     ROUND(COALESCE(AVG(ps.element_satisfaction), 0), 2) AS "요소만족도(1~6번항목의 평균값)",
     ROUND(COALESCE(AVG(ps.social_satisfaction), 0), 2) AS "사회적만족도(7,8번항목의 평균값)",
-    ROUND(COALESCE(AVG(ps.comprehensive_satisfaction), 0), 2) AS "종합만족도(전반적만족도50% + 요소만족도30% + 사회적만족도20%)"
+    ROUND(COALESCE(AVG(ps.comprehensive_satisfaction), 0), 2) AS "종합만족도(전반적50%+요소30%+사회적20%)"
 FROM 
     survey_participants p
     LEFT JOIN survey_responses r ON p.token = r.participant_token

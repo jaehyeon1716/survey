@@ -52,7 +52,8 @@ SELECT
     -- Updated column aliases to include descriptions
     ROUND(AVG(avg_score), 2) AS "평균점수(1~9항목평균)",
     ROUND(AVG(avg_score_100), 2) AS "100점환산점수(평균점수의 100점환산값)",
-    ROUND(AVG(comprehensive_satisfaction), 2) AS "종합만족도(전반적만족도50% + 요소만족도30% + 사회적만족도20%)"
+    -- Shortened column alias to prevent text truncation
+    ROUND(AVG(comprehensive_satisfaction), 2) AS "종합만족도(전반적50%+요소30%+사회적20%)"
 FROM participant_satisfaction
 GROUP BY hospital_name
 ORDER BY "응답수" DESC;

@@ -61,7 +61,7 @@ SELECT
   ROUND(AVG(q7_8_avg_100)::numeric, 2) as "사회적만족도(7,8번항목의 평균값)",
   ROUND(AVG(
     (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
-  )::numeric, 2) as "종합만족도(전반적만족도50% + 요소만족도30% + 사회적만족도20%)"
+  )::numeric, 2) as "종합만족도(전반적50%+요소30%+사회적20%)"
 FROM participant_scores
 GROUP BY gender
 ORDER BY 카테고리;
@@ -126,7 +126,7 @@ SELECT
   ROUND(AVG(q7_8_avg_100)::numeric, 2) as "사회적만족도(7,8번항목의 평균값)",
   ROUND(AVG(
     (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
-  )::numeric, 2) as "종합만족도(전반적만족도50% + 요소만족도30% + 사회적만족도20%)"
+  )::numeric, 2) as "종합만족도(전반적50%+요소30%+사회적20%)"
 FROM participant_scores
 GROUP BY age_group
 ORDER BY 
@@ -191,10 +191,10 @@ SELECT
   ROUND(AVG(q7_8_avg_100)::numeric, 2) as "사회적만족도(7,8번항목의 평균값)",
   ROUND(AVG(
     (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
-  )::numeric, 2) as "종합만족도(전반적만족도50% + 요소만족도30% + 사회적만족도20%)"
+  )::numeric, 2) as "종합만족도(전반적50%+요소30%+사회적20%)"
 FROM participant_scores
 GROUP BY jurisdiction
-ORDER BY "종합만족도(전반적만족도50% + 요소만족도30% + 사회적만족도20%)";
+ORDER BY "종합만족도(전반적50%+요소30%+사회적20%)";
 
 -- ============================================
 -- 4. 종별 만족도
@@ -244,10 +244,10 @@ SELECT
   ROUND(AVG(q7_8_avg_100)::numeric, 2) as "사회적만족도(7,8번항목의 평균값)",
   ROUND(AVG(
     (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
-  )::numeric, 2) as "종합만족도(전반적만족도50% + 요소만족도30% + 사회적만족도20%)"
+  )::numeric, 2) as "종합만족도(전반적50%+요소30%+사회적20%)"
 FROM participant_scores
 GROUP BY category
-ORDER BY "종합만족도(전반적만족도50% + 요소만족도30% + 사회적만족도20%)";
+ORDER BY "종합만족도(전반적50%+요소30%+사회적20%)";
 
 -- ============================================
 -- 5. 입원/외래별 만족도
@@ -297,7 +297,7 @@ SELECT
   ROUND(AVG(q7_8_avg_100)::numeric, 2) as "사회적만족도(7,8번항목의 평균값)",
   ROUND(AVG(
     (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
-  )::numeric, 2) as "종합만족도(전반적만족도50% + 요소만족도30% + 사회적만족도20%)"
+  )::numeric, 2) as "종합만족도(전반적50%+요소30%+사회적20%)"
 FROM participant_scores
 GROUP BY inpatient_outpatient
 ORDER BY 카테고리;
@@ -350,7 +350,7 @@ SELECT
   ROUND(AVG(q7_8_avg_100)::numeric, 2) as "사회적만족도(7,8번항목의 평균값)",
   ROUND(AVG(
     (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
-  )::numeric, 2) as "종합만족도(전반적만족도50% + 요소만족도30% + 사회적만족도20%)"
+  )::numeric, 2) as "종합만족도(전반적50%+요소30%+사회적20%)"
 FROM participant_scores
 GROUP BY qualification_type
-ORDER BY "종합만족도(전반적만족도50% + 요소만족도30% + 사회적만족도20%)";
+ORDER BY "종합만족도(전반적50%+요소30%+사회적20%)";
