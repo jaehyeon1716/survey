@@ -55,7 +55,7 @@ import {
   CartesianGrid,
 } from "recharts"
 
-const ADMIN_PASSWORD = "hospital2024"
+const ADMIN_PASSWORD = "bohun#1234"
 
 interface Survey {
   id: number
@@ -210,6 +210,22 @@ export default function AdminPage() {
     age: [],
     jurisdiction: [],
     institution: [],
+    category: [],
+    inpatientOutpatient: [],
+    qualificationType: [],
+  })
+
+  const [satisfactionData, setSatisfactionData] = useState<{
+    gender: Array<{ name: string; score: number }>
+    age: Array<{ name: string; score: number }>
+    jurisdiction: Array<{ name: string; score: number }>
+    category: Array<{ name: string; score: number }>
+    inpatientOutpatient: Array<{ name: string; score: number }>
+    qualificationType: Array<{ name: string; score: number }>
+  }>({
+    gender: [],
+    age: [],
+    jurisdiction: [],
     category: [],
     inpatientOutpatient: [],
     qualificationType: [],
@@ -517,7 +533,7 @@ export default function AdminPage() {
           <div class="step">
             <div class="step-content">
               <ul>
-                <li><strong>관리자 비밀번호:</strong> <span class="highlight">hospital2024</span></li>
+                <li><strong>관리자 비밀번호:</strong> <span class="highlight"></span></li>
                 <li><strong>지원 브라우저:</strong> Chrome, Firefox, Safari, Edge 최신 버전</li>
                 <li><strong>권장 해상도:</strong> 1280x720 이상</li>
                 <li><strong>CSV 파일 인코딩:</strong> UTF-8</li>
@@ -969,7 +985,6 @@ export default function AdminPage() {
         gender: calculateCompletedCounts("gender"),
         age: calculateAgeGroups(),
         jurisdiction: calculateCompletedCounts("jurisdiction").sort((a, b) => b.value - a.value),
-        institution: calculateCompletedCounts("institution_name"),
         category: calculateCompletedCounts("category"),
         inpatientOutpatient: calculateCompletedCounts("inpatient_outpatient"),
         qualificationType: calculateCompletedCounts("qualification_type"),
@@ -983,9 +998,133 @@ export default function AdminPage() {
     }
   }
 
+  const fetchSatisfactionData = async (surveyId: string) => {
+    try {
+      console.log("[v0] Fetching satisfaction data for survey:", surveyId)
+
+      // Fetch participants with responses
+      const { data: participantsData, error: participantsError } = await supabase
+        .from("survey_participants")
+        .select(
+          "token, gender, age, jurisdiction, institution_name, category, inpatient_outpatient, qualification_type",
+        )
+        .eq("survey_id", surveyId)
+        .eq("is_completed", true)
+
+      if (participantsError) throw participantsError
+      if (!participantsData || participantsData.length === 0) return
+
+      // Fetch all responses for these participants
+      const tokens = participantsData.map((p) => p.token)
+      const { data: responsesData, error: responsesError } = await supabase
+        .from("survey_responses")
+        .select("participant_token, question_number, response_value")
+        .in("participant_token", tokens)
+
+      if (responsesError) throw responsesError
+      if (!responsesData) return
+
+      // Calculate satisfaction score for each participant
+      const participantScores = participantsData.map((participant) => {
+        const responses = responsesData.filter((r) => r.participant_token === participant.token)
+
+        // Get responses by question number
+        const q9 = responses.find((r) => r.question_number === 9)?.response_value
+        const q1to6 = responses
+          .filter((r) => r.question_number >= 1 && r.question_number <= 6)
+          .map((r) => r.response_value)
+        const q7to8 = responses
+          .filter((r) => r.question_number >= 7 && r.question_number <= 8)
+          .map((r) => r.response_value)
+
+        // Convert to 100-point scale and calculate weighted satisfaction
+        const q9Score = q9 ? ((q9 - 1) / 4) * 100 : 0
+        const q1to6Avg = q1to6.length > 0 ? q1to6.reduce((sum, val) => sum + val, 0) / q1to6.length : 0
+        const q1to6Score = ((q1to6Avg - 1) / 4) * 100
+        const q7to8Avg = q7to8.length > 0 ? q7to8.reduce((sum, val) => sum + val, 0) / q7to8.length : 0
+        const q7to8Score = ((q7to8Avg - 1) / 4) * 100
+
+        const satisfactionScore = q9Score * 0.5 + q1to6Score * 0.3 + q7to8Score * 0.2
+
+        return {
+          ...participant,
+          satisfactionScore,
+        }
+      })
+
+      // Calculate average satisfaction by demographic groups
+      const calculateAvgByGroup = (field: keyof (typeof participantsData)[0]) => {
+        const groups = participantScores.reduce(
+          (acc, p) => {
+            const key = (p[field] as string) || "미입력"
+            if (!acc[key]) {
+              acc[key] = { total: 0, count: 0 }
+            }
+            acc[key].total += p.satisfactionScore
+            acc[key].count++
+            return acc
+          },
+          {} as Record<string, { total: number; count: number }>,
+        )
+
+        return Object.entries(groups).map(([name, data]) => ({
+          name,
+          score: Math.round(data.total / data.count),
+        }))
+      }
+
+      const calculateAgeGroups = () => {
+        const ageGroups = participantScores.reduce(
+          (acc, p) => {
+            const age = Number.parseInt(p.age as string)
+            let group = "미입력"
+            if (!isNaN(age)) {
+              if (age < 20) group = "10대"
+              else if (age < 30) group = "20대"
+              else if (age < 40) group = "30대"
+              else if (age < 50) group = "40대"
+              else if (age < 60) group = "50대"
+              else if (age < 70) group = "60대"
+              else if (age < 80) group = "70대"
+              else if (age < 90) group = "80대"
+              else group = "90대 이상"
+            }
+
+            if (!acc[group]) {
+              acc[group] = { total: 0, count: 0 }
+            }
+            acc[group].total += p.satisfactionScore
+            acc[group].count++
+            return acc
+          },
+          {} as Record<string, { total: number; count: number }>,
+        )
+
+        const ageOrder = ["10대", "20대", "30대", "40대", "50대", "60대", "70대", "80대", "90대 이상", "미입력"]
+        return Object.entries(ageGroups)
+          .map(([name, data]) => ({
+            name,
+            score: Math.round(data.total / data.count),
+          }))
+          .sort((a, b) => ageOrder.indexOf(a.name) - ageOrder.indexOf(b.name))
+      }
+
+      setSatisfactionData({
+        gender: calculateAvgByGroup("gender"),
+        age: calculateAgeGroups(),
+        jurisdiction: calculateAvgByGroup("jurisdiction").sort((a, b) => b.score - a.score),
+        category: calculateAvgByGroup("category"),
+        inpatientOutpatient: calculateAvgByGroup("inpatient_outpatient"),
+        qualificationType: calculateAvgByGroup("qualification_type"),
+      })
+    } catch (error) {
+      console.error("[v0] 종합만족도 데이터 조회 오류:", error)
+    }
+  }
+
   // Add downloadAnalysisExcel function here
   const downloadAnalysisExcel = async () => {
-    if (!selectedSurvey || !analysisData) {
+    if (!selectedSurvey || responses.length === 0) {
       alert("다운로드할 분석 데이터가 없습니다.")
       return
     }
@@ -1092,7 +1231,7 @@ export default function AdminPage() {
   }
 
   const addQuestion = () => {
-    setQuestions([...questions, { text: "", type: "objective", responseScaleType: "agreement" }]) // use responseScaleType
+    setQuestions([...questions, { text: "", type: "objective", responseScaleType: "agreement" }])
   }
 
   const removeQuestion = (index: number) => {
@@ -1107,409 +1246,6 @@ export default function AdminPage() {
     const updated = [...questions]
     updated[index][field] = value
     setQuestions(updated)
-  }
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file && file.type === "text/csv") {
-      setFile(file)
-      setParticipantError("")
-      setParticipantSuccess("")
-    } else {
-      setParticipantError("CSV 파일만 업로드 가능합니다.")
-      setFile(null)
-      setParticipantSuccess("")
-    }
-  }
-
-  const handleUpload = async () => {
-    if (!file) {
-      setParticipantError("파일을 선택해주세요.")
-      return
-    }
-
-    if (!selectedSurvey) {
-      setParticipantError("설문지를 선택해주세요.")
-      return
-    }
-
-    setIsUploading(true)
-    setParticipantError("")
-    setParticipantSuccess("")
-    setUploadProgress(0)
-    setDuplicates([])
-
-    try {
-      // Read and parse CSV on client side
-      const csvText = await file.text()
-      const lines = csvText.trim().split("\n")
-
-      if (lines.length === 0) {
-        setParticipantError("CSV 파일이 비어있습니다.")
-        setIsUploading(false)
-        return
-      }
-
-      const participants: Array<{
-        jurisdiction: string
-        institution_code: string
-        institution_name: string
-        category: string
-        name: string
-        age: number
-        gender: string
-        mobile_phone: string
-        inpatient_outpatient: string
-        qualification_type: string
-        // Keep old fields for backward compatibility
-        hospital_name: string
-        participant_name: string
-        phone_number: string
-        // Replaced 'type' field with 'category'
-        category: string
-      }> = []
-      const uniqueParticipants = new Set()
-      const duplicateEntries: Array<{
-        institution: string
-        name: string
-        phone: string
-      }> = []
-
-      for (const line of lines) {
-        const [
-          jurisdiction,
-          institutionCode,
-          institutionName,
-          category,
-          name,
-          age,
-          gender,
-          mobilePhone,
-          inpatientOutpatient,
-          qualificationType,
-        ] = line.split("|").map((item) => item.trim())
-
-        if (
-          !jurisdiction ||
-          !institutionCode ||
-          !institutionName ||
-          !category ||
-          !name ||
-          !age ||
-          !gender ||
-          !mobilePhone ||
-          !inpatientOutpatient ||
-          !qualificationType
-        ) {
-          continue
-        }
-
-        const participantKey = `${institutionName}|${name}|${mobilePhone}`
-        if (uniqueParticipants.has(participantKey)) {
-          duplicateEntries.push({
-            institution: institutionName,
-            name: name,
-            phone: mobilePhone,
-          })
-          continue
-        }
-        uniqueParticipants.add(participantKey)
-
-        participants.push({
-          jurisdiction,
-          institution_code: institutionCode,
-          institution_name: institutionName,
-          category,
-          name,
-          age: Number.parseInt(age) || 0,
-          gender,
-          mobile_phone: mobilePhone,
-          inpatient_outpatient: inpatientOutpatient,
-          qualification_type: qualificationType,
-          // Keep old fields for backward compatibility
-          hospital_name: institutionName,
-          participant_name: name,
-          phone_number: mobilePhone,
-          // Mapped 'category' from CSV to 'category' field in participant object
-          category: category,
-        })
-      }
-
-      if (participants.length === 0) {
-        setParticipantError("유효한 참여자 데이터가 없습니다.")
-        setIsUploading(false)
-        return
-      }
-
-      // Split into chunks of 500 participants
-      const CHUNK_SIZE = 500
-      const chunks: (typeof participants)[] = []
-      for (let i = 0; i < participants.length; i += CHUNK_SIZE) {
-        chunks.push(participants.slice(i, i + CHUNK_SIZE))
-      }
-
-      console.log(`[v0] 총 ${participants.length}명을 ${chunks.length}개 청크로 나누어 업로드 시작`)
-
-      // Upload each chunk
-      let totalUploaded = 0
-      for (let i = 0; i < chunks.length; i++) {
-        const progress = Math.round(((i + 1) / chunks.length) * 100)
-        setUploadProgress(progress)
-
-        const response = await fetch(`/api/admin/surveys/${selectedSurvey.id}/participants`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            participants: chunks[i],
-            isFirstBatch: i === 0,
-          }),
-        })
-
-        const result = await response.json()
-
-        if (!response.ok) {
-          throw new Error(result.error || `청크 ${i + 1}/${chunks.length} 업로드 실패`)
-        }
-
-        totalUploaded += chunks[i].length
-        console.log(`[v0] 청크 ${i + 1}/${chunks.length} 완료: ${totalUploaded}/${participants.length}명 등록됨`)
-      }
-
-      let successMessage = `${totalUploaded}명의 참여자가 성공적으로 등록되었습니다.`
-      if (duplicateEntries.length > 0) {
-        successMessage += ` (중복 ${duplicateEntries.length}건 제외)`
-        setDuplicates(duplicateEntries)
-      }
-
-      setParticipantSuccess(successMessage)
-      setFile(null)
-      const fileInput = document.getElementById("csvFile") as HTMLInputElement
-      if (fileInput) fileInput.value = ""
-      fetchParticipants(selectedSurvey.id)
-    } catch (err) {
-      setParticipantError(err instanceof Error ? err.message : "업로드 중 오류가 발생했습니다.")
-      console.error("[v0] Upload error:", err)
-    } finally {
-      setIsUploading(false)
-    }
-  }
-
-  const copyToClipboard = async (token: string) => {
-    const surveyUrl = `${window.location.origin}/${token}`
-    try {
-      await navigator.clipboard.writeText(surveyUrl)
-      alert("설문 링크가 클립보드에 복사되었습니다!")
-    } catch (err) {
-      alert("링크 복사에 실패했습니다.")
-    }
-  }
-
-  const downloadCSV = () => {
-    if (responses.length === 0) {
-      alert("다운로드할 데이터가 없습니다.")
-      return
-    }
-
-    const headers = ["병원명", "참여자명", "휴대폰번호", "총점", "최대점수", "완료일시"]
-
-    const csvData = responses.map((response) => [
-      response.survey_participants?.hospital_name || "",
-      response.survey_participants?.participant_name || "",
-      response.survey_participants?.phone_number || "",
-      response.total_score || "",
-      response.max_possible_score || "",
-      new Date(response.created_at).toLocaleString("ko-KR"),
-    ])
-
-    const csvContent = [headers, ...csvData].map((row) => row.map((field) => `"${field}"`).join(",")).join("\n")
-
-    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" })
-    const link = document.createElement("a")
-    const url = URL.createObjectURL(blob)
-    link.setAttribute("href", url)
-    link.setAttribute("download", `설문조사_결과_${new Date().toISOString().split("T")[0]}.csv`)
-    link.style.visibility = "hidden"
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-
-  const openDetailModal = async (response: SurveyResponse) => {
-    setSelectedResponse(response)
-    setShowDetailModal(true)
-    setLoadingDetails(true)
-
-    try {
-      if (!supabase) return
-
-      // Fetch detailed responses with question information
-      const { data, error } = await supabase
-        .from("survey_responses")
-        .select(`
-          response_value,
-          response_text,
-          survey_questions (
-            question_number,
-            question_text,
-            question_type
-          )
-        `)
-        .eq("participant_token", response.participant_token)
-        .order("survey_questions(question_number)", { ascending: true })
-
-      if (error) {
-        console.error("[v0] Error fetching detailed responses:", error)
-        return
-      }
-
-      // Transform the data
-      const details: DetailedQuestionResponse[] = (data || []).map((item: any) => ({
-        question_number: item.survey_questions?.question_number || 0,
-        question_text: item.survey_questions?.question_text || "",
-        question_type: item.survey_questions?.question_type || "objective",
-        response_value: item.response_value,
-        response_text: item.response_text,
-      }))
-
-      // Sort by question number
-      details.sort((a, b) => a.question_number - b.question_number)
-
-      setDetailedResponses(details)
-    } catch (err) {
-      console.error("[v0] Error loading detailed responses:", err)
-    } finally {
-      setLoadingDetails(false)
-    }
-  }
-
-  const handleEditSurvey = (survey: Survey) => {
-    setEditingSurvey(survey)
-    setEditTitle(survey.title)
-    setEditDescription(survey.description || "")
-    setEditQuestions(
-      survey.survey_questions?.map((q) => ({
-        text: q.question_text,
-        type: q.question_type || "objective",
-        scaleType: q.response_scale_type || "agreement", // scaleType 설정
-      })) || [{ text: "", type: "objective", scaleType: "agreement" }], // scaleType 초기화
-    )
-    setShowEditModal(true)
-  }
-
-  const handleSaveEdit = async () => {
-    if (!editTitle.trim()) {
-      setSurveyError("설문지 제목을 입력해주세요.")
-      return
-    }
-
-    const validQuestions = editQuestions.filter((q) => q.text.trim() !== "")
-    if (validQuestions.length === 0) {
-      setSurveyError("최소 1개의 문항을 입력해주세요.")
-      return
-    }
-
-    setEditLoading(true)
-    setSurveyError("")
-    setSurveySuccess("")
-
-    try {
-      const response = await fetch(`/api/admin/surveys/${editingSurvey?.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: editTitle.trim(),
-          description: editDescription.trim(),
-          // Pass questions with text, type, and responseScaleType
-          questions: validQuestions.map((q) => ({ text: q.text, type: q.type, responseScaleType: q.scaleType })), // responseScaleType 추가
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setSurveyError(data.error || "설문지 수정 중 오류가 발생했습니다.")
-        return
-      }
-
-      setSurveySuccess("설문지가 성공적으로 수정되었습니다.")
-      setShowEditModal(false)
-      setEditingSurvey(null)
-      fetchSurveys()
-      if (selectedSurvey?.id === editingSurvey?.id) {
-        // If the edited survey was the selected one, clear selection to refetch data
-        setSelectedSurvey(null)
-      }
-    } catch (err) {
-      setSurveyError("설문지 수정 중 오류가 발생했습니다.")
-    } finally {
-      setEditLoading(false)
-    }
-  }
-
-  const handleDeleteConfirm = (survey: Survey) => {
-    setSurveyToDelete(survey)
-    setShowDeleteConfirm(true)
-  }
-
-  const deleteSurvey = async (surveyId: number) => {
-    if (!surveyToDelete) return
-
-    if (deletePassword !== ADMIN_PASSWORD) {
-      setSurveyError("비밀번호가 올바르지 않습니다.")
-      return
-    }
-
-    setDeleteLoading(true)
-    setSurveyError("")
-    setSurveySuccess("")
-
-    try {
-      const response = await fetch(`/api/admin/surveys/${surveyId}`, {
-        method: "DELETE",
-        signal: AbortSignal.timeout(900000), // 15 minutes for large datasets
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setSurveyError(data.error || "설문지 삭제 중 오류가 발생했습니다.")
-      } else {
-        setSurveySuccess(data.message || "설문지가 성공적으로 삭제되었습니다.")
-        setShowDeleteConfirm(false)
-        setSurveyToDelete(null)
-        setDeletePassword("")
-        fetchSurveys()
-        if (selectedSurvey?.id === surveyId) {
-          setSelectedSurvey(null)
-        }
-      }
-    } catch (err) {
-      console.error("[v0] 설문지 삭제 오류:", err)
-      setSurveyError("설문지 삭제 중 오류가 발생했습니다. 대용량 데이터의 경우 시간이 오래 걸릴 수 있습니다.")
-    } finally {
-      setDeleteLoading(false)
-    }
-  }
-
-  const addEditQuestion = () => {
-    setEditQuestions([...editQuestions, { text: "", type: "objective", scaleType: "agreement" }]) // scaleType 추가
-  }
-
-  const removeEditQuestion = (index: number) => {
-    if (editQuestions.length > 1) {
-      setEditQuestions(editQuestions.filter((_, i) => i !== index))
-    }
-  }
-
-  const updateEditQuestion = (index: number, field: "text" | "type" | "scaleType", value: string) => {
-    // scaleType 필드 추가
-    const updated = [...editQuestions]
-    updated[index][field] = value
-    setEditQuestions(updated)
   }
 
   // const filterParticipants = useCallback(() => { ... }, [...])
@@ -1805,6 +1541,7 @@ export default function AdminPage() {
         fetchResponses(selectedSurvey.id, hospitalFilter),
         fetchQuestionStats(selectedSurvey.id),
         fetchAnalysisData(selectedSurvey.id),
+        fetchSatisfactionData(selectedSurvey.id),
       ])
     } catch (err) {
       // Consider adding a general error state for refresh if needed
@@ -1826,6 +1563,7 @@ export default function AdminPage() {
       fetchParticipants(selectedSurvey.id, participantsPage, participantsPerPage)
       fetchResponses(selectedSurvey.id, hospitalFilter)
       fetchAnalysisData(selectedSurvey.id)
+      fetchSatisfactionData(selectedSurvey.id)
     }
   }, [selectedSurvey, participantsPage, participantsPerPage, hospitalFilter, statusFilter])
 
@@ -1910,6 +1648,294 @@ export default function AdminPage() {
 
   const paginatedResponses = responses.slice((responsesPage - 1) * responsesPerPage, responsesPage * responsesPerPage)
   const totalResponsesPages = Math.ceil(responses.length / responsesPerPage)
+
+  // Function definitions for the updates
+
+  const handleEditSurvey = (survey: Survey) => {
+    setEditingSurvey(survey)
+    setEditTitle(survey.title)
+    setEditDescription(survey.description || "")
+    setEditQuestions(
+      survey.survey_questions?.map((q) => ({
+        text: q.question_text,
+        type: q.question_type,
+        scaleType: q.response_scale_type || "agreement", // Ensure scaleType is initialized
+      })) || [{ text: "", type: "objective", scaleType: "agreement" }],
+    )
+    setShowEditModal(true)
+  }
+
+  const addEditQuestion = () => {
+    setEditQuestions([...editQuestions, { text: "", type: "objective", scaleType: "agreement" }])
+  }
+
+  const removeEditQuestion = (index: number) => {
+    if (editQuestions.length > 1) {
+      setEditQuestions(editQuestions.filter((_, i) => i !== index))
+    }
+  }
+
+  const updateEditQuestion = (index: number, field: "text" | "type" | "scaleType", value: string) => {
+    const updated = [...editQuestions]
+    updated[index][field] = value
+    setEditQuestions(updated)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingSurvey) return
+
+    if (!editTitle.trim()) {
+      setSurveyError("설문지 제목을 입력해주세요.")
+      return
+    }
+
+    const validQuestions = editQuestions.filter((q) => q.text.trim() !== "")
+    if (validQuestions.length === 0) {
+      setSurveyError("최소 1개의 문항을 입력해주세요.")
+      return
+    }
+
+    setEditLoading(true)
+    setSurveyError("")
+
+    try {
+      const response = await fetch(`/api/admin/surveys/${editingSurvey.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          description: editDescription.trim(),
+          questions: validQuestions.map((q) => ({
+            text: q.text,
+            type: q.type,
+            responseScaleType: q.scaleType,
+          })),
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setSurveyError(data.error || "설문지 수정 중 오류가 발생했습니다.")
+        return
+      }
+
+      setShowEditModal(false)
+      setSurveySuccess("설문지가 성공적으로 수정되었습니다.")
+      fetchSurveys()
+    } catch (err) {
+      setSurveyError("설문지 수정 중 오류가 발생했습니다.")
+    } finally {
+      setEditLoading(false)
+    }
+  }
+
+  const handleDeleteConfirm = (survey: Survey) => {
+    setSurveyToDelete(survey)
+    setShowDeleteConfirm(true)
+    setDeletePassword("")
+  }
+
+  const deleteSurvey = async (id: number) => {
+    if (!surveyToDelete || deletePassword !== ADMIN_PASSWORD) {
+      alert("비밀번호가 올바르지 않습니다.")
+      return
+    }
+
+    setDeleteLoading(true)
+    setSurveyError("")
+
+    try {
+      const response = await fetch(`/api/admin/surveys/${id}`, {
+        method: "DELETE",
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setSurveyError(data.error || "설문지 삭제 중 오류가 발생했습니다.")
+        return
+      }
+
+      setShowDeleteConfirm(false)
+      setSurveySuccess("설문지가 성공적으로 삭제되었습니다.")
+      fetchSurveys()
+      if (selectedSurvey?.id === id) {
+        setSelectedSurvey(null)
+        setParticipants([])
+        setResponses([])
+        setQuestionStats([])
+        setAnalysisData({
+          gender: [],
+          age: [],
+          jurisdiction: [],
+          institution: [],
+          category: [],
+          inpatientOutpatient: [],
+          qualificationType: [],
+        })
+        setSatisfactionData({
+          gender: [],
+          age: [],
+          jurisdiction: [],
+          category: [],
+          inpatientOutpatient: [],
+          qualificationType: [],
+        })
+      }
+    } catch (err) {
+      setSurveyError("설문지 삭제 중 오류가 발생했습니다.")
+    } finally {
+      setDeleteLoading(false)
+      setDeletePassword("")
+      setSurveyToDelete(null)
+    }
+  }
+
+  const openDetailModal = async (response: SurveyResponse) => {
+    setSelectedResponse(response)
+    setShowDetailModal(true)
+    setLoadingDetails(true)
+    setDetailedResponses([])
+
+    try {
+      const { data, error } = await supabase
+        .from("survey_responses")
+        .select(
+          `
+          *,
+          survey_questions (question_number, question_text, question_type, response_scale_type)
+        `,
+        )
+        .eq("participant_token", response.participant_token)
+        .order("question_number", { ascending: true })
+
+      if (error) throw error
+
+      if (data) {
+        const formattedDetails = data.map((item: any) => ({
+          question_number: item.survey_questions.question_number,
+          question_text: item.survey_questions.question_text,
+          question_type: item.survey_questions.question_type,
+          response_value: item.response_value,
+          response_text: item.response_text,
+        }))
+        setDetailedResponses(formattedDetails)
+      }
+    } catch (err) {
+      console.error("Error fetching detailed responses:", err)
+      alert("상세 응답 조회 중 오류가 발생했습니다.")
+    } finally {
+      setLoadingDetails(false)
+    }
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0])
+    }
+  }
+
+  const handleUpload = async () => {
+    if (!file || !selectedSurvey) return
+
+    setIsUploading(true)
+    setUploadProgress(0)
+    setParticipantError("")
+    setParticipantSuccess("")
+    setDuplicates([]) // Clear previous duplicates
+
+    try {
+      const formData = new FormData()
+      formData.append("csvFile", file)
+      formData.append("surveyId", selectedSurvey.id.toString())
+
+      const response = await fetch("/api/admin/uploadParticipants", {
+        method: "POST",
+        body: formData,
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        setParticipantError(result.error || "파일 업로드 중 오류가 발생했습니다.")
+      } else {
+        setParticipantSuccess("참여자가 성공적으로 업로드되었습니다.")
+        if (result.duplicates && result.duplicates.length > 0) {
+          setDuplicates(result.duplicates) // Set duplicates from API response
+        }
+        fetchParticipants(selectedSurvey.id) // Refresh participant list
+      }
+    } catch (err) {
+      setParticipantError("파일 업로드 중 오류가 발생했습니다.")
+      console.error("Upload error:", err)
+    } finally {
+      setIsUploading(false)
+      setUploadProgress(0) // Reset progress
+      setFile(null) // Clear the selected file
+      // The following line was causing an error when e is not available in this scope.
+      // if (e.target) (e.target as HTMLInputElement).value = "" // Reset input value
+    }
+  }
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      alert("링크가 클립보드에 복사되었습니다.")
+    } catch (err) {
+      console.error("Failed to copy text: ", err)
+      alert("클립보드 복사에 실패했습니다.")
+    }
+  }
+
+  const downloadCSV = async () => {
+    if (!selectedSurvey || responses.length === 0) {
+      alert("다운로드할 응답 데이터가 없습니다.")
+      return
+    }
+
+    try {
+      const excelData = responses.map((response) => ({
+        병원명: response.survey_participants?.hospital_name || "",
+        참여자명: response.survey_participants?.participant_name || "",
+        휴대폰번호: response.survey_participants?.phone_number || "",
+        총점: response.total_score || 0,
+        최대점수: response.max_possible_score || 0,
+        완료일시: new Date(response.created_at).toLocaleString("ko-KR"),
+      }))
+
+      const headers = Object.keys(excelData[0])
+      const csvContent = excelData
+        .map((row) =>
+          headers
+            .map((header) => {
+              const value = row[header as keyof typeof row]
+              return typeof value === "string" && (value.includes(",") || value.includes('"'))
+                ? `"${value.replace(/"/g, '""')}"`
+                : value
+            })
+            .join(","),
+        )
+        .join("\n")
+
+      const BOM = "\uFEFF"
+      const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" })
+
+      const link = document.createElement("a")
+      const url = URL.createObjectURL(blob)
+      link.setAttribute("href", url)
+      link.setAttribute("download", `${selectedSurvey.title}_설문결과_${new Date().toISOString().split("T")[0]}.csv`)
+      link.style.visibility = "hidden"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (err) {
+      console.error("CSV download error:", err)
+      alert("CSV 다운로드 중 오류가 발생했습니다.")
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -2266,18 +2292,13 @@ export default function AdminPage() {
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {duplicates.map(
-                                      (
-                                        dup,
-                                        index, // Use duplicates map
-                                      ) => (
-                                        <tr key={index} className="border-t border-yellow-200">
-                                          <td className="px-2 py-1">{dup.institution}</td>
-                                          <td className="px-2 py-1">{dup.name}</td>
-                                          <td className="px-2 py-1">{dup.phone}</td>
-                                        </tr>
-                                      ),
-                                    )}
+                                    {duplicates.map((dup, index) => (
+                                      <tr key={index} className="border-t border-yellow-200">
+                                        <td className="px-2 py-1">{dup.institution}</td>
+                                        <td className="px-2 py-1">{dup.name}</td>
+                                        <td className="px-2 py-1">{dup.phone}</td>
+                                      </tr>
+                                    ))}
                                   </tbody>
                                 </table>
                               </div>
@@ -2779,23 +2800,28 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-2xl">응답자 분석</CardTitle>
-                        <CardDescription>참여자 특성별 응답률을 확인하세요</CardDescription>
-                      </div>
-                      <Button onClick={downloadAnalysisExcel} variant="outline">
-                        <Download className="mr-2 h-4 w-4" />
-                        분석 엑셀 다운로드
-                      </Button>
-                    </div>
-                  </CardHeader>
-                </Card>
+              <Tabs defaultValue="respondent" className="space-y-6">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="respondent">응답자 분석</TabsTrigger>
+                  <TabsTrigger value="satisfaction">종합만족도 분석</TabsTrigger>
+                </TabsList>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <TabsContent value="respondent" className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-2xl">응답자 분석</CardTitle>
+                          <CardDescription>참여자 특성별 응답률을 확인하세요</CardDescription>
+                        </div>
+                        <Button onClick={downloadAnalysisExcel} variant="outline">
+                          <Download className="mr-2 h-4 w-4" />
+                          분석 엑셀 다운로드
+                        </Button>
+                      </div>
+                    </CardHeader>
+                  </Card>
+
                   {/* Gender Analysis */}
                   {analysisData.gender.length > 0 && (
                     <Card>
@@ -3073,8 +3099,139 @@ export default function AdminPage() {
                       </CardContent>
                     </Card>
                   )}
-                </div>
-              </div>
+                </TabsContent>
+
+                <TabsContent value="satisfaction" className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-2xl">종합만족도 분석</CardTitle>
+                      <CardDescription>
+                        참여자 특성별 종합만족도 점수를 비교하세요 (9번 50% + 1-6번 평균 30% + 7-8번 평균 20%)
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
+
+                  {/* Gender Satisfaction */}
+                  {satisfactionData.gender.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>성별 종합만족도</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={satisfactionData.gender} layout="horizontal">
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis type="number" domain={[0, 100]} />
+                            <YAxis type="category" dataKey="name" />
+                            <Tooltip formatter={(value: number) => [`${value}점`, "종합만족도"]} />
+                            <Bar dataKey="score" fill="#3b82f6" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Age Satisfaction */}
+                  {satisfactionData.age.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>나이대별 종합만족도</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={satisfactionData.age} layout="horizontal">
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis type="number" domain={[0, 100]} />
+                            <YAxis type="category" dataKey="name" width={80} />
+                            <Tooltip formatter={(value: number) => [`${value}점`, "종합만족도"]} />
+                            <Bar dataKey="score" fill="#10b981" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Jurisdiction Satisfaction */}
+                  {satisfactionData.jurisdiction.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>관할별 종합만족도</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={400}>
+                          <BarChart data={satisfactionData.jurisdiction} layout="horizontal">
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis type="number" domain={[0, 100]} />
+                            <YAxis type="category" dataKey="name" width={100} />
+                            <Tooltip formatter={(value: number) => [`${value}점`, "종합만족도"]} />
+                            <Bar dataKey="score" fill="#f59e0b" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Category Satisfaction */}
+                  {satisfactionData.category.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>종별 종합만족도</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={satisfactionData.category} layout="horizontal">
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis type="number" domain={[0, 100]} />
+                            <YAxis type="category" dataKey="name" width={100} />
+                            <Tooltip formatter={(value: number) => [`${value}점`, "종합만족도"]} />
+                            <Bar dataKey="score" fill="#ef4444" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Inpatient/Outpatient Satisfaction */}
+                  {satisfactionData.inpatientOutpatient.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>입원/외래별 종합만족도</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={satisfactionData.inpatientOutpatient} layout="horizontal">
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis type="number" domain={[0, 100]} />
+                            <YAxis type="category" dataKey="name" />
+                            <Tooltip formatter={(value: number) => [`${value}점`, "종합만족도"]} />
+                            <Bar dataKey="score" fill="#8b5cf6" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Qualification Type Satisfaction */}
+                  {satisfactionData.qualificationType.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>자격유형별 종합만족도</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={satisfactionData.qualificationType} layout="horizontal">
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis type="number" domain={[0, 100]} />
+                            <YAxis type="category" dataKey="name" width={100} />
+                            <Tooltip formatter={(value: number) => [`${value}점`, "종합만족도"]} />
+                            <Bar dataKey="score" fill="#ec4899" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+                </TabsContent>
+              </Tabs>
             )}
           </TabsContent>
         </Tabs>
