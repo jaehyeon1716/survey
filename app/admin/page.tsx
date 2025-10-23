@@ -55,7 +55,7 @@ import {
   CartesianGrid,
 } from "recharts"
 
-const ADMIN_PASSWORD = "bohun#1234"
+const ADMIN_PASSWORD = "hospital2024"
 
 interface Survey {
   id: number
@@ -533,7 +533,7 @@ export default function AdminPage() {
           <div class="step">
             <div class="step-content">
               <ul>
-                <li><strong>관리자 비밀번호:</strong> <span class="highlight"></span></li>
+                <li><strong>관리자 비밀번호:</strong> <span class="highlight">hospital2024</span></li>
                 <li><strong>지원 브라우저:</strong> Chrome, Firefox, Safari, Edge 최신 버전</li>
                 <li><strong>권장 해상도:</strong> 1280x720 이상</li>
                 <li><strong>CSV 파일 인코딩:</strong> UTF-8</li>
@@ -1012,7 +1012,6 @@ export default function AdminPage() {
 
       if (questionsError) throw questionsError
 
-      // Check if all questions 1-9 exist and are objective
       const objectiveQuestions = questionsData?.filter((q) => q.question_type === "objective") || []
       if (objectiveQuestions.length < 9) {
         console.log("[v0] Not all questions 1-9 are objective, skipping satisfaction analysis")
@@ -1037,7 +1036,18 @@ export default function AdminPage() {
         .eq("is_completed", true)
 
       if (participantsError) throw participantsError
-      if (!participantsData || participantsData.length === 0) return
+      if (!participantsData || participantsData.length === 0) {
+        console.log("[v0] No completed participants found")
+        setSatisfactionData({
+          gender: [],
+          age: [],
+          jurisdiction: [],
+          category: [],
+          inpatientOutpatient: [],
+          qualificationType: [],
+        })
+        return
+      }
 
       const tokens = participantsData.map((p) => p.token)
       const { data: responsesData, error: responsesError } = await supabase
@@ -1053,35 +1063,60 @@ export default function AdminPage() {
         .in("participant_token", tokens)
 
       if (responsesError) throw responsesError
-      if (!responsesData) return
+      if (!responsesData) {
+        console.log("[v0] No responses found")
+        setSatisfactionData({
+          gender: [],
+          age: [],
+          jurisdiction: [],
+          category: [],
+          inpatientOutpatient: [],
+          qualificationType: [],
+        })
+        return
+      }
 
-      // Calculate satisfaction score for each participant
-      const participantScores = participantsData.map((participant) => {
-        const responses = responsesData.filter((r) => r.participant_token === participant.token)
+      const participantScores = participantsData
+        .map((participant) => {
+          const responses = responsesData.filter((r) => r.participant_token === participant.token)
 
-        // Get responses by question number
-        const q9 = responses.find((r) => r.survey_questions.question_number === 9)?.response_value
-        const q1to6 = responses
-          .filter((r) => r.survey_questions.question_number >= 1 && r.survey_questions.question_number <= 6)
-          .map((r) => r.response_value)
-        const q7to8 = responses
-          .filter((r) => r.survey_questions.question_number >= 7 && r.survey_questions.question_number <= 8)
-          .map((r) => r.response_value)
+          // Get responses by question number
+          const q9Response = responses.find((r) => r.survey_questions.question_number === 9)
+          const q1to6Responses = responses.filter(
+            (r) => r.survey_questions.question_number >= 1 && r.survey_questions.question_number <= 6,
+          )
+          const q7to8Responses = responses.filter(
+            (r) => r.survey_questions.question_number >= 7 && r.survey_questions.question_number <= 8,
+          )
 
-        // Convert to 100-point scale and calculate weighted satisfaction
-        const q9Score = q9 ? ((q9 - 1) / 4) * 100 : 0
-        const q1to6Avg = q1to6.length > 0 ? q1to6.reduce((sum, val) => sum + val, 0) / q1to6.length : 0
-        const q1to6Score = ((q1to6Avg - 1) / 4) * 100
-        const q7to8Avg = q7to8.length > 0 ? q7to8.reduce((sum, val) => sum + val, 0) / q7to8.length : 0
-        const q7to8Score = ((q7to8Avg - 1) / 4) * 100
+          // Check if we have all required responses
+          if (!q9Response || q1to6Responses.length === 0 || q7to8Responses.length === 0) {
+            return null
+          }
 
-        const satisfactionScore = q9Score * 0.5 + q1to6Score * 0.3 + q7to8Score * 0.2
+          // Convert each response to 100-point scale: (value - 1) / 4 * 100
+          const q9Score = ((q9Response.response_value - 1) / 4) * 100
 
-        return {
-          ...participant,
-          satisfactionScore,
-        }
-      })
+          const q1to6Values = q1to6Responses.map((r) => ((r.response_value - 1) / 4) * 100)
+          const q1to6Score = q1to6Values.reduce((sum, val) => sum + val, 0) / q1to6Values.length
+
+          const q7to8Values = q7to8Responses.map((r) => ((r.response_value - 1) / 4) * 100)
+          const q7to8Score = q7to8Values.reduce((sum, val) => sum + val, 0) / q7to8Values.length
+
+          // Calculate weighted satisfaction: Q9(50%) + Q1-6(30%) + Q7-8(20%)
+          const satisfactionScore = q9Score * 0.5 + q1to6Score * 0.3 + q7to8Score * 0.2
+
+          return {
+            ...participant,
+            satisfactionScore: Math.round(satisfactionScore * 10) / 10, // Round to 1 decimal place
+          }
+        })
+        .filter((p) => p !== null) as Array<(typeof participantsData)[0] & { satisfactionScore: number }>
+
+      console.log("[v0] Calculated satisfaction scores for", participantScores.length, "participants")
+      if (participantScores.length > 0) {
+        console.log("[v0] Sample score:", participantScores[0].satisfactionScore)
+      }
 
       // Calculate average satisfaction by demographic groups
       const calculateAvgByGroup = (field: keyof (typeof participantsData)[0]) => {
@@ -1100,7 +1135,7 @@ export default function AdminPage() {
 
         return Object.entries(groups).map(([name, data]) => ({
           name,
-          score: Math.round(data.total / data.count),
+          score: Math.round((data.total / data.count) * 10) / 10, // Round to 1 decimal place
         }))
       }
 
@@ -1135,21 +1170,32 @@ export default function AdminPage() {
         return Object.entries(ageGroups)
           .map(([name, data]) => ({
             name,
-            score: Math.round(data.total / data.count),
+            score: Math.round((data.total / data.count) * 10) / 10,
           }))
           .sort((a, b) => ageOrder.indexOf(a.name) - ageOrder.indexOf(b.name))
       }
 
-      setSatisfactionData({
+      const satisfactionResult = {
         gender: calculateAvgByGroup("gender"),
         age: calculateAgeGroups(),
         jurisdiction: calculateAvgByGroup("jurisdiction").sort((a, b) => b.score - a.score),
         category: calculateAvgByGroup("category"),
         inpatientOutpatient: calculateAvgByGroup("inpatient_outpatient"),
         qualificationType: calculateAvgByGroup("qualification_type"),
-      })
+      }
+
+      console.log("[v0] Satisfaction data calculated:", satisfactionResult)
+      setSatisfactionData(satisfactionResult)
     } catch (error) {
       console.error("[v0] 종합만족도 데이터 조회 오류:", error)
+      setSatisfactionData({
+        gender: [],
+        age: [],
+        jurisdiction: [],
+        category: [],
+        inpatientOutpatient: [],
+        qualificationType: [],
+      })
     }
   }
 
