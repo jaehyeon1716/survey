@@ -5,9 +5,10 @@ SELECT
     q.question_number AS "문항번호",
     q.question_text AS "문항내용",
     COUNT(r.id) AS "응답수",
-    ROUND(AVG(r.response_value), 2) AS "평균점수",
-    -- Added 100-point conversion
-    ROUND(AVG((r.response_value - 1) / 4.0 * 100), 2) AS "100점환산점수"
+    -- Updated column alias to include description
+    ROUND(AVG(r.response_value), 2) AS "평균점수(1~9항목평균)",
+    -- Updated column alias to include description
+    ROUND(AVG((r.response_value - 1) / 4.0 * 100), 2) AS "100점환산점수(평균점수의 100점환산값)"
 FROM 
     survey_questions q
     LEFT JOIN survey_responses r ON q.id = r.question_id
