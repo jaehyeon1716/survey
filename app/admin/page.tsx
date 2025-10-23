@@ -215,22 +215,6 @@ export default function AdminPage() {
     qualificationType: [],
   })
 
-  const [satisfactionData, setSatisfactionData] = useState<{
-    gender: Array<{ name: string; score: number }>
-    age: Array<{ name: string; score: number }>
-    jurisdiction: Array<{ name: string; score: number }>
-    category: Array<{ name: string; score: number }>
-    inpatientOutpatient: Array<{ name: string; score: number }>
-    qualificationType: Array<{ name: string; score: number }>
-  }>({
-    gender: [],
-    age: [],
-    jurisdiction: [],
-    category: [],
-    inpatientOutpatient: [],
-    qualificationType: [],
-  })
-
   const handleHospitalSearch = () => {
     setHospitalFilter(hospitalSearchInput)
     setParticipantsPage(1)
@@ -985,6 +969,7 @@ export default function AdminPage() {
         gender: calculateCompletedCounts("gender"),
         age: calculateAgeGroups(),
         jurisdiction: calculateCompletedCounts("jurisdiction").sort((a, b) => b.value - a.value),
+        institution: calculateCompletedCounts("institution_name"),
         category: calculateCompletedCounts("category"),
         inpatientOutpatient: calculateCompletedCounts("inpatient_outpatient"),
         qualificationType: calculateCompletedCounts("qualification_type"),
@@ -998,210 +983,9 @@ export default function AdminPage() {
     }
   }
 
-  const fetchSatisfactionData = async (surveyId: string) => {
-    try {
-      console.log("[v0] Fetching satisfaction data for survey:", surveyId)
-
-      const { data: questionsData, error: questionsError } = await supabase
-        .from("survey_questions")
-        .select("question_number, question_type")
-        .eq("survey_id", surveyId)
-        .gte("question_number", 1)
-        .lte("question_number", 9)
-        .order("question_number")
-
-      if (questionsError) throw questionsError
-
-      const objectiveQuestions = questionsData?.filter((q) => q.question_type === "objective") || []
-      if (objectiveQuestions.length < 9) {
-        console.log("[v0] Not all questions 1-9 are objective, skipping satisfaction analysis")
-        setSatisfactionData({
-          gender: [],
-          age: [],
-          jurisdiction: [],
-          category: [],
-          inpatientOutpatient: [],
-          qualificationType: [],
-        })
-        return
-      }
-
-      // Fetch participants with responses
-      const { data: participantsData, error: participantsError } = await supabase
-        .from("survey_participants")
-        .select(
-          "token, gender, age, jurisdiction, institution_name, category, inpatient_outpatient, qualification_type",
-        )
-        .eq("survey_id", surveyId)
-        .eq("is_completed", true)
-
-      if (participantsError) throw participantsError
-      if (!participantsData || participantsData.length === 0) {
-        console.log("[v0] No completed participants found")
-        setSatisfactionData({
-          gender: [],
-          age: [],
-          jurisdiction: [],
-          category: [],
-          inpatientOutpatient: [],
-          qualificationType: [],
-        })
-        return
-      }
-
-      const tokens = participantsData.map((p) => p.token)
-      const { data: responsesData, error: responsesError } = await supabase
-        .from("survey_responses")
-        .select(
-          `
-          participant_token,
-          response_value,
-          question_id,
-          survey_questions!inner(question_number)
-        `,
-        )
-        .in("participant_token", tokens)
-
-      if (responsesError) throw responsesError
-      if (!responsesData) {
-        console.log("[v0] No responses found")
-        setSatisfactionData({
-          gender: [],
-          age: [],
-          jurisdiction: [],
-          category: [],
-          inpatientOutpatient: [],
-          qualificationType: [],
-        })
-        return
-      }
-
-      const participantScores = participantsData
-        .map((participant) => {
-          const responses = responsesData.filter((r) => r.participant_token === participant.token)
-
-          // Get responses by question number
-          const q9Response = responses.find((r) => r.survey_questions.question_number === 9)
-          const q1to6Responses = responses.filter(
-            (r) => r.survey_questions.question_number >= 1 && r.survey_questions.question_number <= 6,
-          )
-          const q7to8Responses = responses.filter(
-            (r) => r.survey_questions.question_number >= 7 && r.survey_questions.question_number <= 8,
-          )
-
-          // Check if we have all required responses
-          if (!q9Response || q1to6Responses.length === 0 || q7to8Responses.length === 0) {
-            return null
-          }
-
-          // Convert each response to 100-point scale: (value - 1) / 4 * 100
-          const q9Score = ((q9Response.response_value - 1) / 4) * 100
-
-          const q1to6Values = q1to6Responses.map((r) => ((r.response_value - 1) / 4) * 100)
-          const q1to6Score = q1to6Values.reduce((sum, val) => sum + val, 0) / q1to6Values.length
-
-          const q7to8Values = q7to8Responses.map((r) => ((r.response_value - 1) / 4) * 100)
-          const q7to8Score = q7to8Values.reduce((sum, val) => sum + val, 0) / q7to8Values.length
-
-          // Calculate weighted satisfaction: Q9(50%) + Q1-6(30%) + Q7-8(20%)
-          const satisfactionScore = q9Score * 0.5 + q1to6Score * 0.3 + q7to8Score * 0.2
-
-          return {
-            ...participant,
-            satisfactionScore: Math.round(satisfactionScore * 10) / 10, // Round to 1 decimal place
-          }
-        })
-        .filter((p) => p !== null) as Array<(typeof participantsData)[0] & { satisfactionScore: number }>
-
-      console.log("[v0] Calculated satisfaction scores for", participantScores.length, "participants")
-      if (participantScores.length > 0) {
-        console.log("[v0] Sample score:", participantScores[0].satisfactionScore)
-      }
-
-      // Calculate average satisfaction by demographic groups
-      const calculateAvgByGroup = (field: keyof (typeof participantsData)[0]) => {
-        const groups = participantScores.reduce(
-          (acc, p) => {
-            const key = (p[field] as string) || "미입력"
-            if (!acc[key]) {
-              acc[key] = { total: 0, count: 0 }
-            }
-            acc[key].total += p.satisfactionScore
-            acc[key].count++
-            return acc
-          },
-          {} as Record<string, { total: number; count: number }>,
-        )
-
-        return Object.entries(groups).map(([name, data]) => ({
-          name,
-          score: Math.round((data.total / data.count) * 10) / 10, // Round to 1 decimal place
-        }))
-      }
-
-      const calculateAgeGroups = () => {
-        const ageGroups = participantScores.reduce(
-          (acc, p) => {
-            const age = Number.parseInt(p.age as string)
-            let group = "미입력"
-            if (!isNaN(age)) {
-              if (age < 20) group = "10대"
-              else if (age < 30) group = "20대"
-              else if (age < 40) group = "30대"
-              else if (age < 50) group = "40대"
-              else if (age < 60) group = "50대"
-              else if (age < 70) group = "60대"
-              else if (age < 80) group = "70대"
-              else if (age < 90) group = "80대"
-              else group = "90대 이상"
-            }
-
-            if (!acc[group]) {
-              acc[group] = { total: 0, count: 0 }
-            }
-            acc[group].total += p.satisfactionScore
-            acc[group].count++
-            return acc
-          },
-          {} as Record<string, { total: number; count: number }>,
-        )
-
-        const ageOrder = ["10대", "20대", "30대", "40대", "50대", "60대", "70대", "80대", "90대 이상", "미입력"]
-        return Object.entries(ageGroups)
-          .map(([name, data]) => ({
-            name,
-            score: Math.round((data.total / data.count) * 10) / 10,
-          }))
-          .sort((a, b) => ageOrder.indexOf(a.name) - ageOrder.indexOf(b.name))
-      }
-
-      const satisfactionResult = {
-        gender: calculateAvgByGroup("gender"),
-        age: calculateAgeGroups(),
-        jurisdiction: calculateAvgByGroup("jurisdiction").sort((a, b) => b.score - a.score),
-        category: calculateAvgByGroup("category"),
-        inpatientOutpatient: calculateAvgByGroup("inpatient_outpatient"),
-        qualificationType: calculateAvgByGroup("qualification_type"),
-      }
-
-      console.log("[v0] Satisfaction data calculated:", satisfactionResult)
-      setSatisfactionData(satisfactionResult)
-    } catch (error) {
-      console.error("[v0] 종합만족도 데이터 조회 오류:", error)
-      setSatisfactionData({
-        gender: [],
-        age: [],
-        jurisdiction: [],
-        category: [],
-        inpatientOutpatient: [],
-        qualificationType: [],
-      })
-    }
-  }
-
   // Add downloadAnalysisExcel function here
   const downloadAnalysisExcel = async () => {
-    if (!selectedSurvey || responses.length === 0) {
+    if (!selectedSurvey || !analysisData) {
       alert("다운로드할 분석 데이터가 없습니다.")
       return
     }
@@ -1308,7 +1092,7 @@ export default function AdminPage() {
   }
 
   const addQuestion = () => {
-    setQuestions([...questions, { text: "", type: "objective", responseScaleType: "agreement" }])
+    setQuestions([...questions, { text: "", type: "objective", responseScaleType: "agreement" }]) // use responseScaleType
   }
 
   const removeQuestion = (index: number) => {
@@ -1323,6 +1107,409 @@ export default function AdminPage() {
     const updated = [...questions]
     updated[index][field] = value
     setQuestions(updated)
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && file.type === "text/csv") {
+      setFile(file)
+      setParticipantError("")
+      setParticipantSuccess("")
+    } else {
+      setParticipantError("CSV 파일만 업로드 가능합니다.")
+      setFile(null)
+      setParticipantSuccess("")
+    }
+  }
+
+  const handleUpload = async () => {
+    if (!file) {
+      setParticipantError("파일을 선택해주세요.")
+      return
+    }
+
+    if (!selectedSurvey) {
+      setParticipantError("설문지를 선택해주세요.")
+      return
+    }
+
+    setIsUploading(true)
+    setParticipantError("")
+    setParticipantSuccess("")
+    setUploadProgress(0)
+    setDuplicates([])
+
+    try {
+      // Read and parse CSV on client side
+      const csvText = await file.text()
+      const lines = csvText.trim().split("\n")
+
+      if (lines.length === 0) {
+        setParticipantError("CSV 파일이 비어있습니다.")
+        setIsUploading(false)
+        return
+      }
+
+      const participants: Array<{
+        jurisdiction: string
+        institution_code: string
+        institution_name: string
+        category: string
+        name: string
+        age: number
+        gender: string
+        mobile_phone: string
+        inpatient_outpatient: string
+        qualification_type: string
+        // Keep old fields for backward compatibility
+        hospital_name: string
+        participant_name: string
+        phone_number: string
+        // Replaced 'type' field with 'category'
+        category: string
+      }> = []
+      const uniqueParticipants = new Set()
+      const duplicateEntries: Array<{
+        institution: string
+        name: string
+        phone: string
+      }> = []
+
+      for (const line of lines) {
+        const [
+          jurisdiction,
+          institutionCode,
+          institutionName,
+          category,
+          name,
+          age,
+          gender,
+          mobilePhone,
+          inpatientOutpatient,
+          qualificationType,
+        ] = line.split("|").map((item) => item.trim())
+
+        if (
+          !jurisdiction ||
+          !institutionCode ||
+          !institutionName ||
+          !category ||
+          !name ||
+          !age ||
+          !gender ||
+          !mobilePhone ||
+          !inpatientOutpatient ||
+          !qualificationType
+        ) {
+          continue
+        }
+
+        const participantKey = `${institutionName}|${name}|${mobilePhone}`
+        if (uniqueParticipants.has(participantKey)) {
+          duplicateEntries.push({
+            institution: institutionName,
+            name: name,
+            phone: mobilePhone,
+          })
+          continue
+        }
+        uniqueParticipants.add(participantKey)
+
+        participants.push({
+          jurisdiction,
+          institution_code: institutionCode,
+          institution_name: institutionName,
+          category,
+          name,
+          age: Number.parseInt(age) || 0,
+          gender,
+          mobile_phone: mobilePhone,
+          inpatient_outpatient: inpatientOutpatient,
+          qualification_type: qualificationType,
+          // Keep old fields for backward compatibility
+          hospital_name: institutionName,
+          participant_name: name,
+          phone_number: mobilePhone,
+          // Mapped 'category' from CSV to 'category' field in participant object
+          category: category,
+        })
+      }
+
+      if (participants.length === 0) {
+        setParticipantError("유효한 참여자 데이터가 없습니다.")
+        setIsUploading(false)
+        return
+      }
+
+      // Split into chunks of 500 participants
+      const CHUNK_SIZE = 500
+      const chunks: (typeof participants)[] = []
+      for (let i = 0; i < participants.length; i += CHUNK_SIZE) {
+        chunks.push(participants.slice(i, i + CHUNK_SIZE))
+      }
+
+      console.log(`[v0] 총 ${participants.length}명을 ${chunks.length}개 청크로 나누어 업로드 시작`)
+
+      // Upload each chunk
+      let totalUploaded = 0
+      for (let i = 0; i < chunks.length; i++) {
+        const progress = Math.round(((i + 1) / chunks.length) * 100)
+        setUploadProgress(progress)
+
+        const response = await fetch(`/api/admin/surveys/${selectedSurvey.id}/participants`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            participants: chunks[i],
+            isFirstBatch: i === 0,
+          }),
+        })
+
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.error || `청크 ${i + 1}/${chunks.length} 업로드 실패`)
+        }
+
+        totalUploaded += chunks[i].length
+        console.log(`[v0] 청크 ${i + 1}/${chunks.length} 완료: ${totalUploaded}/${participants.length}명 등록됨`)
+      }
+
+      let successMessage = `${totalUploaded}명의 참여자가 성공적으로 등록되었습니다.`
+      if (duplicateEntries.length > 0) {
+        successMessage += ` (중복 ${duplicateEntries.length}건 제외)`
+        setDuplicates(duplicateEntries)
+      }
+
+      setParticipantSuccess(successMessage)
+      setFile(null)
+      const fileInput = document.getElementById("csvFile") as HTMLInputElement
+      if (fileInput) fileInput.value = ""
+      fetchParticipants(selectedSurvey.id)
+    } catch (err) {
+      setParticipantError(err instanceof Error ? err.message : "업로드 중 오류가 발생했습니다.")
+      console.error("[v0] Upload error:", err)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const copyToClipboard = async (token: string) => {
+    const surveyUrl = `${window.location.origin}/${token}`
+    try {
+      await navigator.clipboard.writeText(surveyUrl)
+      alert("설문 링크가 클립보드에 복사되었습니다!")
+    } catch (err) {
+      alert("링크 복사에 실패했습니다.")
+    }
+  }
+
+  const downloadCSV = () => {
+    if (responses.length === 0) {
+      alert("다운로드할 데이터가 없습니다.")
+      return
+    }
+
+    const headers = ["병원명", "참여자명", "휴대폰번호", "총점", "최대점수", "완료일시"]
+
+    const csvData = responses.map((response) => [
+      response.survey_participants?.hospital_name || "",
+      response.survey_participants?.participant_name || "",
+      response.survey_participants?.phone_number || "",
+      response.total_score || "",
+      response.max_possible_score || "",
+      new Date(response.created_at).toLocaleString("ko-KR"),
+    ])
+
+    const csvContent = [headers, ...csvData].map((row) => row.map((field) => `"${field}"`).join(",")).join("\n")
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `설문조사_결과_${new Date().toISOString().split("T")[0]}.csv`)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const openDetailModal = async (response: SurveyResponse) => {
+    setSelectedResponse(response)
+    setShowDetailModal(true)
+    setLoadingDetails(true)
+
+    try {
+      if (!supabase) return
+
+      // Fetch detailed responses with question information
+      const { data, error } = await supabase
+        .from("survey_responses")
+        .select(`
+          response_value,
+          response_text,
+          survey_questions (
+            question_number,
+            question_text,
+            question_type
+          )
+        `)
+        .eq("participant_token", response.participant_token)
+        .order("survey_questions(question_number)", { ascending: true })
+
+      if (error) {
+        console.error("[v0] Error fetching detailed responses:", error)
+        return
+      }
+
+      // Transform the data
+      const details: DetailedQuestionResponse[] = (data || []).map((item: any) => ({
+        question_number: item.survey_questions?.question_number || 0,
+        question_text: item.survey_questions?.question_text || "",
+        question_type: item.survey_questions?.question_type || "objective",
+        response_value: item.response_value,
+        response_text: item.response_text,
+      }))
+
+      // Sort by question number
+      details.sort((a, b) => a.question_number - b.question_number)
+
+      setDetailedResponses(details)
+    } catch (err) {
+      console.error("[v0] Error loading detailed responses:", err)
+    } finally {
+      setLoadingDetails(false)
+    }
+  }
+
+  const handleEditSurvey = (survey: Survey) => {
+    setEditingSurvey(survey)
+    setEditTitle(survey.title)
+    setEditDescription(survey.description || "")
+    setEditQuestions(
+      survey.survey_questions?.map((q) => ({
+        text: q.question_text,
+        type: q.question_type || "objective",
+        scaleType: q.response_scale_type || "agreement", // scaleType 설정
+      })) || [{ text: "", type: "objective", scaleType: "agreement" }], // scaleType 초기화
+    )
+    setShowEditModal(true)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editTitle.trim()) {
+      setSurveyError("설문지 제목을 입력해주세요.")
+      return
+    }
+
+    const validQuestions = editQuestions.filter((q) => q.text.trim() !== "")
+    if (validQuestions.length === 0) {
+      setSurveyError("최소 1개의 문항을 입력해주세요.")
+      return
+    }
+
+    setEditLoading(true)
+    setSurveyError("")
+    setSurveySuccess("")
+
+    try {
+      const response = await fetch(`/api/admin/surveys/${editingSurvey?.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          description: editDescription.trim(),
+          // Pass questions with text, type, and responseScaleType
+          questions: validQuestions.map((q) => ({ text: q.text, type: q.type, responseScaleType: q.scaleType })), // responseScaleType 추가
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setSurveyError(data.error || "설문지 수정 중 오류가 발생했습니다.")
+        return
+      }
+
+      setSurveySuccess("설문지가 성공적으로 수정되었습니다.")
+      setShowEditModal(false)
+      setEditingSurvey(null)
+      fetchSurveys()
+      if (selectedSurvey?.id === editingSurvey?.id) {
+        // If the edited survey was the selected one, clear selection to refetch data
+        setSelectedSurvey(null)
+      }
+    } catch (err) {
+      setSurveyError("설문지 수정 중 오류가 발생했습니다.")
+    } finally {
+      setEditLoading(false)
+    }
+  }
+
+  const handleDeleteConfirm = (survey: Survey) => {
+    setSurveyToDelete(survey)
+    setShowDeleteConfirm(true)
+  }
+
+  const deleteSurvey = async (surveyId: number) => {
+    if (!surveyToDelete) return
+
+    if (deletePassword !== ADMIN_PASSWORD) {
+      setSurveyError("비밀번호가 올바르지 않습니다.")
+      return
+    }
+
+    setDeleteLoading(true)
+    setSurveyError("")
+    setSurveySuccess("")
+
+    try {
+      const response = await fetch(`/api/admin/surveys/${surveyId}`, {
+        method: "DELETE",
+        signal: AbortSignal.timeout(900000), // 15 minutes for large datasets
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setSurveyError(data.error || "설문지 삭제 중 오류가 발생했습니다.")
+      } else {
+        setSurveySuccess(data.message || "설문지가 성공적으로 삭제되었습니다.")
+        setShowDeleteConfirm(false)
+        setSurveyToDelete(null)
+        setDeletePassword("")
+        fetchSurveys()
+        if (selectedSurvey?.id === surveyId) {
+          setSelectedSurvey(null)
+        }
+      }
+    } catch (err) {
+      console.error("[v0] 설문지 삭제 오류:", err)
+      setSurveyError("설문지 삭제 중 오류가 발생했습니다. 대용량 데이터의 경우 시간이 오래 걸릴 수 있습니다.")
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const addEditQuestion = () => {
+    setEditQuestions([...editQuestions, { text: "", type: "objective", scaleType: "agreement" }]) // scaleType 추가
+  }
+
+  const removeEditQuestion = (index: number) => {
+    if (editQuestions.length > 1) {
+      setEditQuestions(editQuestions.filter((_, i) => i !== index))
+    }
+  }
+
+  const updateEditQuestion = (index: number, field: "text" | "type" | "scaleType", value: string) => {
+    // scaleType 필드 추가
+    const updated = [...editQuestions]
+    updated[index][field] = value
+    setEditQuestions(updated)
   }
 
   // const filterParticipants = useCallback(() => { ... }, [...])
@@ -1618,7 +1805,6 @@ export default function AdminPage() {
         fetchResponses(selectedSurvey.id, hospitalFilter),
         fetchQuestionStats(selectedSurvey.id),
         fetchAnalysisData(selectedSurvey.id),
-        fetchSatisfactionData(selectedSurvey.id),
       ])
     } catch (err) {
       // Consider adding a general error state for refresh if needed
@@ -1640,7 +1826,6 @@ export default function AdminPage() {
       fetchParticipants(selectedSurvey.id, participantsPage, participantsPerPage)
       fetchResponses(selectedSurvey.id, hospitalFilter)
       fetchAnalysisData(selectedSurvey.id)
-      fetchSatisfactionData(selectedSurvey.id)
     }
   }, [selectedSurvey, participantsPage, participantsPerPage, hospitalFilter, statusFilter])
 
@@ -1725,294 +1910,6 @@ export default function AdminPage() {
 
   const paginatedResponses = responses.slice((responsesPage - 1) * responsesPerPage, responsesPage * responsesPerPage)
   const totalResponsesPages = Math.ceil(responses.length / responsesPerPage)
-
-  // Function definitions for the updates
-
-  const handleEditSurvey = (survey: Survey) => {
-    setEditingSurvey(survey)
-    setEditTitle(survey.title)
-    setEditDescription(survey.description || "")
-    setEditQuestions(
-      survey.survey_questions?.map((q) => ({
-        text: q.question_text,
-        type: q.question_type,
-        scaleType: q.response_scale_type || "agreement", // Ensure scaleType is initialized
-      })) || [{ text: "", type: "objective", scaleType: "agreement" }],
-    )
-    setShowEditModal(true)
-  }
-
-  const addEditQuestion = () => {
-    setEditQuestions([...editQuestions, { text: "", type: "objective", scaleType: "agreement" }])
-  }
-
-  const removeEditQuestion = (index: number) => {
-    if (editQuestions.length > 1) {
-      setEditQuestions(editQuestions.filter((_, i) => i !== index))
-    }
-  }
-
-  const updateEditQuestion = (index: number, field: "text" | "type" | "scaleType", value: string) => {
-    const updated = [...editQuestions]
-    updated[index][field] = value
-    setEditQuestions(updated)
-  }
-
-  const handleSaveEdit = async () => {
-    if (!editingSurvey) return
-
-    if (!editTitle.trim()) {
-      setSurveyError("설문지 제목을 입력해주세요.")
-      return
-    }
-
-    const validQuestions = editQuestions.filter((q) => q.text.trim() !== "")
-    if (validQuestions.length === 0) {
-      setSurveyError("최소 1개의 문항을 입력해주세요.")
-      return
-    }
-
-    setEditLoading(true)
-    setSurveyError("")
-
-    try {
-      const response = await fetch(`/api/admin/surveys/${editingSurvey.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: editTitle.trim(),
-          description: editDescription.trim(),
-          questions: validQuestions.map((q) => ({
-            text: q.text,
-            type: q.type,
-            responseScaleType: q.scaleType,
-          })),
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setSurveyError(data.error || "설문지 수정 중 오류가 발생했습니다.")
-        return
-      }
-
-      setShowEditModal(false)
-      setSurveySuccess("설문지가 성공적으로 수정되었습니다.")
-      fetchSurveys()
-    } catch (err) {
-      setSurveyError("설문지 수정 중 오류가 발생했습니다.")
-    } finally {
-      setEditLoading(false)
-    }
-  }
-
-  const handleDeleteConfirm = (survey: Survey) => {
-    setSurveyToDelete(survey)
-    setShowDeleteConfirm(true)
-    setDeletePassword("")
-  }
-
-  const deleteSurvey = async (id: number) => {
-    if (!surveyToDelete || deletePassword !== ADMIN_PASSWORD) {
-      alert("비밀번호가 올바르지 않습니다.")
-      return
-    }
-
-    setDeleteLoading(true)
-    setSurveyError("")
-
-    try {
-      const response = await fetch(`/api/admin/surveys/${id}`, {
-        method: "DELETE",
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setSurveyError(data.error || "설문지 삭제 중 오류가 발생했습니다.")
-        return
-      }
-
-      setShowDeleteConfirm(false)
-      setSurveySuccess("설문지가 성공적으로 삭제되었습니다.")
-      fetchSurveys()
-      if (selectedSurvey?.id === id) {
-        setSelectedSurvey(null)
-        setParticipants([])
-        setResponses([])
-        setQuestionStats([])
-        setAnalysisData({
-          gender: [],
-          age: [],
-          jurisdiction: [],
-          institution: [],
-          category: [],
-          inpatientOutpatient: [],
-          qualificationType: [],
-        })
-        setSatisfactionData({
-          gender: [],
-          age: [],
-          jurisdiction: [],
-          category: [],
-          inpatientOutpatient: [],
-          qualificationType: [],
-        })
-      }
-    } catch (err) {
-      setSurveyError("설문지 삭제 중 오류가 발생했습니다.")
-    } finally {
-      setDeleteLoading(false)
-      setDeletePassword("")
-      setSurveyToDelete(null)
-    }
-  }
-
-  const openDetailModal = async (response: SurveyResponse) => {
-    setSelectedResponse(response)
-    setShowDetailModal(true)
-    setLoadingDetails(true)
-    setDetailedResponses([])
-
-    try {
-      const { data, error } = await supabase
-        .from("survey_responses")
-        .select(
-          `
-          *,
-          survey_questions (question_number, question_text, question_type, response_scale_type)
-        `,
-        )
-        .eq("participant_token", response.participant_token)
-        .order("question_number", { ascending: true })
-
-      if (error) throw error
-
-      if (data) {
-        const formattedDetails = data.map((item: any) => ({
-          question_number: item.survey_questions.question_number,
-          question_text: item.survey_questions.question_text,
-          question_type: item.survey_questions.question_type,
-          response_value: item.response_value,
-          response_text: item.response_text,
-        }))
-        setDetailedResponses(formattedDetails)
-      }
-    } catch (err) {
-      console.error("Error fetching detailed responses:", err)
-      alert("상세 응답 조회 중 오류가 발생했습니다.")
-    } finally {
-      setLoadingDetails(false)
-    }
-  }
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0])
-    }
-  }
-
-  const handleUpload = async () => {
-    if (!file || !selectedSurvey) return
-
-    setIsUploading(true)
-    setUploadProgress(0)
-    setParticipantError("")
-    setParticipantSuccess("")
-    setDuplicates([]) // Clear previous duplicates
-
-    try {
-      const formData = new FormData()
-      formData.append("csvFile", file)
-      formData.append("surveyId", selectedSurvey.id.toString())
-
-      const response = await fetch("/api/admin/uploadParticipants", {
-        method: "POST",
-        body: formData,
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        setParticipantError(result.error || "파일 업로드 중 오류가 발생했습니다.")
-      } else {
-        setParticipantSuccess("참여자가 성공적으로 업로드되었습니다.")
-        if (result.duplicates && result.duplicates.length > 0) {
-          setDuplicates(result.duplicates) // Set duplicates from API response
-        }
-        fetchParticipants(selectedSurvey.id) // Refresh participant list
-      }
-    } catch (err) {
-      setParticipantError("파일 업로드 중 오류가 발생했습니다.")
-      console.error("Upload error:", err)
-    } finally {
-      setIsUploading(false)
-      setUploadProgress(0) // Reset progress
-      setFile(null) // Clear the selected file
-      // The following line was causing an error when e is not available in this scope.
-      // if (e.target) (e.target as HTMLInputElement).value = "" // Reset input value
-    }
-  }
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      alert("링크가 클립보드에 복사되었습니다.")
-    } catch (err) {
-      console.error("Failed to copy text: ", err)
-      alert("클립보드 복사에 실패했습니다.")
-    }
-  }
-
-  const downloadCSV = async () => {
-    if (!selectedSurvey || responses.length === 0) {
-      alert("다운로드할 응답 데이터가 없습니다.")
-      return
-    }
-
-    try {
-      const excelData = responses.map((response) => ({
-        병원명: response.survey_participants?.hospital_name || "",
-        참여자명: response.survey_participants?.participant_name || "",
-        휴대폰번호: response.survey_participants?.phone_number || "",
-        총점: response.total_score || 0,
-        최대점수: response.max_possible_score || 0,
-        완료일시: new Date(response.created_at).toLocaleString("ko-KR"),
-      }))
-
-      const headers = Object.keys(excelData[0])
-      const csvContent = excelData
-        .map((row) =>
-          headers
-            .map((header) => {
-              const value = row[header as keyof typeof row]
-              return typeof value === "string" && (value.includes(",") || value.includes('"'))
-                ? `"${value.replace(/"/g, '""')}"`
-                : value
-            })
-            .join(","),
-        )
-        .join("\n")
-
-      const BOM = "\uFEFF"
-      const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" })
-
-      const link = document.createElement("a")
-      const url = URL.createObjectURL(blob)
-      link.setAttribute("href", url)
-      link.setAttribute("download", `${selectedSurvey.title}_설문결과_${new Date().toISOString().split("T")[0]}.csv`)
-      link.style.visibility = "hidden"
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    } catch (err) {
-      console.error("CSV download error:", err)
-      alert("CSV 다운로드 중 오류가 발생했습니다.")
-    }
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -2369,13 +2266,18 @@ export default function AdminPage() {
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {duplicates.map((dup, index) => (
-                                      <tr key={index} className="border-t border-yellow-200">
-                                        <td className="px-2 py-1">{dup.institution}</td>
-                                        <td className="px-2 py-1">{dup.name}</td>
-                                        <td className="px-2 py-1">{dup.phone}</td>
-                                      </tr>
-                                    ))}
+                                    {duplicates.map(
+                                      (
+                                        dup,
+                                        index, // Use duplicates map
+                                      ) => (
+                                        <tr key={index} className="border-t border-yellow-200">
+                                          <td className="px-2 py-1">{dup.institution}</td>
+                                          <td className="px-2 py-1">{dup.name}</td>
+                                          <td className="px-2 py-1">{dup.phone}</td>
+                                        </tr>
+                                      ),
+                                    )}
                                   </tbody>
                                 </table>
                               </div>
@@ -2877,111 +2779,82 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
             ) : (
-              <Tabs defaultValue="respondent" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="respondent">응답자 분석</TabsTrigger>
-                  <TabsTrigger value="satisfaction">종합만족도 분석</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="respondent" className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-2xl">응답자 분석</CardTitle>
-                          <CardDescription>참여자 특성별 응답률을 확인하세요</CardDescription>
-                        </div>
-                        <Button onClick={downloadAnalysisExcel} variant="outline">
-                          <Download className="mr-2 h-4 w-4" />
-                          분석 엑셀 다운로드
-                        </Button>
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-2xl">응답자 분석</CardTitle>
+                        <CardDescription>참여자 특성별 응답률을 확인하세요</CardDescription>
                       </div>
-                    </CardHeader>
-                  </Card>
+                      <Button onClick={downloadAnalysisExcel} variant="outline">
+                        <Download className="mr-2 h-4 w-4" />
+                        분석 엑셀 다운로드
+                      </Button>
+                    </div>
+                  </CardHeader>
+                </Card>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Gender Analysis */}
-                    {analysisData.gender.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>성별 응답률</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                              <Pie
-                                data={analysisData.gender}
-                                dataKey="value"
-                                nameKey="name"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={80}
-                                label={({ name, percentage }) => `${name}: ${percentage}%`}
-                              >
-                                {analysisData.gender.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={["#3b82f6", "#ec4899", "#8b5cf6"][index % 3]} />
-                                ))}
-                              </Pie>
-                              <Tooltip
-                                formatter={(value: number, name: string, props: any) => [
-                                  `${value}명 (${props.payload.percentage}%)`,
-                                  name,
-                                ]}
-                              />
-                              <Legend />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
-                    )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Gender Analysis */}
+                  {analysisData.gender.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>성별 응답률</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={analysisData.gender}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              label={({ name, percentage }) => `${name}: ${percentage}%`}
+                            >
+                              {analysisData.gender.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={["#3b82f6", "#ec4899", "#8b5cf6"][index % 3]} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              formatter={(value: number, name: string, props: any) => [
+                                `${value}명 (${props.payload.percentage}%)`,
+                                name,
+                              ]}
+                            />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
 
-                    {/* Age Analysis */}
-                    {analysisData.age.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>나이대별 응답 분포</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={analysisData.age}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="name" />
-                              <YAxis />
-                              <Tooltip
-                                formatter={(value: number, name: string, props: any) => [
-                                  `${value}명 (${props.payload.percentage}%)`,
-                                  props.payload.name,
-                                ]}
-                              />
-                              <Bar dataKey="value">
-                                {analysisData.age.map((entry, index) => (
-                                  <Cell
-                                    key={`cell-${index}`}
-                                    fill={
-                                      [
-                                        "#3b82f6",
-                                        "#10b981",
-                                        "#f59e0b",
-                                        "#ef4444",
-                                        "#8b5cf6",
-                                        "#ec4899",
-                                        "#06b6d4",
-                                        "#84cc16",
-                                        "#f97316",
-                                      ][index % 9]
-                                    }
-                                  />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                          <div className="mt-4 flex flex-wrap gap-4 justify-center">
-                            {analysisData.age.map((entry, index) => (
-                              <div key={entry.name} className="flex items-center gap-2">
-                                <div
-                                  className="w-3 h-3 rounded-full"
-                                  style={{
-                                    backgroundColor: [
+                  {/* Age Analysis */}
+                  {analysisData.age.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>나이대별 응답 분포</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={analysisData.age}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip
+                              formatter={(value: number, name: string, props: any) => [
+                                `${value}명 (${props.payload.percentage}%)`,
+                                props.payload.name,
+                              ]}
+                            />
+                            <Bar dataKey="value">
+                              {analysisData.age.map((entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={
+                                    [
                                       "#3b82f6",
                                       "#10b981",
                                       "#f59e0b",
@@ -2991,63 +2864,64 @@ export default function AdminPage() {
                                       "#06b6d4",
                                       "#84cc16",
                                       "#f97316",
-                                    ][index % 9],
-                                  }}
+                                    ][index % 9]
+                                  }
                                 />
-                                <span className="text-sm">{entry.name}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Jurisdiction Analysis */}
-                    {analysisData.jurisdiction.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>관할별 응답률</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={analysisData.jurisdiction}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="name" />
-                              <YAxis />
-                              <Tooltip
-                                formatter={(value: number, name: string, props: any) => [
-                                  `${value}명 (${props.payload.percentage}%)`,
-                                  props.payload.name,
-                                ]}
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                        <div className="mt-4 flex flex-wrap gap-4 justify-center">
+                          {analysisData.age.map((entry, index) => (
+                            <div key={entry.name} className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{
+                                  backgroundColor: [
+                                    "#3b82f6",
+                                    "#10b981",
+                                    "#f59e0b",
+                                    "#ef4444",
+                                    "#8b5cf6",
+                                    "#ec4899",
+                                    "#06b6d4",
+                                    "#84cc16",
+                                    "#f97316",
+                                  ][index % 9],
+                                }}
                               />
-                              <Bar dataKey="value">
-                                {analysisData.jurisdiction.map((entry, index) => (
-                                  <Cell
-                                    key={`cell-${index}`}
-                                    fill={
-                                      [
-                                        "#3b82f6",
-                                        "#10b981",
-                                        "#f59e0b",
-                                        "#ef4444",
-                                        "#8b5cf6",
-                                        "#ec4899",
-                                        "#06b6d4",
-                                        "#84cc16",
-                                      ][index % 8]
-                                    }
-                                  />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                          <div className="mt-4 flex flex-wrap gap-4 justify-center">
-                            {analysisData.jurisdiction.map((entry, index) => (
-                              <div key={entry.name} className="flex items-center gap-2">
-                                <div
-                                  className="w-3 h-3 rounded-full"
-                                  style={{
-                                    backgroundColor: [
+                              <span className="text-sm">{entry.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Jurisdiction Analysis */}
+                  {analysisData.jurisdiction.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>관할별 응답률</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={analysisData.jurisdiction}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip
+                              formatter={(value: number, name: string, props: any) => [
+                                `${value}명 (${props.payload.percentage}%)`,
+                                props.payload.name,
+                              ]}
+                            />
+                            <Bar dataKey="value">
+                              {analysisData.jurisdiction.map((entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={
+                                    [
                                       "#3b82f6",
                                       "#10b981",
                                       "#f59e0b",
@@ -3056,263 +2930,151 @@ export default function AdminPage() {
                                       "#ec4899",
                                       "#06b6d4",
                                       "#84cc16",
-                                    ][index % 8],
-                                  }}
+                                    ][index % 8]
+                                  }
                                 />
-                                <span className="text-sm">{entry.name}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Type Analysis */}
-                    {analysisData.category.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>종별 응답률</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                              <Pie
-                                data={analysisData.category}
-                                dataKey="value"
-                                nameKey="name"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={80}
-                                label={({ name, percentage }) => `${name}: ${percentage}%`}
-                              >
-                                {analysisData.category.map((entry, index) => (
-                                  <Cell
-                                    key={`cell-${index}`}
-                                    fill={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"][index % 5]}
-                                  />
-                                ))}
-                              </Pie>
-                              <Tooltip
-                                formatter={(value: number, name: string, props: any) => [
-                                  `${value}명 (${props.payload.percentage}%)`,
-                                  name,
-                                ]}
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                        <div className="mt-4 flex flex-wrap gap-4 justify-center">
+                          {analysisData.jurisdiction.map((entry, index) => (
+                            <div key={entry.name} className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{
+                                  backgroundColor: [
+                                    "#3b82f6",
+                                    "#10b981",
+                                    "#f59e0b",
+                                    "#ef4444",
+                                    "#8b5cf6",
+                                    "#ec4899",
+                                    "#06b6d4",
+                                    "#84cc16",
+                                  ][index % 8],
+                                }}
                               />
-                              <Legend />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
-                    )}
+                              <span className="text-sm">{entry.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
-                    {/* Inpatient/Outpatient Analysis */}
-                    {analysisData.inpatientOutpatient.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>입원/외래별 응답률</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                              <Pie
-                                data={analysisData.inpatientOutpatient}
-                                dataKey="value"
-                                nameKey="name"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={80}
-                                label={({ name, percentage }) => `${name}: ${percentage}%`}
-                              >
-                                {analysisData.inpatientOutpatient.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={["#3b82f6", "#10b981"][index % 2]} />
-                                ))}
-                              </Pie>
-                              <Tooltip
-                                formatter={(value: number, name: string, props: any) => [
-                                  `${value}명 (${props.payload.percentage}%)`,
-                                  name,
-                                ]}
-                              />
-                              <Legend />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
-                    )}
+                  {/* Type Analysis */}
+                  {analysisData.category.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>종별 응답률</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={analysisData.category}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              label={({ name, percentage }) => `${name}: ${percentage}%`}
+                            >
+                              {analysisData.category.map((entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"][index % 5]}
+                                />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              formatter={(value: number, name: string, props: any) => [
+                                `${value}명 (${props.payload.percentage}%)`,
+                                name,
+                              ]}
+                            />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
 
-                    {/* Qualification Type Analysis */}
-                    {analysisData.qualificationType.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>자격유형별 응답률</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                              <Pie
-                                data={analysisData.qualificationType}
-                                dataKey="value"
-                                nameKey="name"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={80}
-                                label={({ name, percentage }) => `${name}: ${percentage}%`}
-                              >
-                                {analysisData.qualificationType.map((entry, index) => (
-                                  <Cell
-                                    key={`cell-${index}`}
-                                    fill={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"][index % 6]}
-                                  />
-                                ))}
-                              </Pie>
-                              <Tooltip
-                                formatter={(value: number, name: string, props: any) => [
-                                  `${value}명 (${props.payload.percentage}%)`,
-                                  name,
-                                ]}
-                              />
-                              <Legend />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                </TabsContent>
+                  {/* Inpatient/Outpatient Analysis */}
+                  {analysisData.inpatientOutpatient.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>입원/외래별 응답률</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={analysisData.inpatientOutpatient}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              label={({ name, percentage }) => `${name}: ${percentage}%`}
+                            >
+                              {analysisData.inpatientOutpatient.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={["#3b82f6", "#10b981"][index % 2]} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              formatter={(value: number, name: string, props: any) => [
+                                `${value}명 (${props.payload.percentage}%)`,
+                                name,
+                              ]}
+                            />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
 
-                <TabsContent value="satisfaction" className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-2xl">종합만족도 분석</CardTitle>
-                      <CardDescription>
-                        참여자 특성별 종합만족도 점수를 비교하세요 (9번 50% + 1-6번 평균 30% + 7-8번 평균 20%)
-                      </CardDescription>
-                    </CardHeader>
-                  </Card>
-
-                  <div className="grid grid-cols-2 gap-6">
-                    {/* Gender Satisfaction */}
-                    {satisfactionData.gender.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>성별 종합만족도</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={satisfactionData.gender}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="name" />
-                              <YAxis domain={[0, 100]} />
-                              <Tooltip formatter={(value: number) => [`${value.toFixed(1)}점`, "종합만족도"]} />
-                              <Bar dataKey="score" fill="#3b82f6" />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Age Satisfaction */}
-                    {satisfactionData.age.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>나이대별 종합만족도</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={satisfactionData.age}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="name" />
-                              <YAxis domain={[0, 100]} />
-                              <Tooltip formatter={(value: number) => [`${value.toFixed(1)}점`, "종합만족도"]} />
-                              <Bar dataKey="score" fill="#10b981" />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Jurisdiction Satisfaction */}
-                    {satisfactionData.jurisdiction.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>관할별 종합만족도</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={satisfactionData.jurisdiction}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
-                              <YAxis domain={[0, 100]} />
-                              <Tooltip formatter={(value: number) => [`${value.toFixed(1)}점`, "종합만족도"]} />
-                              <Bar dataKey="score" fill="#f59e0b" />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Category Satisfaction */}
-                    {satisfactionData.category.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>종별 종합만족도</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={satisfactionData.category}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
-                              <YAxis domain={[0, 100]} />
-                              <Tooltip formatter={(value: number) => [`${value.toFixed(1)}점`, "종합만족도"]} />
-                              <Bar dataKey="score" fill="#ef4444" />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Inpatient/Outpatient Satisfaction */}
-                    {satisfactionData.inpatientOutpatient.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>입원/외래별 종합만족도</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={satisfactionData.inpatientOutpatient}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="name" />
-                              <YAxis domain={[0, 100]} />
-                              <Tooltip formatter={(value: number) => [`${value.toFixed(1)}점`, "종합만족도"]} />
-                              <Bar dataKey="score" fill="#8b5cf6" />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Qualification Type Satisfaction */}
-                    {satisfactionData.qualificationType.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>자격유형별 종합만족도</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={satisfactionData.qualificationType}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
-                              <YAxis domain={[0, 100]} />
-                              <Tooltip formatter={(value: number) => [`${value.toFixed(1)}점`, "종합만족도"]} />
-                              <Bar dataKey="score" fill="#ec4899" />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                </TabsContent>
-              </Tabs>
+                  {/* Qualification Type Analysis */}
+                  {analysisData.qualificationType.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>자격유형별 응답률</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={analysisData.qualificationType}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              label={({ name, percentage }) => `${name}: ${percentage}%`}
+                            >
+                              {analysisData.qualificationType.map((entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"][index % 6]}
+                                />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              formatter={(value: number, name: string, props: any) => [
+                                `${value}명 (${props.payload.percentage}%)`,
+                                name,
+                              ]}
+                            />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </div>
             )}
           </TabsContent>
         </Tabs>
