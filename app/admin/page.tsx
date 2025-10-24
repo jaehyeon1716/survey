@@ -876,24 +876,41 @@ export default function AdminPage() {
     try {
       console.log("[v0] Fetching analysis data for survey:", surveyId)
 
-      const { data: participantsData, error } = await supabase
-        .from("survey_participants")
-        .select(
-          "gender, age, jurisdiction, institution_name, category, inpatient_outpatient, qualification_type, is_completed",
-        )
-        .eq("survey_id", surveyId)
-        .eq("is_completed", true)
-        .limit(1000000)
+      // Fetch all completed participants using pagination to bypass 1000 row limit
+      let allParticipants: any[] = []
+      let from = 0
+      const batchSize = 1000
+      let hasMore = true
 
-      console.log("[v0] Participants data:", participantsData)
-      console.log("[v0] Error:", error)
+      while (hasMore) {
+        const { data: batch, error } = await supabase
+          .from("survey_participants")
+          .select(
+            "gender, age, jurisdiction, institution_name, category, inpatient_outpatient, qualification_type, is_completed",
+          )
+          .eq("survey_id", surveyId)
+          .eq("is_completed", true)
+          .range(from, from + batchSize - 1)
 
-      if (error) throw error
+        if (error) throw error
 
-      if (!participantsData || participantsData.length === 0) {
+        if (batch && batch.length > 0) {
+          allParticipants = [...allParticipants, ...batch]
+          from += batchSize
+          hasMore = batch.length === batchSize
+        } else {
+          hasMore = false
+        }
+      }
+
+      console.log("[v0] Total participants fetched:", allParticipants.length)
+
+      if (!allParticipants || allParticipants.length === 0) {
         console.log("[v0] No participants data found")
         return
       }
+
+      const participantsData = allParticipants
 
       const calculateCompletedCounts = (field: keyof (typeof participantsData)[0]) => {
         const groups = participantsData.reduce(
