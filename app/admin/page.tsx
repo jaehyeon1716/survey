@@ -716,7 +716,6 @@ export default function AdminPage() {
     if (!supabase) return
 
     setLoading(true)
-    // No specific error/success state for this fetch, it's part of the overall loading
     try {
       let completedCountQuery = supabase
         .from("survey_participants")
@@ -735,7 +734,6 @@ export default function AdminPage() {
       if (completedCountError) throw completedCountError
       setTotalResponsesCount(completedCount || 0)
 
-      // Fetch response summaries for display
       let query = supabase
         .from("survey_response_summaries")
         .select(`
@@ -755,14 +753,12 @@ export default function AdminPage() {
           )
         `)
         .order("created_at", { ascending: false })
-        .range(0, 9999)
 
       if (surveyId) {
         query = query.eq("survey_id", surveyId)
       }
 
       if (hospitalName && hospitalName.trim()) {
-        // Need to join with survey_participants to filter by hospital
         const { data: participantTokens } = await supabase
           .from("survey_participants")
           .select("token")
@@ -773,17 +769,29 @@ export default function AdminPage() {
           const tokens = participantTokens.map((p) => p.token)
           query = query.in("participant_token", tokens)
         } else {
-          // No participants match the filter, set count to 0
           setResponses([])
           setLoading(false)
           return
         }
       }
 
-      const { data, error } = await query
+      let allData: any[] = []
+      let from = 0
+      const batchSize = 1000
 
-      if (error) throw error
-      setResponses(data || [])
+      while (true) {
+        const { data, error } = await query.range(from, from + batchSize - 1)
+
+        if (error) throw error
+        if (!data || data.length === 0) break
+
+        allData = [...allData, ...data]
+
+        if (data.length < batchSize) break
+        from += batchSize
+      }
+
+      setResponses(allData)
 
       if (surveyId) {
         await fetchQuestionStats(surveyId)
@@ -1916,11 +1924,9 @@ export default function AdminPage() {
     )
   }
 
-  // const paginatedParticipants = filteredParticipants // Removed filteredParticipants usage, directly using participants
-  const totalParticipantsPages = Math.ceil(totalParticipantsCount / participantsPerPage)
+  const totalResponsesPages = Math.ceil(totalResponsesCount / responsesPerPage)
 
   const paginatedResponses = responses.slice((responsesPage - 1) * responsesPerPage, responsesPage * responsesPerPage)
-  const totalResponsesPages = Math.ceil(responses.length / responsesPerPage)
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">

@@ -3,7 +3,7 @@
 
 DO $$
 DECLARE
-    v_survey_id INTEGER;
+    v_survey_id UUID;
     v_add_count INTEGER := 100; -- ★ 여기를 원하는 숫자로 변경하세요 (1, 10, 100, 1000 등)
     v_added_count INTEGER := 0;
     v_objective_count INTEGER;
@@ -44,7 +44,7 @@ BEGIN
     RAISE NOTICE '객관식 문항: %개 (필수)', v_objective_count;
     RAISE NOTICE '주관식 문항: %개 (선택)', v_subjective_count;
     
-    -- UPSERT 방식으로 변경하여 기존 응답 덮어쓰기
+    -- UPSERT에서 INSERT로 변경 - 이미 응답이 있으면 건너뛰기
     -- 1. 미응답 참여자 중 지정된 수만큼 선택하여 객관식 응답 생성
     WITH selected_participants AS (
         SELECT token
@@ -73,12 +73,10 @@ BEGIN
     FROM selected_participants sp
     CROSS JOIN objective_questions oq
     ON CONFLICT (participant_token, question_id) 
-    DO UPDATE SET 
-        response_value = EXCLUDED.response_value,
-        response_text = EXCLUDED.response_text;
+    DO NOTHING; -- 기존 응답이 있으면 건너뛰기 (덮어쓰지 않음)
     
     GET DIAGNOSTICS v_added_count = ROW_COUNT;
-    RAISE NOTICE '객관식 응답 추가/업데이트: %개 레코드', v_added_count;
+    RAISE NOTICE '객관식 응답 추가: %개 레코드', v_added_count;
     
     -- 2. 같은 참여자들에게 주관식 응답 생성 (100% 응답으로 테스트)
     WITH selected_participants AS (
@@ -122,12 +120,10 @@ BEGIN
     FROM selected_participants sp
     CROSS JOIN subjective_questions sq
     ON CONFLICT (participant_token, question_id) 
-    DO UPDATE SET 
-        response_value = EXCLUDED.response_value,
-        response_text = EXCLUDED.response_text;
+    DO NOTHING; -- 기존 응답이 있으면 건너뛰기 (덮어쓰지 않음)
     
     GET DIAGNOSTICS v_added_count = ROW_COUNT;
-    RAISE NOTICE '주관식 응답 추가/업데이트: %개 레코드', v_added_count;
+    RAISE NOTICE '주관식 응답 추가: %개 레코드', v_added_count;
     
     -- 완료 상태 업데이트 로직 개선
     -- 3. 완료 상태 업데이트 (모든 필수 문항에 응답한 참여자)
