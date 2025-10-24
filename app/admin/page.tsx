@@ -718,36 +718,24 @@ export default function AdminPage() {
     setLoading(true)
     // No specific error/success state for this fetch, it's part of the overall loading
     try {
-      let countQuery = supabase.from("survey_response_summaries").select("*", { count: "exact", head: true })
+      let completedCountQuery = supabase
+        .from("survey_participants")
+        .select("*", { count: "exact", head: true })
+        .eq("is_completed", true)
 
       if (surveyId) {
-        countQuery = countQuery.eq("survey_id", surveyId)
+        completedCountQuery = completedCountQuery.eq("survey_id", surveyId)
       }
 
       if (hospitalName && hospitalName.trim()) {
-        // Need to join with survey_participants to filter by hospital
-        const { data: participantTokens } = await supabase
-          .from("survey_participants")
-          .select("token")
-          .eq("survey_id", surveyId || 0)
-          .ilike("hospital_name", `%${hospitalName.trim()}%`)
-
-        if (participantTokens && participantTokens.length > 0) {
-          const tokens = participantTokens.map((p) => p.token)
-          countQuery = countQuery.in("participant_token", tokens)
-        } else {
-          // No participants match the filter, set count to 0
-          setTotalResponsesCount(0)
-          setResponses([])
-          setLoading(false)
-          return
-        }
+        completedCountQuery = completedCountQuery.ilike("hospital_name", `%${hospitalName.trim()}%`)
       }
 
-      const { count, error: countError } = await countQuery
-      if (countError) throw countError
-      setTotalResponsesCount(count || 0)
+      const { count: completedCount, error: completedCountError } = await completedCountQuery
+      if (completedCountError) throw completedCountError
+      setTotalResponsesCount(completedCount || 0)
 
+      // Fetch response summaries for display
       let query = supabase
         .from("survey_response_summaries")
         .select(`
@@ -767,13 +755,14 @@ export default function AdminPage() {
           )
         `)
         .order("created_at", { ascending: false })
-        .range(0, 9999) // Increased range for better initial fetch, pagination will handle smaller chunks
+        .range(0, 9999)
 
       if (surveyId) {
         query = query.eq("survey_id", surveyId)
       }
 
       if (hospitalName && hospitalName.trim()) {
+        // Need to join with survey_participants to filter by hospital
         const { data: participantTokens } = await supabase
           .from("survey_participants")
           .select("token")
@@ -783,6 +772,11 @@ export default function AdminPage() {
         if (participantTokens && participantTokens.length > 0) {
           const tokens = participantTokens.map((p) => p.token)
           query = query.in("participant_token", tokens)
+        } else {
+          // No participants match the filter, set count to 0
+          setResponses([])
+          setLoading(false)
+          return
         }
       }
 
@@ -1973,7 +1967,7 @@ export default function AdminPage() {
                       value={newSurvey.title}
                       onChange={(e) => setNewSurvey({ ...newSurvey, title: e.target.value })}
                       className="mt-2 h-12 text-lg"
-                      placeholder="예: 2025년 병원 만족도 조사"
+                      placeholder="예: 2024년 병원 만족도 조사"
                     />
                   </div>
 
@@ -2130,7 +2124,7 @@ export default function AdminPage() {
                               >
                                 {survey.is_active ? "활성" : "비활성"}
                               </span>
-                              {/* <Button
+                              <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleEditSurvey(survey)
@@ -2141,7 +2135,7 @@ export default function AdminPage() {
                               >
                                 <Edit className="w-3 h-3 mr-1" />
                                 수정
-                              </Button> */}
+                              </Button>
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -2447,36 +2441,6 @@ export default function AdminPage() {
                           </div>
                         </div>
 
-                        {/* pagination */}
-                        <div className="flex justify-between items-center mt-4">
-                          <div className="text-sm text-gray-600">
-                            페이지 {participantsPage} /{" "}
-                            {Math.ceil(filteredParticipantsCount / participantsPerPage) || 1}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={() => setParticipantsPage((prev) => Math.max(1, prev - 1))}
-                              disabled={participantsPage === 1}
-                              variant="outline"
-                              size="sm"
-                            >
-                              이전
-                            </Button>
-                            <Button
-                              onClick={() =>
-                                setParticipantsPage((prev) =>
-                                  Math.min(Math.ceil(filteredParticipantsCount / participantsPerPage), prev + 1),
-                                )
-                              }
-                              disabled={participantsPage >= Math.ceil(filteredParticipantsCount / participantsPerPage)}
-                              variant="outline"
-                              size="sm"
-                            >
-                              다음
-                            </Button>
-                          </div>
-                        </div>
-
                         <div className="overflow-x-auto">
                           <table className="w-full border-collapse border border-gray-300">
                             <thead>
@@ -2554,7 +2518,35 @@ export default function AdminPage() {
                             </tbody>
                           </table>
                         </div>
-                        
+                        {/* pagination */}
+                        <div className="flex justify-between items-center mt-4">
+                          <div className="text-sm text-gray-600">
+                            페이지 {participantsPage} /{" "}
+                            {Math.ceil(filteredParticipantsCount / participantsPerPage) || 1}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => setParticipantsPage((prev) => Math.max(1, prev - 1))}
+                              disabled={participantsPage === 1}
+                              variant="outline"
+                              size="sm"
+                            >
+                              이전
+                            </Button>
+                            <Button
+                              onClick={() =>
+                                setParticipantsPage((prev) =>
+                                  Math.min(Math.ceil(filteredParticipantsCount / participantsPerPage), prev + 1),
+                                )
+                              }
+                              disabled={participantsPage >= Math.ceil(filteredParticipantsCount / participantsPerPage)}
+                              variant="outline"
+                              size="sm"
+                            >
+                              다음
+                            </Button>
+                          </div>
+                        </div>
                       </>
                     )}
                   </div>
@@ -2694,12 +2686,12 @@ export default function AdminPage() {
                       <CardTitle className="text-2xl">통계</CardTitle>
                       <CardDescription className="text-lg">설문 결과에 대한 상세 통계를 확인하세요</CardDescription>
                     </div>
-                    {/* {selectedSurvey && responses.length > 0 && (
+                    {selectedSurvey && responses.length > 0 && (
                       <Button onClick={downloadStatsExcel} className="bg-green-600 hover:bg-green-700">
                         <Download className="w-4 h-4 mr-2" />
                         통계 엑셀 다운로드
                       </Button>
-                    )} */}
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent>

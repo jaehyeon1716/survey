@@ -44,7 +44,7 @@ BEGIN
     RAISE NOTICE '객관식 문항: %개 (필수)', v_objective_count;
     RAISE NOTICE '주관식 문항: %개 (선택)', v_subjective_count;
     
-    -- max_score 컬럼 제거, 객관식은 항상 5점 만점
+    -- UPSERT 방식으로 변경하여 기존 응답 덮어쓰기
     -- 1. 미응답 참여자 중 지정된 수만큼 선택하여 객관식 응답 생성
     WITH selected_participants AS (
         SELECT token
@@ -72,12 +72,14 @@ BEGIN
         NULL
     FROM selected_participants sp
     CROSS JOIN objective_questions oq
-    ON CONFLICT (participant_token, question_id) DO NOTHING;
+    ON CONFLICT (participant_token, question_id) 
+    DO UPDATE SET 
+        response_value = EXCLUDED.response_value,
+        response_text = EXCLUDED.response_text;
     
     GET DIAGNOSTICS v_added_count = ROW_COUNT;
-    RAISE NOTICE '객관식 응답 추가: %개 레코드', v_added_count;
+    RAISE NOTICE '객관식 응답 추가/업데이트: %개 레코드', v_added_count;
     
-    -- max_score 컬럼 제거, total_score와 max_possible_score 컬럼도 제거
     -- 2. 같은 참여자들에게 주관식 응답 생성 (100% 응답으로 테스트)
     WITH selected_participants AS (
         SELECT token
@@ -119,11 +121,15 @@ BEGIN
         (SELECT texts[floor(random() * 10 + 1)::INTEGER] FROM random_texts)
     FROM selected_participants sp
     CROSS JOIN subjective_questions sq
-    ON CONFLICT (participant_token, question_id) DO NOTHING;
+    ON CONFLICT (participant_token, question_id) 
+    DO UPDATE SET 
+        response_value = EXCLUDED.response_value,
+        response_text = EXCLUDED.response_text;
     
     GET DIAGNOSTICS v_added_count = ROW_COUNT;
-    RAISE NOTICE '주관식 응답 추가: %개 레코드', v_added_count;
+    RAISE NOTICE '주관식 응답 추가/업데이트: %개 레코드', v_added_count;
     
+    -- 완료 상태 업데이트 로직 개선
     -- 3. 완료 상태 업데이트 (모든 필수 문항에 응답한 참여자)
     WITH participant_response_counts AS (
         SELECT 
@@ -139,7 +145,7 @@ BEGIN
     FROM participant_response_counts prc
     WHERE sp.token = prc.participant_token
     AND sp.survey_id = v_survey_id
-    AND prc.objective_answered = v_objective_count
+    AND prc.objective_answered >= v_objective_count
     AND sp.is_completed = false;
     
     GET DIAGNOSTICS v_added_count = ROW_COUNT;
