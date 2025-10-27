@@ -243,35 +243,77 @@ export default function AdminPage() {
       return
     }
 
+    if (totalParticipantsCount > 10000) {
+      const confirmed = confirm(
+        `참여자가 ${totalParticipantsCount.toLocaleString()}명으로 대용량입니다.\n\n` +
+          `다운로드에 시간이 오래 걸리거나 실패할 수 있습니다.\n\n` +
+          `대안: Supabase SQL Editor에서 다음 쿼리를 실행하세요:\n\n` +
+          `COPY (SELECT participant_name AS "참여자명", phone_number AS "휴대폰번호", ` +
+          `hospital_name AS "병원명", token AS "토큰" ` +
+          `FROM survey_participants WHERE survey_id = ${selectedSurvey.id}) ` +
+          `TO STDOUT WITH CSV HEADER;\n\n` +
+          `그래도 다운로드를 시도하시겠습니까?`,
+      )
+      if (!confirmed) return
+    }
+
     setIsDownloading(true)
 
     try {
-      // Fetch all participants in batches
       const allParticipants: any[] = []
       const batchSize = 1000
       let offset = 0
+      let consecutiveErrors = 0
+      const maxConsecutiveErrors = 3
+
+      console.log(`[v0] Starting download of ${totalParticipantsCount} participants...`)
 
       while (offset < totalParticipantsCount) {
-        const { data, error } = await supabase
-          .from("survey_participants")
-          .select("*")
-          .eq("survey_id", selectedSurvey.id)
-          .range(offset, offset + batchSize - 1)
-          .order("created_at", { ascending: true })
+        try {
+          const { data, error } = await supabase
+            .from("survey_participants")
+            .select("participant_name, phone_number, hospital_name, token")
+            .eq("survey_id", selectedSurvey.id)
+            .range(offset, offset + batchSize - 1)
+            .order("created_at", { ascending: true })
 
-        if (error) {
-          console.error("[v0] Error fetching participants for download:", error)
-          throw error
+          if (error) {
+            console.error(`[v0] Error fetching batch at offset ${offset}:`, error)
+            consecutiveErrors++
+
+            if (consecutiveErrors >= maxConsecutiveErrors) {
+              throw new Error(`연속 ${maxConsecutiveErrors}회 오류 발생. 다운로드를 중단합니다.`)
+            }
+
+            // Wait before retrying
+            await new Promise((resolve) => setTimeout(resolve, 1000))
+            continue
+          }
+
+          if (data) {
+            allParticipants.push(...data)
+            consecutiveErrors = 0 // Reset error counter on success
+            console.log(`[v0] Downloaded ${allParticipants.length}/${totalParticipantsCount} participants`)
+          }
+
+          offset += batchSize
+
+          if (offset < totalParticipantsCount) {
+            await new Promise((resolve) => setTimeout(resolve, 100))
+          }
+        } catch (batchError) {
+          console.error(`[v0] Batch error at offset ${offset}:`, batchError)
+          consecutiveErrors++
+
+          if (consecutiveErrors >= maxConsecutiveErrors) {
+            throw batchError
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 1000))
         }
-
-        if (data) {
-          allParticipants.push(...data)
-        }
-
-        offset += batchSize
       }
 
-      console.log(`[v0] Downloaded ${allParticipants.length} participants for Excel`)
+      console.log(`[v0] Successfully downloaded ${allParticipants.length} participants`)
 
       const excelData = allParticipants.map((participant) => ({
         참여자명: participant.participant_name,
@@ -281,8 +323,9 @@ export default function AdminPage() {
       }))
 
       const headers = Object.keys(excelData[0])
-      const csvContent = excelData
-        .map((row) =>
+      const csvContent = [
+        headers.join(","),
+        ...excelData.map((row) =>
           headers
             .map((header) => {
               const value = row[header as keyof typeof row]
@@ -291,8 +334,8 @@ export default function AdminPage() {
                 : value
             })
             .join(","),
-        )
-        .join("\n")
+        ),
+      ].join("\n")
 
       const BOM = "\uFEFF"
       const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" })
@@ -308,9 +351,18 @@ export default function AdminPage() {
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
+
+      alert(`${allParticipants.length}명의 연락처를 다운로드했습니다.`)
     } catch (error) {
       console.error("[v0] Error downloading participants:", error)
-      alert("연락처 다운로드 중 오류가 발생했습니다.")
+      alert(
+        `연락처 다운로드 중 오류가 발생했습니다.\n\n` +
+          `대용량 데이터의 경우 Supabase SQL Editor를 사용하세요:\n\n` +
+          `COPY (SELECT participant_name AS "참여자명", phone_number AS "휴대폰번호", ` +
+          `hospital_name AS "병원명", token AS "토큰" ` +
+          `FROM survey_participants WHERE survey_id = ${selectedSurvey?.id}) ` +
+          `TO STDOUT WITH CSV HEADER;`,
+      )
     } finally {
       setIsDownloading(false)
     }
@@ -517,7 +569,7 @@ export default function AdminPage() {
           <div class="step">
             <div class="step-content">
               <ul>
-                <li><strong>관리자 비밀번호:</strong> <span class="highlight">hospital2024</span></li>
+                <li><strong>관리자 비밀번호:</strong> <span class="highlight"></span></li>
                 <li><strong>지원 브라우저:</strong> Chrome, Firefox, Safari, Edge 최신 버전</li>
                 <li><strong>권장 해상도:</strong> 1280x720 이상</li>
                 <li><strong>CSV 파일 인코딩:</strong> UTF-8</li>
