@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
+export const maxDuration = 300 // 대용량 데이터 삭제를 위해 타임아웃을 5분으로 증가
+
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -71,12 +73,77 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   const surveyId = Number.parseInt(params.id)
 
   try {
-    // The database has ON DELETE CASCADE set up for:
-    // - survey_questions (via survey_id)
-    // - survey_participants (via survey_id)
-    // - survey_responses (via participant_token and question_id)
-    // So deleting the survey will automatically delete all related data
+    console.log("[v0] 설문지 삭제 시작:", surveyId)
 
+    // 1. 참여자 토큰 목록 조회 (배치 처리를 위해)
+    const { data: participants, error: participantsError } = await supabase
+      .from("survey_participants")
+      .select("token")
+      .eq("survey_id", surveyId)
+
+    if (participantsError) throw participantsError
+
+    const totalParticipants = participants?.length || 0
+    console.log("[v0] 삭제할 참여자 수:", totalParticipants)
+
+    // 2. 참여자가 많은 경우 배치로 응답 데이터 삭제
+    if (participants && participants.length > 0) {
+      const batchSize = 1000
+      const tokens = participants.map((p) => p.token)
+
+      for (let i = 0; i < tokens.length; i += batchSize) {
+        const batchTokens = tokens.slice(i, i + batchSize)
+        console.log(`[v0] 응답 삭제 진행: ${i + 1}-${Math.min(i + batchSize, tokens.length)}/${tokens.length}`)
+
+        // 응답 데이터 삭제
+        const { error: responsesError } = await supabase
+          .from("survey_responses")
+          .delete()
+          .in("participant_token", batchTokens)
+
+        if (responsesError) {
+          console.error("[v0] 응답 삭제 오류:", responsesError)
+          throw responsesError
+        }
+
+        // 응답 요약 삭제
+        const { error: summariesError } = await supabase
+          .from("survey_response_summaries")
+          .delete()
+          .in("participant_token", batchTokens)
+
+        if (summariesError) {
+          console.error("[v0] 응답 요약 삭제 오류:", summariesError)
+          throw summariesError
+        }
+      }
+
+      // 3. 참여자 데이터 배치 삭제
+      for (let i = 0; i < tokens.length; i += batchSize) {
+        const batchTokens = tokens.slice(i, i + batchSize)
+        console.log(`[v0] 참여자 삭제 진행: ${i + 1}-${Math.min(i + batchSize, tokens.length)}/${tokens.length}`)
+
+        const { error: participantDeleteError } = await supabase
+          .from("survey_participants")
+          .delete()
+          .in("token", batchTokens)
+
+        if (participantDeleteError) {
+          console.error("[v0] 참여자 삭제 오류:", participantDeleteError)
+          throw participantDeleteError
+        }
+      }
+    }
+
+    // 4. 설문 문항 삭제
+    const { error: questionsError } = await supabase.from("survey_questions").delete().eq("survey_id", surveyId)
+
+    if (questionsError) {
+      console.error("[v0] 문항 삭제 오류:", questionsError)
+      throw questionsError
+    }
+
+    // 5. 설문지 삭제
     const { error: surveyError } = await supabase.from("surveys").delete().eq("id", surveyId)
 
     if (surveyError) {
@@ -88,6 +155,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
     return NextResponse.json({
       message: "설문지가 성공적으로 삭제되었습니다.",
+      deletedParticipants: totalParticipants,
     })
   } catch (error) {
     console.error("[v0] 설문지 삭제 오류:", error)
