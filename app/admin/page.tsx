@@ -55,7 +55,7 @@ import {
   CartesianGrid,
 } from "recharts"
 
-const ADMIN_PASSWORD = "bohun#1234"
+const ADMIN_PASSWORD = "hospital2024"
 
 interface Survey {
   id: number
@@ -517,7 +517,7 @@ export default function AdminPage() {
           <div class="step">
             <div class="step-content">
               <ul>
-                <li><strong>관리자 비밀번호:</strong> <span class="highlight"></span></li>
+                <li><strong>관리자 비밀번호:</strong> <span class="highlight">hospital2024</span></li>
                 <li><strong>지원 브라우저:</strong> Chrome, Firefox, Safari, Edge 최신 버전</li>
                 <li><strong>권장 해상도:</strong> 1280x720 이상</li>
                 <li><strong>CSV 파일 인코딩:</strong> UTF-8</li>
@@ -1152,6 +1152,21 @@ export default function AdminPage() {
       return
     }
 
+    if (totalParticipantsCount > 10000) {
+      const confirmed = window.confirm(
+        `⚠️ 대용량 데이터 경고\n\n` +
+          `현재 ${totalParticipantsCount.toLocaleString()}명의 참여자가 등록되어 있습니다.\n\n` +
+          `대용량 데이터(1만명 이상)의 경우 참여자 교체 작업이 실패할 수 있습니다.\n\n` +
+          `대신 Supabase SQL Editor에서 다음 쿼리를 실행하여 직접 삭제해주세요:\n\n` +
+          `DELETE FROM survey_participants WHERE survey_id = ${selectedSurvey.id};\n\n` +
+          `그래도 계속 진행하시겠습니까?`,
+      )
+
+      if (!confirmed) {
+        return
+      }
+    }
+
     setIsUploading(true)
     setParticipantError("")
     setParticipantSuccess("")
@@ -1480,6 +1495,34 @@ export default function AdminPage() {
     if (deletePassword !== ADMIN_PASSWORD) {
       setSurveyError("비밀번호가 올바르지 않습니다.")
       return
+    }
+
+    try {
+      const { count, error: countError } = await supabase
+        .from("survey_participants")
+        .select("*", { count: "exact", head: true })
+        .eq("survey_id", surveyId)
+
+      if (countError) throw countError
+
+      if (count && count > 10000) {
+        const sqlCommand = `DELETE FROM survey_participants WHERE survey_id = ${surveyId};\nDELETE FROM survey_questions WHERE survey_id = ${surveyId};\nDELETE FROM surveys WHERE id = ${surveyId};`
+
+        setSurveyError(
+          `⚠️ 대용량 데이터 삭제 불가\n\n` +
+            `이 설문지에는 ${count.toLocaleString()}명의 참여자가 등록되어 있습니다.\n\n` +
+            `대용량 데이터(1만명 이상)는 애플리케이션에서 직접 삭제할 수 없습니다.\n\n` +
+            `Supabase SQL Editor에서 다음 쿼리를 실행하여 삭제해주세요:\n\n` +
+            `${sqlCommand}\n\n` +
+            `또는 시스템 관리자에게 문의하세요.`,
+        )
+        setShowDeleteConfirm(false)
+        setSurveyToDelete(null)
+        setDeletePassword("")
+        return
+      }
+    } catch (err) {
+      console.error("[v0] 참여자 수 확인 오류:", err)
     }
 
     setDeleteLoading(true)
