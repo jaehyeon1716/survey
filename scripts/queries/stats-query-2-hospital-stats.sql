@@ -17,6 +17,8 @@ WITH question_scores AS (
         INNER JOIN survey_questions q ON r.question_id = q.id
     WHERE 
         q.question_type = 'objective'
+        -- 완료된 응답자만 포함하도록 필터 추가
+        AND p.is_completed = true
         -- Added survey_id filter to prevent data mixing
         AND p.survey_id = 'YOUR_SURVEY_ID_HERE'  -- 이 값을 실제 설문 ID로 변경하세요
         AND q.survey_id = 'YOUR_SURVEY_ID_HERE'  -- 이 값을 실제 설문 ID로 변경하세요
