@@ -55,7 +55,7 @@ import {
   CartesianGrid,
 } from "recharts"
 
-const ADMIN_PASSWORD = "hospital2024"
+const ADMIN_PASSWORD = "bohun#1234"
 
 interface Survey {
   id: number
