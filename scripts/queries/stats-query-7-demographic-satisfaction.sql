@@ -20,11 +20,8 @@ WITH participant_scores AS (
     AVG(CASE WHEN sq.question_number = 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q6_aesthetics,
     AVG(CASE WHEN sq.question_number = 7 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_reliability,
     AVG(CASE WHEN sq.question_number = 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q8_public_interest,
-    AVG(CASE WHEN sq.question_number = 9 THEN sr.response_value END) as q9_score,
     AVG(CASE WHEN sq.question_number = 9 THEN (sr.response_value - 1) / 4.0 * 100 END) as q9_score_100,
-    AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN sr.response_value END) as q1_6_avg,
     AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q1_6_avg_100,
-    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg,
     AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_8_avg_100
   FROM survey_participants sp
   JOIN survey_responses sr ON sp.token = sr.participant_token
@@ -53,7 +50,7 @@ SELECT
   ROUND(AVG(q1_6_avg_100)::numeric, 2) as "요소만족도(1~6번항목의 평균값)",
   ROUND(AVG(q7_8_avg_100)::numeric, 2) as "사회적만족도(7,8번항목의 평균값)",
   ROUND(AVG(
-    (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
+    q9_score_100 * 0.5 + q1_6_avg_100 * 0.3 + q7_8_avg_100 * 0.2
   )::numeric, 2) as "종합만족도(전반적50%+요소30%+사회적20%)"
 FROM participant_scores
 GROUP BY gender
@@ -86,11 +83,8 @@ WITH participant_scores AS (
     AVG(CASE WHEN sq.question_number = 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q6_aesthetics,
     AVG(CASE WHEN sq.question_number = 7 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_reliability,
     AVG(CASE WHEN sq.question_number = 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q8_public_interest,
-    AVG(CASE WHEN sq.question_number = 9 THEN sr.response_value END) as q9_score,
     AVG(CASE WHEN sq.question_number = 9 THEN (sr.response_value - 1) / 4.0 * 100 END) as q9_score_100,
-    AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN sr.response_value END) as q1_6_avg,
     AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q1_6_avg_100,
-    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg,
     AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_8_avg_100
   FROM survey_participants sp
   JOIN survey_responses sr ON sp.token = sr.participant_token
@@ -119,7 +113,7 @@ SELECT
   ROUND(AVG(q1_6_avg_100)::numeric, 2) as "요소만족도(1~6번항목의 평균값)",
   ROUND(AVG(q7_8_avg_100)::numeric, 2) as "사회적만족도(7,8번항목의 평균값)",
   ROUND(AVG(
-    (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
+    q9_score_100 * 0.5 + q1_6_avg_100 * 0.3 + q7_8_avg_100 * 0.2
   )::numeric, 2) as "종합만족도(전반적50%+요소30%+사회적20%)"
 FROM participant_scores
 GROUP BY age_group
@@ -153,11 +147,8 @@ WITH participant_scores AS (
     AVG(CASE WHEN sq.question_number = 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q6_aesthetics,
     AVG(CASE WHEN sq.question_number = 7 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_reliability,
     AVG(CASE WHEN sq.question_number = 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q8_public_interest,
-    AVG(CASE WHEN sq.question_number = 9 THEN sr.response_value END) as q9_score,
     AVG(CASE WHEN sq.question_number = 9 THEN (sr.response_value - 1) / 4.0 * 100 END) as q9_score_100,
-    AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN sr.response_value END) as q1_6_avg,
     AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q1_6_avg_100,
-    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg,
     AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_8_avg_100
   FROM survey_participants sp
   JOIN survey_responses sr ON sp.token = sr.participant_token
@@ -186,7 +177,7 @@ SELECT
   ROUND(AVG(q1_6_avg_100)::numeric, 2) as "요소만족도(1~6번항목의 평균값)",
   ROUND(AVG(q7_8_avg_100)::numeric, 2) as "사회적만족도(7,8번항목의 평균값)",
   ROUND(AVG(
-    (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
+    q9_score_100 * 0.5 + q1_6_avg_100 * 0.3 + q7_8_avg_100 * 0.2
   )::numeric, 2) as "종합만족도(전반적50%+요소30%+사회적20%)"
 FROM participant_scores
 GROUP BY jurisdiction
@@ -208,11 +199,8 @@ WITH participant_scores AS (
     AVG(CASE WHEN sq.question_number = 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q6_aesthetics,
     AVG(CASE WHEN sq.question_number = 7 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_reliability,
     AVG(CASE WHEN sq.question_number = 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q8_public_interest,
-    AVG(CASE WHEN sq.question_number = 9 THEN sr.response_value END) as q9_score,
     AVG(CASE WHEN sq.question_number = 9 THEN (sr.response_value - 1) / 4.0 * 100 END) as q9_score_100,
-    AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN sr.response_value END) as q1_6_avg,
     AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q1_6_avg_100,
-    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg,
     AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_8_avg_100
   FROM survey_participants sp
   JOIN survey_responses sr ON sp.token = sr.participant_token
@@ -241,7 +229,7 @@ SELECT
   ROUND(AVG(q1_6_avg_100)::numeric, 2) as "요소만족도(1~6번항목의 평균값)",
   ROUND(AVG(q7_8_avg_100)::numeric, 2) as "사회적만족도(7,8번항목의 평균값)",
   ROUND(AVG(
-    (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
+    q9_score_100 * 0.5 + q1_6_avg_100 * 0.3 + q7_8_avg_100 * 0.2
   )::numeric, 2) as "종합만족도(전반적50%+요소30%+사회적20%)"
 FROM participant_scores
 GROUP BY category
@@ -263,11 +251,8 @@ WITH participant_scores AS (
     AVG(CASE WHEN sq.question_number = 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q6_aesthetics,
     AVG(CASE WHEN sq.question_number = 7 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_reliability,
     AVG(CASE WHEN sq.question_number = 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q8_public_interest,
-    AVG(CASE WHEN sq.question_number = 9 THEN sr.response_value END) as q9_score,
     AVG(CASE WHEN sq.question_number = 9 THEN (sr.response_value - 1) / 4.0 * 100 END) as q9_score_100,
-    AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN sr.response_value END) as q1_6_avg,
     AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q1_6_avg_100,
-    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg,
     AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_8_avg_100
   FROM survey_participants sp
   JOIN survey_responses sr ON sp.token = sr.participant_token
@@ -296,7 +281,7 @@ SELECT
   ROUND(AVG(q1_6_avg_100)::numeric, 2) as "요소만족도(1~6번항목의 평균값)",
   ROUND(AVG(q7_8_avg_100)::numeric, 2) as "사회적만족도(7,8번항목의 평균값)",
   ROUND(AVG(
-    (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
+    q9_score_100 * 0.5 + q1_6_avg_100 * 0.3 + q7_8_avg_100 * 0.2
   )::numeric, 2) as "종합만족도(전반적50%+요소30%+사회적20%)"
 FROM participant_scores
 GROUP BY inpatient_outpatient
@@ -318,11 +303,8 @@ WITH participant_scores AS (
     AVG(CASE WHEN sq.question_number = 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q6_aesthetics,
     AVG(CASE WHEN sq.question_number = 7 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_reliability,
     AVG(CASE WHEN sq.question_number = 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q8_public_interest,
-    AVG(CASE WHEN sq.question_number = 9 THEN sr.response_value END) as q9_score,
     AVG(CASE WHEN sq.question_number = 9 THEN (sr.response_value - 1) / 4.0 * 100 END) as q9_score_100,
-    AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN sr.response_value END) as q1_6_avg,
     AVG(CASE WHEN sq.question_number BETWEEN 1 AND 6 THEN (sr.response_value - 1) / 4.0 * 100 END) as q1_6_avg_100,
-    AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN sr.response_value END) as q7_8_avg,
     AVG(CASE WHEN sq.question_number BETWEEN 7 AND 8 THEN (sr.response_value - 1) / 4.0 * 100 END) as q7_8_avg_100
   FROM survey_participants sp
   JOIN survey_responses sr ON sp.token = sr.participant_token
@@ -351,7 +333,7 @@ SELECT
   ROUND(AVG(q1_6_avg_100)::numeric, 2) as "요소만족도(1~6번항목의 평균값)",
   ROUND(AVG(q7_8_avg_100)::numeric, 2) as "사회적만족도(7,8번항목의 평균값)",
   ROUND(AVG(
-    (q9_score * 0.5 + q1_6_avg * 0.3 + q7_8_avg * 0.2 - 1) / 4.0 * 100
+    q9_score_100 * 0.5 + q1_6_avg_100 * 0.3 + q7_8_avg_100 * 0.2
   )::numeric, 2) as "종합만족도(전반적50%+요소30%+사회적20%)"
 FROM participant_scores
 GROUP BY qualification_type

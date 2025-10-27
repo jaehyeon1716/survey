@@ -14,8 +14,12 @@ SELECT
 FROM 
     survey_questions q
     LEFT JOIN survey_responses r ON q.id = r.question_id
+    -- 완료된 응답자만 포함하도록 participant 테이블 조인 추가
+    LEFT JOIN survey_participants p ON r.participant_token = p.token
 WHERE 
     q.question_type = 'objective'
+    -- 완료된 응답만 집계하도록 필터 추가
+    AND (p.is_completed = true OR r.id IS NULL)
     -- Added survey_id filter to prevent data mixing between different surveys
     AND q.survey_id = 'YOUR_SURVEY_ID_HERE'  -- 이 값을 실제 설문 ID로 변경하세요
 GROUP BY 

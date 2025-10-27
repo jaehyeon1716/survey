@@ -39,8 +39,10 @@ FROM
     CROSS JOIN survey_questions q
     LEFT JOIN survey_responses r ON p.token = r.participant_token AND q.id = r.question_id
 WHERE 
+    -- 완료된 응답자만 포함하도록 필터 추가
+    p.is_completed = true
     -- Added survey_id filter to prevent data mixing
-    p.survey_id = 'YOUR_SURVEY_ID_HERE'  -- 이 값을 실제 설문 ID로 변경하세요
+    AND p.survey_id = 'YOUR_SURVEY_ID_HERE'  -- 이 값을 실제 설문 ID로 변경하세요
     AND q.survey_id = 'YOUR_SURVEY_ID_HERE'  -- 이 값을 실제 설문 ID로 변경하세요
 GROUP BY 
     p.hospital_name, q.id, q.question_number, q.question_text, q.question_type
