@@ -75,25 +75,37 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   try {
     console.log("[v0] 설문지 삭제 시작:", surveyId)
 
-    // 1. 참여자 토큰 목록 조회 (배치 처리를 위해)
-    const { data: participants, error: participantsError } = await supabase
-      .from("survey_participants")
-      .select("token")
-      .eq("survey_id", surveyId)
+    let allTokens: string[] = []
+    let page = 0
+    const pageSize = 1000
 
-    if (participantsError) throw participantsError
+    while (true) {
+      const { data: participants, error: participantsError } = await supabase
+        .from("survey_participants")
+        .select("token")
+        .eq("survey_id", surveyId)
+        .range(page * pageSize, (page + 1) * pageSize - 1)
 
-    const totalParticipants = participants?.length || 0
-    console.log("[v0] 삭제할 참여자 수:", totalParticipants)
+      if (participantsError) throw participantsError
 
-    // 2. 참여자가 많은 경우 배치로 응답 데이터 삭제
-    if (participants && participants.length > 0) {
+      if (!participants || participants.length === 0) break
+
+      allTokens = allTokens.concat(participants.map((p) => p.token))
+      console.log(`[v0] 토큰 조회 진행: ${allTokens.length}개`)
+
+      if (participants.length < pageSize) break
+      page++
+    }
+
+    const totalParticipants = allTokens.length
+    console.log("[v0] 총 삭제할 참여자 수:", totalParticipants)
+
+    if (allTokens.length > 0) {
       const batchSize = 1000
-      const tokens = participants.map((p) => p.token)
 
-      for (let i = 0; i < tokens.length; i += batchSize) {
-        const batchTokens = tokens.slice(i, i + batchSize)
-        console.log(`[v0] 응답 삭제 진행: ${i + 1}-${Math.min(i + batchSize, tokens.length)}/${tokens.length}`)
+      for (let i = 0; i < allTokens.length; i += batchSize) {
+        const batchTokens = allTokens.slice(i, i + batchSize)
+        console.log(`[v0] 응답 삭제 진행: ${i + 1}-${Math.min(i + batchSize, allTokens.length)}/${allTokens.length}`)
 
         // 응답 데이터 삭제
         const { error: responsesError } = await supabase
@@ -105,23 +117,11 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
           console.error("[v0] 응답 삭제 오류:", responsesError)
           throw responsesError
         }
-
-        // 응답 요약 삭제
-        const { error: summariesError } = await supabase
-          .from("survey_response_summaries")
-          .delete()
-          .in("participant_token", batchTokens)
-
-        if (summariesError) {
-          console.error("[v0] 응답 요약 삭제 오류:", summariesError)
-          throw summariesError
-        }
       }
 
-      // 3. 참여자 데이터 배치 삭제
-      for (let i = 0; i < tokens.length; i += batchSize) {
-        const batchTokens = tokens.slice(i, i + batchSize)
-        console.log(`[v0] 참여자 삭제 진행: ${i + 1}-${Math.min(i + batchSize, tokens.length)}/${tokens.length}`)
+      for (let i = 0; i < allTokens.length; i += batchSize) {
+        const batchTokens = allTokens.slice(i, i + batchSize)
+        console.log(`[v0] 참여자 삭제 진행: ${i + 1}-${Math.min(i + batchSize, allTokens.length)}/${allTokens.length}`)
 
         const { error: participantDeleteError } = await supabase
           .from("survey_participants")
@@ -135,7 +135,6 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       }
     }
 
-    // 4. 설문 문항 삭제
     const { error: questionsError } = await supabase.from("survey_questions").delete().eq("survey_id", surveyId)
 
     if (questionsError) {
@@ -143,7 +142,6 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       throw questionsError
     }
 
-    // 5. 설문지 삭제
     const { error: surveyError } = await supabase.from("surveys").delete().eq("id", surveyId)
 
     if (surveyError) {

@@ -30,17 +30,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (isFirstBatch) {
       console.log("[v0] 첫 번째 배치: 기존 참여자 삭제 시작...")
 
-      // Get all participant tokens in batches
       let allTokens: string[] = []
-      let offset = 0
-      const batchSize = 1000
+      let page = 0
+      const pageSize = 1000
 
       while (true) {
         const { data: tokens, error: tokenError } = await supabase
           .from("survey_participants")
           .select("token")
           .eq("survey_id", Number.parseInt(surveyId))
-          .range(offset, offset + batchSize - 1)
+          .range(page * pageSize, (page + 1) * pageSize - 1)
 
         if (tokenError) {
           console.error("[v0] 토큰 조회 오류:", tokenError)
@@ -50,14 +49,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         if (!tokens || tokens.length === 0) break
 
         allTokens = allTokens.concat(tokens.map((t) => t.token))
-        offset += batchSize
+        console.log(`[v0] 토큰 조회 진행: ${allTokens.length}개`)
 
-        if (tokens.length < batchSize) break
+        if (tokens.length < pageSize) break
+        page++
       }
 
       console.log(`[v0] 총 ${allTokens.length}개의 참여자 토큰 발견`)
 
-      // Delete survey_responses in batches
       if (allTokens.length > 0) {
         const responseBatchSize = 1000
         for (let i = 0; i < allTokens.length; i += responseBatchSize) {
@@ -74,32 +73,24 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
           console.log(`[v0] 응답 삭제 진행: ${Math.min(i + responseBatchSize, allTokens.length)}/${allTokens.length}`)
         }
-      }
 
-      // Delete survey_participants in batches
-      let deletedCount = 0
-      while (true) {
-        const { data: deleted, error: deleteError } = await supabase
-          .from("survey_participants")
-          .delete()
-          .eq("survey_id", Number.parseInt(surveyId))
-          .limit(1000)
-          .select("token")
+        for (let i = 0; i < allTokens.length; i += responseBatchSize) {
+          const tokenBatch = allTokens.slice(i, i + responseBatchSize)
+          const { error: participantError } = await supabase
+            .from("survey_participants")
+            .delete()
+            .in("token", tokenBatch)
 
-        if (deleteError) {
-          console.error("[v0] 참여자 삭제 오류:", deleteError)
-          throw new Error(`참여자 삭제 중 오류 발생: ${deleteError.message}`)
+          if (participantError) {
+            console.error("[v0] 참여자 삭제 오류:", participantError)
+            throw new Error(`참여자 삭제 중 오류 발생: ${participantError.message}`)
+          }
+
+          console.log(`[v0] 참여자 삭제 진행: ${Math.min(i + responseBatchSize, allTokens.length)}/${allTokens.length}`)
         }
-
-        if (!deleted || deleted.length === 0) break
-
-        deletedCount += deleted.length
-        console.log(`[v0] 참여자 삭제 진행: ${deletedCount}명`)
-
-        if (deleted.length < 1000) break
       }
 
-      console.log(`[v0] 기존 참여자 삭제 완료: 총 ${deletedCount}명`)
+      console.log(`[v0] 기존 참여자 삭제 완료: 총 ${allTokens.length}명`)
     }
 
     const participantsWithTokens = participants.map((p) => ({
