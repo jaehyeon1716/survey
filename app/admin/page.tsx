@@ -2683,12 +2683,12 @@ export default function AdminPage() {
                     <CardTitle className="text-2xl">설문 결과</CardTitle>
                     <CardDescription className="text-lg">완료된 설문 응답을 확인하고 다운로드하세요</CardDescription>
                   </div>
-                  {/* {responses.length > 0 && (
-                    <Button onClick={downloadCSV} className="bg-green-600 hover:bg-green-700">
-                      <Download className="w-4 h-4 mr-2" />
-                      CSV 다운로드
-                    </Button>
-                  )} */}
+                  {responses.length > 0 && (
+                    // <Button onClick={downloadCSV} className="bg-green-600 hover:bg-green-700">
+                    //   <Download className="w-4 h-4 mr-2" />
+                    //   CSV 다운로드
+                    // </Button>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
