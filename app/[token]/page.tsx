@@ -339,7 +339,7 @@ export default function HospitalSurvey() {
         <div className="text-center mb-8">
           <Heart className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-4xl font-bold text-gray-800 mb-2">{survey?.title || "설문조사"}</h1>
-          <p className="text-xl text-gray-600 mb-6 whitespace-pre-line">
+          <p className="text-xl text-gray-600 mb-6">
             {survey?.description || "더 나은 서비스를 위한 여러분의 소중한 의견을 들려주세요"}
           </p>
 

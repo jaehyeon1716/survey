@@ -2,6 +2,39 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { randomBytes } from "crypto"
 
+function generateShortToken(): string {
+  // 영숫자 10자 생성 (a-z, A-Z, 0-9)
+  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+  let token = ""
+  const bytes = randomBytes(10)
+  for (let i = 0; i < 10; i++) {
+    token += chars[bytes[i] % chars.length]
+  }
+  return token
+}
+
+async function generateUniqueToken(supabase: any, surveyId: string): Promise<string> {
+  let token = generateShortToken()
+  let attempts = 0
+  const maxAttempts = 10
+
+  // 중복 체크 (최대 10회 시도)
+  while (attempts < maxAttempts) {
+    const { data, error } = await supabase.from("survey_participants").select("token").eq("token", token).single()
+
+    if (error?.code === "PGRST116" || !data) {
+      // 토큰이 존재하지 않음 (사용 가능)
+      return token
+    }
+
+    // 중복 발견, 재생성
+    token = generateShortToken()
+    attempts++
+  }
+
+  throw new Error("고유한 토큰 생성 실패. 다시 시도해주세요.")
+}
+
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -37,23 +70,25 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       await supabase.from("survey_participants").delete().eq("survey_id", Number.parseInt(surveyId))
     }
 
-    const participantsWithTokens = participants.map((p) => ({
-      survey_id: Number.parseInt(surveyId),
-      token: randomBytes(16).toString("hex"),
-      jurisdiction: p.jurisdiction,
-      institution_code: p.institution_code,
-      institution_name: p.institution_name,
-      category: p.category,
-      name: p.name,
-      age: p.age,
-      gender: p.gender,
-      mobile_phone: p.mobile_phone,
-      inpatient_outpatient: p.inpatient_outpatient,
-      qualification_type: p.qualification_type,
-      hospital_name: p.hospital_name,
-      participant_name: p.participant_name,
-      phone_number: p.phone_number,
-    }))
+    const participantsWithTokens = await Promise.all(
+      participants.map(async (p) => ({
+        survey_id: Number.parseInt(surveyId),
+        token: await generateUniqueToken(supabase, surveyId),
+        jurisdiction: p.jurisdiction,
+        institution_code: p.institution_code,
+        institution_name: p.institution_name,
+        category: p.category,
+        name: p.name,
+        age: p.age,
+        gender: p.gender,
+        mobile_phone: p.mobile_phone,
+        inpatient_outpatient: p.inpatient_outpatient,
+        qualification_type: p.qualification_type,
+        hospital_name: p.hospital_name,
+        participant_name: p.participant_name,
+        phone_number: p.phone_number,
+      })),
+    )
 
     const { error } = await supabase.from("survey_participants").insert(participantsWithTokens)
 
