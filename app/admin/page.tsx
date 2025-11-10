@@ -265,7 +265,6 @@ export default function AdminPage() {
       let offset = 0
       let consecutiveErrors = 0
       const maxConsecutiveErrors = 3
-
       console.log(`[v0] Starting download of ${totalParticipantsCount} participants...`)
 
       while (offset < totalParticipantsCount) {
@@ -285,14 +284,13 @@ export default function AdminPage() {
               throw new Error(`연속 ${maxConsecutiveErrors}회 오류 발생. 다운로드를 중단합니다.`)
             }
 
-            // Wait before retrying
             await new Promise((resolve) => setTimeout(resolve, 1000))
             continue
           }
 
           if (data) {
             allParticipants.push(...data)
-            consecutiveErrors = 0 // Reset error counter on success
+            consecutiveErrors = 0
             console.log(`[v0] Downloaded ${allParticipants.length}/${totalParticipantsCount} participants`)
           }
 
@@ -369,7 +367,6 @@ export default function AdminPage() {
   }
 
   const downloadGuide = () => {
-    // HTML 기반 가이드 생성
     const guideHTML = `
       <!DOCTYPE html>
       <html lang="ko">
@@ -398,10 +395,8 @@ export default function AdminPage() {
           <h2>관리자 페이지 사용 가이드</h2>
           <p>버전 1.0 | ${new Date().toLocaleDateString("ko-KR")}</p>
         </div>
-
         <div class="section">
           <div class="section-title">📋 1. 설문지 생성 및 관리</div>
-          
           <div class="step">
             <div class="step-title">1-1. 새 설문지 만들기</div>
             <div class="step-content">
@@ -417,7 +412,6 @@ export default function AdminPage() {
               </div>
             </div>
           </div>
-
           <div class="step">
             <div class="step-title">1-2. 설문지 수정 및 삭제</div>
             <div class="step-content">
@@ -432,10 +426,8 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
-
         <div class="section">
           <div class="section-title">👥 2. 참여자 등록 및 관리</div>
-          
           <div class="step">
             <div class="step-title">2-1. CSV 파일로 참여자 등록</div>
             <div class="step-content">
@@ -452,7 +444,6 @@ export default function AdminPage() {
               </div>
             </div>
           </div>
-
           <div class="step">
             <div class="step-title">2-2. 참여자 목록 관리</div>
             <div class="step-content">
@@ -465,10 +456,8 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
-
         <div class="section">
           <div class="section-title">📱 3. 문자 발송 가이드</div>
-          
           <div class="step">
             <div class="step-title">3-1. 연락처 파일 준비</div>
             <div class="step-content">
@@ -485,7 +474,6 @@ export default function AdminPage() {
               </div>
             </div>
           </div>
-
           <div class="step">
             <div class="step-title">3-2. 외부 문자 발송 플랫폼 활용</div>
             <div class="step-content">
@@ -503,10 +491,8 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
-
         <div class="section">
           <div class="section-title">📊 4. 결과 조회 및 통계 분석</div>
-          
           <div class="step">
             <div class="step-title">4-1. 설문 결과 조회</div>
             <div class="step-content">
@@ -517,7 +503,6 @@ export default function AdminPage() {
               </ul>
             </div>
           </div>
-
           <div class="step">
             <div class="step-title">4-2. 통계 분석</div>
             <div class="step-content">
@@ -533,10 +518,8 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
-
         <div class="section">
           <div class="section-title">🔒 5. 보안 및 주의사항</div>
-          
           <div class="step">
             <div class="step-title">5-1. 보안 기능</div>
             <div class="step-content">
@@ -548,7 +531,6 @@ export default function AdminPage() {
               </ul>
             </div>
           </div>
-
           <div class="step">
             <div class="step-title">5-2. 설문 링크 형식</div>
             <div class="step-content">
@@ -562,10 +544,8 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
-
         <div class="section">
           <div class="section-title">🔧 6. 시스템 정보</div>
-          
           <div class="step">
             <div class="step-content">
               <ul>
@@ -580,7 +560,6 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
-
         <div style="text-align: center; margin-top: 50px; padding: 20px; background-color: #f8fafc; border-radius: 8px;">
           <p><strong>🏥 병원 만족도 조사 시스템 v1.0</strong></p>
           <p>© 2024 Hospital Survey System. All rights reserved.</p>
@@ -589,11 +568,9 @@ export default function AdminPage() {
       </html>
     `
 
-    // HTML을 PDF로 변환
     import("html2canvas")
       .then((html2canvas) => {
         import("jspdf").then(({ jsPDF }) => {
-          // 임시 div 생성
           const tempDiv = document.createElement("div")
           tempDiv.innerHTML = guideHTML
           tempDiv.style.width = "800px"
@@ -619,11 +596,9 @@ export default function AdminPage() {
               let heightLeft = imgHeight
               let position = 10
 
-              // 첫 페이지 추가
               pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight)
               heightLeft -= pageHeight
 
-              // 필요한 경우 추가 페이지 생성
               while (heightLeft >= 0) {
                 position = heightLeft - imgHeight + 10
                 pdf.addPage()
@@ -631,18 +606,15 @@ export default function AdminPage() {
                 heightLeft -= pageHeight
               }
 
-              // PDF 다운로드
               const fileName = `관리자페이지_사용가이드_${new Date().toISOString().split("T")[0]}.pdf`
               pdf.save(fileName)
 
-              // 임시 div 제거
               document.body.removeChild(tempDiv)
             })
             .catch((error) => {
               console.error("PDF 생성 중 오류:", error)
               document.body.removeChild(tempDiv)
 
-              // 실패 시 텍스트 파일로 대체
               const textContent = guideHTML
                 .replace(/<[^>]*>/g, "")
                 .replace(/\s+/g, " ")
@@ -669,17 +641,14 @@ export default function AdminPage() {
     e.preventDefault()
     if (password === ADMIN_PASSWORD) {
       setIsAuthenticated(true)
-      // Removed setError("") here, as login error is handled separately
     } else {
-      // Moved error handling to the login form component
-      // setError("비밀번호가 올바르지 않습니다.")
     }
   }
 
   const fetchSurveys = async () => {
-    setLoading(true) // Assuming a general loading state, though specific ones are preferred
-    setSurveyError("") // Clear previous error
-    setSurveySuccess("") // Clear previous success
+    setLoading(true)
+    setSurveyError("")
+    setSurveySuccess("")
     try {
       const response = await fetch("/api/admin/surveys")
       const data = await response.json()
@@ -700,8 +669,8 @@ export default function AdminPage() {
     if (!supabase) return
 
     setLoading(true)
-    setParticipantError("") // Clear previous error
-    setParticipantSuccess("") // Clear previous success
+    setParticipantError("")
+    setParticipantSuccess("")
     try {
       let unfilteredCountQuery = supabase.from("survey_participants").select("*", { count: "exact", head: true })
       if (surveyId) {
@@ -717,7 +686,6 @@ export default function AdminPage() {
         countQuery = countQuery.eq("survey_id", surveyId)
       }
 
-      // Apply filters to count query
       if (hospitalFilter.trim()) {
         countQuery = countQuery.ilike("hospital_name", `%${hospitalFilter}%`)
       }
@@ -729,7 +697,6 @@ export default function AdminPage() {
       if (countError) throw countError
       setFilteredParticipantsCount(count || 0)
 
-      // Fetch only the current page of data
       const start = (page - 1) * perPage
       const end = start + perPage - 1
 
@@ -743,7 +710,6 @@ export default function AdminPage() {
         query = query.eq("survey_id", surveyId)
       }
 
-      // Apply filters to data query
       if (hospitalFilter.trim()) {
         query = query.ilike("hospital_name", `%${hospitalFilter}%`)
       }
@@ -755,8 +721,6 @@ export default function AdminPage() {
 
       if (error) throw error
       setParticipants(data || [])
-      // setParticipants(data || []) // This line seems to be duplicated, might be a typo. Keep one.
-      // setFilteredParticipants(data || []) // This line was removed and replaced by direct use of `participants` later. If `filteredParticipants` is needed for other logic, reintroduce it.
     } catch (err) {
       setParticipantError("참여자 데이터를 불러오는데 실패했습니다.")
     } finally {
@@ -855,7 +819,6 @@ export default function AdminPage() {
     }
   }
 
-  // This is the modified fetchQuestionStats function
   const fetchQuestionStats = async (surveyId: number) => {
     if (!supabase) return
 
@@ -896,14 +859,12 @@ export default function AdminPage() {
       const questionStatsMap = questionsData.map((question) => {
         const questionResponses = responsesData.filter((r) => r.question_id === question.id)
 
-        // For objective questions, calculate average score
         const objectiveResponses = questionResponses.filter((r) => r.response_value !== null)
         const averageScore =
           objectiveResponses.length > 0
             ? objectiveResponses.reduce((sum, r) => sum + r.response_value, 0) / objectiveResponses.length
             : 0
 
-        // For subjective questions, collect text responses
         const textResponses = questionResponses
           .filter((r) => r.response_text !== null && r.response_text.trim() !== "")
           .map((r) => r.response_text)
@@ -931,12 +892,10 @@ export default function AdminPage() {
     }
   }
 
-  // The fetchAnalysisData function is updated here.
   const fetchAnalysisData = async (surveyId: string) => {
     try {
       console.log("[v0] Fetching analysis data for survey:", surveyId)
 
-      // Fetch all completed participants using pagination to bypass 1000 row limit
       let allParticipants: any[] = []
       let from = 0
       const batchSize = 1000
@@ -1054,7 +1013,6 @@ export default function AdminPage() {
     }
   }
 
-  // Add downloadAnalysisExcel function here
   const downloadAnalysisExcel = async () => {
     if (!selectedSurvey || !analysisData) {
       alert("다운로드할 분석 데이터가 없습니다.")
@@ -1121,7 +1079,7 @@ export default function AdminPage() {
       return
     }
 
-    setCreateLoading(true) // Renamed from isUploading to createLoading
+    setCreateLoading(true)
     setSurveyError("")
     setSurveySuccess("")
 
@@ -1138,32 +1096,30 @@ export default function AdminPage() {
             text: q.text,
             type: q.type,
             responseScaleType: q.responseScaleType,
-          })), // use responseScaleType
+          })),
         }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        // Update the error message based on the response from the API
         setSurveyError(data.error || "설문지 생성 중 오류가 발생했습니다.")
         return
       }
 
-      // Clear form and show success message
       setSurveySuccess("설문지가 성공적으로 생성되었습니다.")
-      setNewSurvey({ title: "", description: "" }) // Reset newSurvey state
-      setQuestions([{ text: "", type: "objective", responseScaleType: "agreement" }]) // Reset questions state
+      setNewSurvey({ title: "", description: "" })
+      setQuestions([{ text: "", type: "objective", responseScaleType: "agreement" }])
       fetchSurveys()
     } catch (err) {
       setSurveyError("설문지 생성 중 오류가 발생했습니다.")
     } finally {
-      setCreateLoading(false) // Renamed from isUploading to createLoading
+      setCreateLoading(false)
     }
   }
 
   const addQuestion = () => {
-    setQuestions([...questions, { text: "", type: "objective", responseScaleType: "agreement" }]) // use responseScaleType
+    setQuestions([...questions, { text: "", type: "objective", responseScaleType: "agreement" }])
   }
 
   const removeQuestion = (index: number) => {
@@ -1173,8 +1129,6 @@ export default function AdminPage() {
   }
 
   const updateQuestion = (index: number, field: "text" | "type" | "responseScaleType", value: string) => {
-    // Added responseScaleType
-    // scaleType 필드 추가
     const updated = [...questions]
     updated[index][field] = value
     setQuestions(updated)
@@ -1226,7 +1180,6 @@ export default function AdminPage() {
     setDuplicates([])
 
     try {
-      // Read and parse CSV on client side
       const csvText = await file.text()
       const lines = csvText.trim().split("\n")
 
@@ -1247,18 +1200,10 @@ export default function AdminPage() {
         mobile_phone: string
         inpatient_outpatient: string
         qualification_type: string
-        // Keep old fields for backward compatibility
         hospital_name: string
         participant_name: string
         phone_number: string
-        // Replaced 'type' field with 'category'
         category: string
-      }> = []
-      const uniqueParticipants = new Set()
-      const duplicateEntries: Array<{
-        institution: string
-        name: string
-        phone: string
       }> = []
 
       for (const line of lines) {
@@ -1290,17 +1235,6 @@ export default function AdminPage() {
           continue
         }
 
-        const participantKey = `${institutionName}|${name}|${mobilePhone}`
-        if (uniqueParticipants.has(participantKey)) {
-          duplicateEntries.push({
-            institution: institutionName,
-            name: name,
-            phone: mobilePhone,
-          })
-          continue
-        }
-        uniqueParticipants.add(participantKey)
-
         participants.push({
           jurisdiction,
           institution_code: institutionCode,
@@ -1312,11 +1246,9 @@ export default function AdminPage() {
           mobile_phone: mobilePhone,
           inpatient_outpatient: inpatientOutpatient,
           qualification_type: qualificationType,
-          // Keep old fields for backward compatibility
           hospital_name: institutionName,
           participant_name: name,
           phone_number: mobilePhone,
-          // Mapped 'category' from CSV to 'category' field in participant object
           category: category,
         })
       }
@@ -1327,7 +1259,6 @@ export default function AdminPage() {
         return
       }
 
-      // Split into chunks of 500 participants
       const CHUNK_SIZE = 500
       const chunks: (typeof participants)[] = []
       for (let i = 0; i < participants.length; i += CHUNK_SIZE) {
@@ -1336,7 +1267,6 @@ export default function AdminPage() {
 
       console.log(`[v0] 총 ${participants.length}명을 ${chunks.length}개 청크로 나누어 업로드 시작`)
 
-      // Upload each chunk
       let totalUploaded = 0
       for (let i = 0; i < chunks.length; i++) {
         const progress = Math.round(((i + 1) / chunks.length) * 100)
@@ -1363,11 +1293,7 @@ export default function AdminPage() {
         console.log(`[v0] 청크 ${i + 1}/${chunks.length} 완료: ${totalUploaded}/${participants.length}명 등록됨`)
       }
 
-      let successMessage = `${totalUploaded}명의 참여자가 성공적으로 등록되었습니다.`
-      if (duplicateEntries.length > 0) {
-        successMessage += ` (중복 ${duplicateEntries.length}건 제외)`
-        setDuplicates(duplicateEntries)
-      }
+      const successMessage = `${totalUploaded}명의 참여자가 성공적으로 등록되었습니다.`
 
       setParticipantSuccess(successMessage)
       setFile(null)
@@ -1430,7 +1356,6 @@ export default function AdminPage() {
     try {
       if (!supabase) return
 
-      // Fetch detailed responses with question information
       const { data, error } = await supabase
         .from("survey_responses")
         .select(`
@@ -1450,7 +1375,6 @@ export default function AdminPage() {
         return
       }
 
-      // Transform the data
       const details: DetailedQuestionResponse[] = (data || []).map((item: any) => ({
         question_number: item.survey_questions?.question_number || 0,
         question_text: item.survey_questions?.question_text || "",
@@ -1459,7 +1383,6 @@ export default function AdminPage() {
         response_text: item.response_text,
       }))
 
-      // Sort by question number
       details.sort((a, b) => a.question_number - b.question_number)
 
       setDetailedResponses(details)
@@ -1478,8 +1401,8 @@ export default function AdminPage() {
       survey.survey_questions?.map((q) => ({
         text: q.question_text,
         type: q.question_type || "objective",
-        scaleType: q.response_scale_type || "agreement", // scaleType 설정
-      })) || [{ text: "", type: "objective", scaleType: "agreement" }], // scaleType 초기화
+        scaleType: q.response_scale_type || "agreement",
+      })) || [{ text: "", type: "objective", scaleType: "agreement" }],
     )
     setShowEditModal(true)
   }
@@ -1509,8 +1432,7 @@ export default function AdminPage() {
         body: JSON.stringify({
           title: editTitle.trim(),
           description: editDescription.trim(),
-          // Pass questions with text, type, and responseScaleType
-          questions: validQuestions.map((q) => ({ text: q.text, type: q.type, responseScaleType: q.scaleType })), // responseScaleType 추가
+          questions: validQuestions.map((q) => ({ text: q.text, type: q.type, responseScaleType: q.scaleType })),
         }),
       })
 
@@ -1526,7 +1448,6 @@ export default function AdminPage() {
       setEditingSurvey(null)
       fetchSurveys()
       if (selectedSurvey?.id === editingSurvey?.id) {
-        // If the edited survey was the selected one, clear selection to refetch data
         setSelectedSurvey(null)
       }
     } catch (err) {
@@ -1584,7 +1505,7 @@ export default function AdminPage() {
     try {
       const response = await fetch(`/api/admin/surveys/${surveyId}`, {
         method: "DELETE",
-        signal: AbortSignal.timeout(900000), // 15 minutes for large datasets
+        signal: AbortSignal.timeout(900000),
       })
 
       const data = await response.json()
@@ -1610,7 +1531,7 @@ export default function AdminPage() {
   }
 
   const addEditQuestion = () => {
-    setEditQuestions([...editQuestions, { text: "", type: "objective", scaleType: "agreement" }]) // scaleType 추가
+    setEditQuestions([...editQuestions, { text: "", type: "objective", scaleType: "agreement" }])
   }
 
   const removeEditQuestion = (index: number) => {
@@ -1620,13 +1541,10 @@ export default function AdminPage() {
   }
 
   const updateEditQuestion = (index: number, field: "text" | "type" | "scaleType", value: string) => {
-    // scaleType 필드 추가
     const updated = [...editQuestions]
     updated[index][field] = value
     setEditQuestions(updated)
   }
-
-  // const filterParticipants = useCallback(() => { ... }, [...])
 
   const downloadStatsExcel = async () => {
     if (!selectedSurvey || responses.length === 0) {
@@ -1640,7 +1558,6 @@ export default function AdminPage() {
         return
       }
 
-      // Fetch all questions
       const { data: allQuestions, error: questionsError } = await supabase
         .from("survey_questions")
         .select("*")
@@ -1653,7 +1570,6 @@ export default function AdminPage() {
         return
       }
 
-      // Fetch all responses with participant info
       const { data: allResponses, error: responsesError } = await supabase
         .from("survey_responses")
         .select("question_id, response_value, response_text, participant_token")
@@ -1666,7 +1582,6 @@ export default function AdminPage() {
         return
       }
 
-      // Fetch all participants
       const participantTokens = [...new Set(allResponses?.map((r) => r.participant_token) || [])]
       const { data: allParticipants, error: participantsError } = await supabase
         .from("survey_participants")
@@ -1682,7 +1597,6 @@ export default function AdminPage() {
         return
       }
 
-      // Create participant map
       const participantMap = new Map(
         allParticipants?.map((p) => [
           p.token,
@@ -1692,7 +1606,6 @@ export default function AdminPage() {
             age: p.age,
             jurisdiction: p.jurisdiction,
             institution_name: p.institution_name,
-            // Changed 'type' to 'category' in the map
             category: p.category,
             inpatient_outpatient: p.inpatient_outpatient,
             qualification_type: p.qualification_type,
@@ -1700,7 +1613,6 @@ export default function AdminPage() {
         ]) || [],
       )
 
-      // Query 1: 객관식 문항별 통계
       const objectiveQuestions = allQuestions?.filter((q) => q.question_type === "objective") || []
       const objectiveStats = objectiveQuestions.map((q) => {
         const questionResponses = allResponses?.filter((r) => r.question_id === q.id && r.response_value != null) || []
@@ -1718,7 +1630,6 @@ export default function AdminPage() {
         }
       })
 
-      // Query 2: 병원별 통계
       const hospitalMap = new Map<string, { responses: number[]; count: number }>()
       allResponses?.forEach((r) => {
         const question = allQuestions?.find((q) => q.id === r.question_id)
@@ -1744,7 +1655,6 @@ export default function AdminPage() {
         }))
         .sort((a, b) => a.병원명.localeCompare(b.병원명))
 
-      // Query 3: 주관식 문항별 통계
       const subjectiveQuestions = allQuestions?.filter((q) => q.question_type === "subjective") || []
       const subjectiveStats = subjectiveQuestions.map((q) => {
         const questionResponses =
@@ -1756,12 +1666,10 @@ export default function AdminPage() {
         }
       })
 
-      // Query 5: 병원별 문항별 상세 통계
       const detailedStatsMap = new Map<string, any>()
       allQuestions?.forEach((q) => {
         const questionResponses = allResponses?.filter((r) => r.question_id === q.id) || []
 
-        // Group by hospital
         const hospitalResponseMap = new Map<string, any[]>()
         questionResponses.forEach((r) => {
           const hospitalName = participantMap.get(r.participant_token)?.hospital_name || "알 수 없음"
@@ -1797,7 +1705,6 @@ export default function AdminPage() {
         return hospitalCompare !== 0 ? hospitalCompare : a.문항번호 - b.문항번호
       })
 
-      // Query 6: 주관식 응답내용
       const subjectiveResponses =
         allResponses
           ?.filter((r) => {
@@ -1817,7 +1724,6 @@ export default function AdminPage() {
             return questionCompare !== 0 ? questionCompare : a.병원명.localeCompare(b.병원명)
           }) || []
 
-      // Build Excel data
       const basicStats = [
         ["통계 항목", "값"],
         ["설문지 제목", selectedSurvey.title],
@@ -1921,7 +1827,6 @@ export default function AdminPage() {
         fetchAnalysisData(selectedSurvey.id),
       ])
     } catch (err) {
-      // Consider adding a general error state for refresh if needed
       console.error("Refresh error:", err)
       alert("데이터 새로고침 중 오류가 발생했습니다.")
     } finally {
@@ -1950,16 +1855,13 @@ export default function AdminPage() {
   }, [selectedSurvey])
 
   useEffect(() => {
-    // This effect is now tied to the fetchParticipants call, which is in the main useEffect.
-    // We need to ensure pages reset correctly when filters change.
     setParticipantsPage(1)
-  }, [hospitalFilter, statusFilter, filteredParticipantsCount]) // Depend on filteredParticipantsCount to re-evaluate pages
+  }, [hospitalFilter, statusFilter, filteredParticipantsCount])
 
   useEffect(() => {
     setResponsesPage(1)
   }, [responses.length])
 
-  // Initialize subjective response pagination states based on fetched question stats
   useEffect(() => {
     const initialSubjectivePages: Record<number, number> = {}
     const initialSubjectivePerPage: Record<number, number> = {}
@@ -1971,7 +1873,7 @@ export default function AdminPage() {
       })
     setSubjectiveResponsesPage(initialSubjectivePages)
     setSubjectiveResponsesPerPage(initialSubjectivePerPage)
-  }, [questionStats]) // Re-run when questionStats change
+  }, [questionStats])
 
   if (!isAuthenticated) {
     return (
@@ -2003,7 +1905,6 @@ export default function AdminPage() {
                   required
                 />
               </div>
-              {/* Replaced generic error state with specific login error handling */}
               {password !== ADMIN_PASSWORD && password !== "" && (
                 <Alert className="border-red-200 bg-red-50">
                   <AlertDescription className="text-red-700">비밀번호가 올바르지 않습니다.</AlertDescription>
@@ -2033,9 +1934,9 @@ export default function AdminPage() {
               onClick={handleRefresh}
               variant="outline"
               className="flex items-center gap-2 bg-transparent"
-              disabled={loading} // Use loading state
+              disabled={loading}
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> {/* Use actual loading state */}
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
               새로고침
             </Button>
             <Button onClick={() => setIsAuthenticated(false)} variant="outline" className="text-lg px-6 py-2">
@@ -2085,7 +1986,7 @@ export default function AdminPage() {
                       value={newSurvey.title}
                       onChange={(e) => setNewSurvey({ ...newSurvey, title: e.target.value })}
                       className="mt-2 h-12 text-lg"
-                      placeholder="예: 2024년 병원 만족도 조사"
+                      placeholder="예: 2025년 병원 만족도 조사"
                     />
                   </div>
 
@@ -2176,7 +2077,7 @@ export default function AdminPage() {
 
                   <Button
                     onClick={handleCreateSurvey}
-                    disabled={createLoading} // Use createLoading
+                    disabled={createLoading}
                     className="w-full h-12 text-lg font-semibold bg-green-600 hover:bg-green-700"
                   >
                     {createLoading ? "생성 중..." : "설문지 생성"}
@@ -2206,7 +2107,7 @@ export default function AdminPage() {
                   <CardDescription className="text-lg">생성된 설문지를 확인하고 관리하세요</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {loading ? ( // Use loading state
+                  {loading ? (
                     <div className="text-center py-8">
                       <p className="text-xl">데이터를 불러오는 중...</p>
                     </div>
@@ -2322,7 +2223,7 @@ export default function AdminPage() {
                         />
                       </div>
 
-                      {file && ( // Check if file state is not null
+                      {file && (
                         <div className="p-4 bg-blue-50 rounded-lg">
                           <p className="text-lg font-medium text-blue-800">선택된 파일:</p>
                           <p className="text-lg text-blue-600">{file.name}</p>
@@ -2332,13 +2233,13 @@ export default function AdminPage() {
 
                       <Button
                         onClick={handleUpload}
-                        disabled={!file || isUploading} // Use isUploading state
+                        disabled={!file || isUploading}
                         className="w-full h-12 text-lg font-semibold bg-green-600 hover:bg-green-700 disabled:bg-gray-400"
                       >
                         {isUploading ? "업로드 중..." : "CSV 파일 업로드"}
                       </Button>
 
-                      {uploadProgress > 0 && ( // Show progress bar only if uploadProgress is greater than 0
+                      {uploadProgress > 0 && (
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm text-gray-600">
                             <span>진행률</span>
@@ -2362,7 +2263,7 @@ export default function AdminPage() {
                         </Alert>
                       )}
 
-                      {duplicates.length > 0 && ( // Use duplicates state
+                      {duplicates.length > 0 && (
                         <Alert className="border-yellow-200 bg-yellow-50 mt-4">
                           <AlertCircle className="h-5 w-5 text-yellow-600" />
                           <AlertDescription>
@@ -2378,18 +2279,13 @@ export default function AdminPage() {
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {duplicates.map(
-                                      (
-                                        dup,
-                                        index, // Use duplicates map
-                                      ) => (
-                                        <tr key={index} className="border-t border-yellow-200">
-                                          <td className="px-2 py-1">{dup.institution}</td>
-                                          <td className="px-2 py-1">{dup.name}</td>
-                                          <td className="px-2 py-1">{dup.phone}</td>
-                                        </tr>
-                                      ),
-                                    )}
+                                    {duplicates.map((dup, index) => (
+                                      <tr key={index} className="border-t border-yellow-200">
+                                        <td className="px-2 py-1">{dup.institution}</td>
+                                        <td className="px-2 py-1">{dup.name}</td>
+                                        <td className="px-2 py-1">{dup.phone}</td>
+                                      </tr>
+                                    ))}
                                   </tbody>
                                 </table>
                               </div>
@@ -2448,7 +2344,7 @@ export default function AdminPage() {
                   <div className="text-center py-8">
                     <p className="text-xl text-gray-500">설문지를 선택해주세요</p>
                   </div>
-                ) : loading ? ( // Use loading state
+                ) : loading ? (
                   <div className="text-center py-8">
                     <p className="text-xl">데이터를 불러오는 중...</p>
                   </div>
@@ -2479,7 +2375,7 @@ export default function AdminPage() {
                         <select
                           value={statusFilter}
                           onChange={(e) => {
-                            setStatusFilter(e.target.value as "all" | "completed" | "incomplete") // Type assertion
+                            setStatusFilter(e.target.value as "all" | "completed" | "incomplete")
                             setParticipantsPage(1)
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -2493,7 +2389,7 @@ export default function AdminPage() {
                         <Button
                           onClick={downloadParticipantsExcel}
                           className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white"
-                          disabled={participants.length === 0 || isDownloading} // Check participants length
+                          disabled={participants.length === 0 || isDownloading}
                         >
                           {isDownloading ? (
                             <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -2517,11 +2413,11 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {filteredParticipantsCount === 0 ? ( // Use filteredParticipantsCount for check
+                    {filteredParticipantsCount === 0 ? (
                       <div className="text-center py-8">
                         <p className="text-xl text-gray-500">등록된 참여자가 없습니다</p>
                       </div>
-                    ) : participants.length === 0 ? ( // Check participants length
+                    ) : participants.length === 0 ? (
                       <div className="text-center py-8">
                         <p className="text-xl text-gray-500">검색 결과가 없습니다</p>
                         <p className="text-sm text-gray-400 mt-2">다른 검색어를 입력하거나 필터를 초기화해주세요</p>
@@ -2636,7 +2532,6 @@ export default function AdminPage() {
                             </tbody>
                           </table>
                         </div>
-                        {/* pagination */}
                         <div className="flex justify-between items-center mt-4">
                           <div className="text-sm text-gray-600">
                             페이지 {participantsPage} /{" "}
@@ -2694,7 +2589,7 @@ export default function AdminPage() {
                   <div className="text-center py-8">
                     <p className="text-xl text-gray-500">설문지를 선택해주세요</p>
                   </div>
-                ) : loading ? ( // Use loading state
+                ) : loading ? (
                   <div className="text-center py-8">
                     <p className="text-xl">데이터를 불러오는 중...</p>
                   </div>
@@ -2908,7 +2803,6 @@ export default function AdminPage() {
                 </Card>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Gender Analysis */}
                   {analysisData.gender.length > 0 && (
                     <Card>
                       <CardHeader>
@@ -2943,7 +2837,6 @@ export default function AdminPage() {
                     </Card>
                   )}
 
-                  {/* Age Analysis */}
                   {analysisData.age.length > 0 && (
                     <Card>
                       <CardHeader>
@@ -3010,7 +2903,6 @@ export default function AdminPage() {
                     </Card>
                   )}
 
-                  {/* Jurisdiction Analysis */}
                   {analysisData.jurisdiction.length > 0 && (
                     <Card>
                       <CardHeader>
@@ -3075,7 +2967,6 @@ export default function AdminPage() {
                     </Card>
                   )}
 
-                  {/* Type Analysis */}
                   {analysisData.category.length > 0 && (
                     <Card>
                       <CardHeader>
@@ -3113,7 +3004,6 @@ export default function AdminPage() {
                     </Card>
                   )}
 
-                  {/* Inpatient/Outpatient Analysis */}
                   {analysisData.inpatientOutpatient.length > 0 && (
                     <Card>
                       <CardHeader>
@@ -3148,7 +3038,6 @@ export default function AdminPage() {
                     </Card>
                   )}
 
-                  {/* Qualification Type Analysis */}
                   {analysisData.qualificationType.length > 0 && (
                     <Card>
                       <CardHeader>
@@ -3327,7 +3216,7 @@ export default function AdminPage() {
                 취소
               </AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => deleteSurvey(surveyToDelete!.id)} // Use deleteSurvey function with surveyId
+                onClick={() => deleteSurvey(surveyToDelete!.id)}
                 disabled={deleteLoading}
                 className="bg-red-600 hover:bg-red-700"
               >
