@@ -54,6 +54,7 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts"
+import JSZip from "jszip"
 
 const ADMIN_PASSWORD = "bohun#1234"
 
@@ -247,11 +248,6 @@ export default function AdminPage() {
       const confirmed = confirm(
         `참여자가 ${totalParticipantsCount.toLocaleString()}명으로 대용량입니다.\n\n` +
           `다운로드에 시간이 오래 걸리거나 실패할 수 있습니다.\n\n` +
-          `대안: Supabase SQL Editor에서 다음 쿼리를 실행하세요:\n\n` +
-          `COPY (SELECT participant_name AS "참여자명", phone_number AS "휴대폰번호", ` +
-          `hospital_name AS "병원명", token AS "토큰" ` +
-          `FROM survey_participants WHERE survey_id = ${selectedSurvey.id}) ` +
-          `TO STDOUT WITH CSV HEADER;\n\n` +
           `그래도 다운로드를 시도하시겠습니까?`,
       )
       if (!confirmed) return
@@ -260,107 +256,134 @@ export default function AdminPage() {
     setIsDownloading(true)
 
     try {
-      const allParticipants: any[] = []
-      const batchSize = 1000
-      let offset = 0
-      let consecutiveErrors = 0
-      const maxConsecutiveErrors = 3
-      console.log(`[v0] Starting download of ${totalParticipantsCount} participants...`)
+      console.log(`[v0] Starting download process for survey ${selectedSurvey.id}...`)
 
-      while (offset < totalParticipantsCount) {
-        try {
-          const { data, error } = await supabase
-            .from("survey_participants")
-            .select("participant_name, phone_number, hospital_name, token")
-            .eq("survey_id", selectedSurvey.id)
-            .range(offset, offset + batchSize - 1)
-            .order("created_at", { ascending: true })
+      // Step 1: 최대 중복 횟수 조회
+      const { data: maxNumData, error: maxNumError } = await supabase.rpc("get_max_phone_duplicate", {
+        p_survey_id: selectedSurvey.id,
+      })
 
-          if (error) {
-            console.error(`[v0] Error fetching batch at offset ${offset}:`, error)
-            consecutiveErrors++
+      if (maxNumError) {
+        console.error("[v0] Error getting max duplicate count:", maxNumError)
 
-            if (consecutiveErrors >= maxConsecutiveErrors) {
-              throw new Error(`연속 ${maxConsecutiveErrors}회 오류 발생. 다운로드를 중단합니다.`)
+        // RPC 함수가 없는 경우 직접 쿼리
+        const { data: allParticipants, error: fetchError } = await supabase
+          .from("survey_participants")
+          .select("id, token, phone_number")
+          .eq("survey_id", selectedSurvey.id)
+          .order("id", { ascending: true })
+
+        if (fetchError) throw fetchError
+
+        // 클라이언트에서 ROW_NUMBER 계산
+        const phoneGroups = new Map<string, Array<{ token: string; phone_number: string; num: number }>>()
+
+        allParticipants?.forEach((participant) => {
+          const phone = participant.phone_number || ""
+          if (!phoneGroups.has(phone)) {
+            phoneGroups.set(phone, [])
+          }
+          const group = phoneGroups.get(phone)!
+          group.push({
+            token: participant.token,
+            phone_number: participant.phone_number,
+            num: group.length + 1,
+          })
+        })
+
+        const maxNum = Math.max(...Array.from(phoneGroups.values()).map((group) => group.length))
+        console.log(`[v0] Max duplicate count: ${maxNum}`)
+
+        // ZIP 파일 생성
+        const zip = new JSZip()
+
+        for (let num = 1; num <= maxNum; num++) {
+          const contacts: Array<{ token: string; phone_number: string }> = []
+
+          phoneGroups.forEach((group) => {
+            const participant = group.find((p) => p.num === num)
+            if (participant) {
+              contacts.push({
+                token: participant.token,
+                phone_number: participant.phone_number,
+              })
             }
+          })
 
-            await new Promise((resolve) => setTimeout(resolve, 1000))
-            continue
+          if (contacts.length > 0) {
+            const csvContent = ["토큰,휴대폰번호", ...contacts.map((c) => `${c.token},${c.phone_number}`)].join("\n")
+
+            const BOM = "\uFEFF"
+            zip.file(`contacts_${num}.csv`, BOM + csvContent)
+            console.log(`[v0] Created file ${num} with ${contacts.length} contacts`)
           }
+        }
 
-          if (data) {
-            allParticipants.push(...data)
-            consecutiveErrors = 0
-            console.log(`[v0] Downloaded ${allParticipants.length}/${totalParticipantsCount} participants`)
-          }
+        // ZIP 다운로드
+        const zipBlob = await zip.generateAsync({ type: "blob" })
+        const link = document.createElement("a")
+        const url = URL.createObjectURL(zipBlob)
+        link.setAttribute("href", url)
+        link.setAttribute("download", `${selectedSurvey.title}_연락처_${new Date().toISOString().split("T")[0]}.zip`)
+        link.style.visibility = "hidden"
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
 
-          offset += batchSize
+        alert(`${maxNum}개 파일로 분리하여 다운로드했습니다.\n(총 ${totalParticipantsCount}명)`)
+        return
+      }
 
-          if (offset < totalParticipantsCount) {
-            await new Promise((resolve) => setTimeout(resolve, 100))
-          }
-        } catch (batchError) {
-          console.error(`[v0] Batch error at offset ${offset}:`, batchError)
-          consecutiveErrors++
+      const maxNum = maxNumData || 1
+      console.log(`[v0] Max duplicate count: ${maxNum}`)
 
-          if (consecutiveErrors >= maxConsecutiveErrors) {
-            throw batchError
-          }
+      // Step 2: 각 num별로 파일 생성
+      const zip = new JSZip()
 
-          await new Promise((resolve) => setTimeout(resolve, 1000))
+      for (let num = 1; num <= maxNum; num++) {
+        console.log(`[v0] Processing file ${num}/${maxNum}...`)
+
+        const { data: contacts, error: contactsError } = await supabase.rpc("get_contacts_by_duplicate_num", {
+          p_survey_id: selectedSurvey.id,
+          p_num: num,
+        })
+
+        if (contactsError) {
+          console.error(`[v0] Error fetching contacts for num ${num}:`, contactsError)
+          continue
+        }
+
+        if (contacts && contacts.length > 0) {
+          const csvContent = ["토큰,휴대폰번호", ...contacts.map((c: any) => `${c.token},${c.phone_number}`)].join("\n")
+
+          const BOM = "\uFEFF"
+          zip.file(`contacts_${num}.csv`, BOM + csvContent)
+          console.log(`[v0] Created file ${num} with ${contacts.length} contacts`)
+        }
+
+        // Rate limiting 방지
+        if (num < maxNum) {
+          await new Promise((resolve) => setTimeout(resolve, 100))
         }
       }
 
-      console.log(`[v0] Successfully downloaded ${allParticipants.length} participants`)
-
-      const excelData = allParticipants.map((participant) => ({
-        참여자명: participant.participant_name,
-        휴대폰번호: participant.phone_number,
-        병원명: participant.hospital_name,
-        설문링크: `${window.location.origin}/${participant.token}`,
-      }))
-
-      const headers = Object.keys(excelData[0])
-      const csvContent = [
-        headers.join(","),
-        ...excelData.map((row) =>
-          headers
-            .map((header) => {
-              const value = row[header as keyof typeof row]
-              return typeof value === "string" && (value.includes(",") || value.includes('"'))
-                ? `"${value.replace(/"/g, '""')}"`
-                : value
-            })
-            .join(","),
-        ),
-      ].join("\n")
-
-      const BOM = "\uFEFF"
-      const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" })
+      // Step 3: ZIP 파일 다운로드
+      console.log(`[v0] Generating ZIP file...`)
+      const zipBlob = await zip.generateAsync({ type: "blob" })
 
       const link = document.createElement("a")
-      const url = URL.createObjectURL(blob)
+      const url = URL.createObjectURL(zipBlob)
       link.setAttribute("href", url)
-      link.setAttribute(
-        "download",
-        `${selectedSurvey.title}_참여자연락처_${new Date().toISOString().split("T")[0]}.csv`,
-      )
+      link.setAttribute("download", `${selectedSurvey.title}_연락처_${new Date().toISOString().split("T")[0]}.zip`)
       link.style.visibility = "hidden"
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
 
-      alert(`${allParticipants.length}명의 연락처를 다운로드했습니다.`)
+      alert(`${maxNum}개 파일로 분리하여 다운로드했습니다.\n(총 ${totalParticipantsCount}명)`)
     } catch (error) {
       console.error("[v0] Error downloading participants:", error)
-      alert(
-        `연락처 다운로드 중 오류가 발생했습니다.\n\n` +
-          `대용량 데이터의 경우 Supabase SQL Editor를 사용하세요:\n\n` +
-          `COPY (SELECT participant_name AS "참여자명", phone_number AS "휴대폰번호", ` +
-          `hospital_name AS "병원명", token AS "토큰" ` +
-          `FROM survey_participants WHERE survey_id = ${selectedSurvey?.id}) ` +
-          `TO STDOUT WITH CSV HEADER;`,
-      )
+      alert(`연락처 다운로드 중 오류가 발생했습니다.\n\n${error instanceof Error ? error.message : "알 수 없는 오류"}`)
     } finally {
       setIsDownloading(false)
     }
@@ -1986,7 +2009,7 @@ export default function AdminPage() {
                       value={newSurvey.title}
                       onChange={(e) => setNewSurvey({ ...newSurvey, title: e.target.value })}
                       className="mt-2 h-12 text-lg"
-                      placeholder="예: 2025년 병원 만족도 조사"
+                      placeholder="예: 2024년 병원 만족도 조사"
                     />
                   </div>
 
@@ -2143,7 +2166,7 @@ export default function AdminPage() {
                               >
                                 {survey.is_active ? "활성" : "비활성"}
                               </span>
-                              {/* <Button
+                              <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleEditSurvey(survey)
@@ -2154,7 +2177,7 @@ export default function AdminPage() {
                               >
                                 <Edit className="w-3 h-3 mr-1" />
                                 수정
-                              </Button> */}
+                              </Button>
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation()
